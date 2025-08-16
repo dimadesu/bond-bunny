@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:fillViewport="true"
+  android:scrollbars="vertical"
+  android:fadeScrollbars="true"
+  android:scrollbarStyle="insideOverlay">
+
+<LinearLayout
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical"
+  android:padding="16dp"
+  android:paddingBottom="24dp">
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="SRT to SRTLA Bonding App"
+      android:layout_marginBottom="4dp" />
+
+  <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="The purpose of this app is to use multiple connections of this device, such as cellular, Wi-Fi, and Ethernet, at the same time to send SRT data packets in parallel to the SRTLA server, a process also known as bonding."
+      android:textSize="12sp"
+      android:layout_marginBottom="4dp" />
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="This app will listen for SRT data packets on the port you specify (6000 by default), and forward them to the SRTLA server."
+      android:textSize="12sp"
+      android:layout_marginBottom="4dp" />
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Configure your livestreaming app to send SRT to the localhost or device's IP address."
+      android:textSize="12sp"
+      android:layout_marginBottom="4dp" />
+
+  <ScrollView
+      android:layout_width="match_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1"
+      android:layout_marginBottom="4dp">
+
+    <TextView
+        android:id="@+id/text_networks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Available Networks:\nScanning..."
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:padding="8dp"
+        android:background="#f0f0f0" />
+
+  </ScrollView>
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Local Listen Port:"
+      android:layout_marginBottom="4dp" />
+
+  <EditText
+      android:id="@+id/edit_listen_port"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="6000 (SRT client connects here)"
+      android:inputType="number"
+      android:layout_marginBottom="12dp" />
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Stream ID is only used here for building SRT URL.\nYour streaming app must send it."
+      android:layout_marginBottom="4dp" />
+
+  <EditText
+      android:id="@+id/edit_stream_id"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="yourStreamId (will be added to SRT URLs)"
+      android:inputType="text"
+      android:layout_marginBottom="16dp" />
+
+  <!-- SRT URL Generator Section -->
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="📺 SRT URLs for your streaming app:"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:layout_marginBottom="8dp" />
+
+  <TextView
+    android:id="@+id/text_srt_url_localhost"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="srt://localhost:6000"
+    android:textSize="14sp"
+    android:fontFamily="monospace"
+    android:padding="8dp"
+    android:background="#e8f5e8"
+    android:layout_marginBottom="4dp"
+    android:selectAllOnFocus="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true" />
+
+  <TextView
+    android:id="@+id/text_srt_url_wifi"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="srt://192.168.1.xxx:6000"
+    android:textSize="14sp"
+    android:fontFamily="monospace"
+    android:padding="8dp"
+    android:background="#e3f2fd"
+    android:layout_marginBottom="16dp"
+    android:selectAllOnFocus="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true" />
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp">
+
+    <Button
+        android:id="@+id/button_copy_localhost"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:layout_weight="1"
+        android:text="📋 Copy Localhost URL"
+        android:textSize="12sp"
+        android:layout_marginEnd="4dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="4dp" />
+
+    <Button
+        android:id="@+id/button_copy_wifi"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:layout_weight="1"
+        android:text="📋 Copy WiFi URL"
+        android:textSize="12sp"
+        android:layout_marginStart="4dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="4dp" />
+
+  </LinearLayout>
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="SRTLA Server:"
+      android:layout_marginBottom="4dp" />
+
+  <EditText
+      android:id="@+id/edit_server_host"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="10.0.0.1"
+      android:inputType="text"
+      android:layout_marginBottom="12dp" />
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="SRTLA Server Port:"
+      android:layout_marginBottom="4dp" />
+
+  <EditText
+      android:id="@+id/edit_server_port"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="5000"
+      android:inputType="number"
+      android:layout_marginBottom="12dp" />
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="24dp">
+
+    <Button
+        android:id="@+id/button_start"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Start Service"
+        android:layout_marginEnd="8dp" />
+
+    <Button
+        android:id="@+id/button_stop"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Stop Service"
+        android:layout_marginStart="8dp"
+        android:enabled="false" />
+
+  </LinearLayout>
+
+  <TextView
+    android:id="@+id/text_status"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Status: Stopped"
+    android:textSize="16sp"
+    android:layout_marginBottom="16dp" />
+  <!-- Connection Statistics Section -->
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="📊 Connection Statistics:"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:layout_marginBottom="8dp" />
+
+  <TextView
+    android:id="@+id/text_connection_stats"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="No active connections"
+    android:textSize="14sp"
+    android:fontFamily="monospace"
+    android:padding="12dp"
+    android:background="#e8f5e8"
+    android:layout_marginBottom="16dp" />
+
+  <!-- Connection Windows Visualization -->
+  <TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="📈 Connection Windows:"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:layout_marginBottom="8dp" />
+
+  <com.example.srtla.ConnectionWindowView
+    android:id="@+id/connection_window_view"
+    android:layout_width="match_parent"
+    android:layout_height="200dp"
+    android:layout_marginBottom="16dp"
+    android:background="#ffffff"
+    android:elevation="2dp" />
+
+</LinearLayout>
+
+</ScrollView>
