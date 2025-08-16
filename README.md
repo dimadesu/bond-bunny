@@ -7,3 +7,5 @@ This is compatible with any apps that can stream SRT and it essentially extends 
 Android implementation of [SRTLA](https://github.com/BELABOX/srtla).
 
 Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblink](https://github.com/eerimoq/moblink).
+
+Discord https://discord.gg/naWvw9kr
