@@ -10,4 +10,12 @@ Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblin
 
 Discord https://discord.gg/naWvw9kr
 
+#### Apps that can stream SRT on Android:
+- IRL Pro (free)
+- Larix Broadcaster (subscription)
+- Larix Screencaster (subscription)
+- Can do HDMI/USB/UVC as input:
+  - USB Camera (free with ads) / USB Camera Pro (one-time payment to remove ads)
+  - CameraFi (free version with ads or subscription)
+
 ![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
