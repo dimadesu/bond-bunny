@@ -504,7 +504,7 @@ public class MainActivity extends Activity {
     
     private void updateStickinessButtonText() {
         if (stickinessEnabled) {
-            buttonToggleStickiness.setText("ON (500ms)");
+            buttonToggleStickiness.setText("ON");
             buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 getResources().getColor(android.R.color.holo_green_light)));
         } else {
