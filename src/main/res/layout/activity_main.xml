@@ -191,7 +191,7 @@
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
 
-    <!-- Connection Stickiness Toggle -->
+    <!-- Classic SRTLA Algorithm Toggle -->
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -203,11 +203,37 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Connection stickiness\nPrevents frequent network switching.\nUses selected network for at least 500ms."
+        android:text="Classic SRTLA algorithm\nDisables all enhancements.\nMatches original srtla_send logic."
         android:textSize="12sp" />
 
       <Button
-        android:id="@+id/button_toggle_stickiness"
+        android:id="@+id/button_toggle_classic_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OFF"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+        android:backgroundTint="@android:color/holo_red_light" />
+
+    </LinearLayout>
+
+    <!-- Network Priority Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Network priority scaling\nPrefers WiFi over Cellular.\nBoosts stable connections."
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_network_priority"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="ON"
@@ -243,32 +269,6 @@
 
     </LinearLayout>
 
-    <!-- Network Priority Toggle -->
-    <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:layout_marginBottom="8dp"
-      android:gravity="center_vertical">
-
-      <TextView
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Network priority scaling\nPrefers WiFi over Cellular.\nBoosts stable connections."
-        android:textSize="12sp" />
-
-      <Button
-        android:id="@+id/button_toggle_network_priority"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="ON"
-        android:textSize="12sp"
-        android:minWidth="100dp"
-        android:backgroundTint="@android:color/holo_green_light" />
-
-    </LinearLayout>
-
     <!-- Connection Exploration Toggle -->
     <LinearLayout
       android:layout_width="match_parent"
@@ -295,7 +295,7 @@
 
     </LinearLayout>
 
-    <!-- Classic SRTLA Algorithm Toggle -->
+    <!-- Connection Stickiness Toggle -->
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -307,17 +307,17 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Classic SRTLA Algorithm\nDisables all enhancements.\nMatches original srtla_send.c exactly."
+        android:text="Connection stickiness\nPrevents frequent network switching.\nUses selected network for at least 500ms."
         android:textSize="12sp" />
 
       <Button
-        android:id="@+id/button_toggle_classic_mode"
+        android:id="@+id/button_toggle_stickiness"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="OFF"
+        android:text="ON"
         android:textSize="12sp"
         android:minWidth="100dp"
-        android:backgroundTint="@android:color/holo_red_light" />
+        android:backgroundTint="@android:color/holo_green_light" />
 
     </LinearLayout>
 
