@@ -10,7 +10,18 @@ Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblin
 
 Discord https://discord.gg/naWvw9kr
 
-#### Apps that can stream SRT on Android:
+## Installation Instructions
+
+Not sure yet when app will be ready for publishing to Google Play store if ever.
+
+For now I'll be publishing .apk files periodically via GitHub releases on this repo.
+
+- Open https://github.com/dimadesu/bond-bunny/releases on the device that you want to install it on
+- Download .apk file
+- Install
+- Enjoy!
+
+## Apps that can stream SRT on Android
 - IRL Pro (free)
 - Larix Broadcaster (subscription)
 - Larix Screencaster (subscription)
