@@ -87,7 +87,7 @@ public class EnhancedSrtlaService extends Service {
     private static boolean qualityScoringEnabled = true; // Enable NAK-based quality scoring
     private static boolean networkPriorityEnabled = true; // Enable network type priority scaling
     private static boolean explorationEnabled = true; // Enable connection exploration
-    private static boolean cStyleMode = false; // Pure C SRTLA mode (disables all enhancements)
+    private static boolean classicMode = false; // Classic SRTLA algorithm mode (disables all enhancements)
     private SrtlaConnection lastSelectedConnection = null;
     
     // Smart reconnection management (moblink-inspired)
@@ -390,8 +390,8 @@ public class EnhancedSrtlaService extends Service {
         int inFlight = connection.getInFlightPackets();
         int baseScore = window / (inFlight + 1);
         
-        // In pure C SRTLA mode, return just the base score
-        if (cStyleMode) {
+        // In classic SRTLA mode, return just the base score
+        if (classicMode) {
             return baseScore;
         }
         
@@ -1334,20 +1334,20 @@ public class EnhancedSrtlaService extends Service {
     }
     
     /**
-     * Enable or disable C-style mode (pure C SRTLA compatibility)
-     * @param enabled true for pure C mode, false for enhanced Android mode
+     * Enable or disable classic SRTLA algorithm mode (pure C SRTLA compatibility)
+     * @param enabled true for classic mode, false for enhanced Android mode
      */
-    public static void setCStyleMode(boolean enabled) {
-        cStyleMode = enabled;
-        SrtlaLogger.info("EnhancedSrtlaService", "C-style mode " + (enabled ? "enabled" : "disabled"));
+    public static void setClassicMode(boolean enabled) {
+        classicMode = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "Classic SRTLA algorithm " + (enabled ? "enabled" : "disabled"));
     }
     
     /**
-     * Get current C-style mode state
-     * @return true if C-style mode is enabled
+     * Get current classic mode state
+     * @return true if classic mode is enabled
      */
-    public static boolean isCStyleMode() {
-        return cStyleMode;
+    public static boolean isClassicMode() {
+        return classicMode;
     }
     
     private SrtlaConnection getLastSelectedConnection() {

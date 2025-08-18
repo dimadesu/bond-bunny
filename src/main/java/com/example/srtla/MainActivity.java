@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
     private static final String PREF_QUALITY_SCORING_ENABLED = "quality_scoring_enabled";
     private static final String PREF_NETWORK_PRIORITY_ENABLED = "network_priority_enabled";
     private static final String PREF_EXPLORATION_ENABLED = "exploration_enabled";
-    private static final String PREF_C_STYLE_MODE = "c_style_mode";
+    private static final String PREF_CLASSIC_MODE = "classic_mode";
     
     private EditText editSrtlaReceiverHost;
     private EditText editSrtlaReceiverPort;
@@ -54,14 +54,14 @@ public class MainActivity extends Activity {
     private Button buttonToggleQualityScoring;
     private Button buttonToggleNetworkPriority;
     private Button buttonToggleExploration;
-    private Button buttonToggleCStyle;
+    private Button buttonToggleClassicMode;
     private ConnectivityManager connectivityManager;
     private boolean serviceRunning = false;
     private boolean stickinessEnabled = true; // Default to enabled
     private boolean qualityScoringEnabled = true; // Default to enabled
     private boolean networkPriorityEnabled = true; // Default to enabled  
     private boolean explorationEnabled = true; // Default to enabled
-    private boolean cStyleMode = false; // Default to enhanced mode
+    private boolean classicMode = false; // Default to enhanced mode
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -114,7 +114,7 @@ public class MainActivity extends Activity {
         buttonToggleQualityScoring = findViewById(R.id.button_toggle_quality_scoring);
         buttonToggleNetworkPriority = findViewById(R.id.button_toggle_network_priority);
         buttonToggleExploration = findViewById(R.id.button_toggle_exploration);
-        buttonToggleCStyle = findViewById(R.id.button_toggle_c_style);
+        buttonToggleClassicMode = findViewById(R.id.button_toggle_classic_mode);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
         buttonToggleQualityScoring.setOnClickListener(v -> toggleQualityScoring());
         buttonToggleNetworkPriority.setOnClickListener(v -> toggleNetworkPriority());
         buttonToggleExploration.setOnClickListener(v -> toggleExploration());
-        buttonToggleCStyle.setOnClickListener(v -> toggleCStyleMode());
+        buttonToggleClassicMode.setOnClickListener(v -> toggleClassicMode());
         updateAdvancedFeatureButtons();
         
         // Add text watchers to update SRT URLs when port or stream ID changes
@@ -216,7 +216,7 @@ public class MainActivity extends Activity {
         EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
         EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
         EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-        EnhancedSrtlaService.setCStyleMode(cStyleMode);
+        EnhancedSrtlaService.setClassicMode(classicMode);
         
         updateUI();
         startStatsUpdates();
@@ -439,7 +439,7 @@ public class MainActivity extends Activity {
         qualityScoringEnabled = prefs.getBoolean(PREF_QUALITY_SCORING_ENABLED, true);
         networkPriorityEnabled = prefs.getBoolean(PREF_NETWORK_PRIORITY_ENABLED, true);
         explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, true);
-        cStyleMode = prefs.getBoolean(PREF_C_STYLE_MODE, false);
+        classicMode = prefs.getBoolean(PREF_CLASSIC_MODE, false);
         
         editSrtlaReceiverHost.setText(savedHost);
         editSrtlaReceiverPort.setText(savedSrtlaPort);
@@ -461,7 +461,7 @@ public class MainActivity extends Activity {
         editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);
         editor.putBoolean(PREF_NETWORK_PRIORITY_ENABLED, networkPriorityEnabled);
         editor.putBoolean(PREF_EXPLORATION_ENABLED, explorationEnabled);
-        editor.putBoolean(PREF_C_STYLE_MODE, cStyleMode);
+        editor.putBoolean(PREF_CLASSIC_MODE, classicMode);
         
         editor.apply();
     }
@@ -589,20 +589,20 @@ public class MainActivity extends Activity {
         }
     }
     
-    private void toggleCStyleMode() {
-        cStyleMode = !cStyleMode;
+    private void toggleClassicMode() {
+        classicMode = !classicMode;
         updateAdvancedFeatureButtons();
         savePreferences();
         
-        // C-style mode overrides all other settings
-        if (cStyleMode) {
-            // When enabling C-style, disable all enhancements
+        // Classic mode overrides all other settings
+        if (classicMode) {
+            // When enabling classic mode, disable all enhancements
             qualityScoringEnabled = false;
             networkPriorityEnabled = false;
             explorationEnabled = false;
             stickinessEnabled = false;
         } else {
-            // When disabling C-style, restore enhanced defaults
+            // When disabling classic mode, restore enhanced defaults
             qualityScoringEnabled = true;
             networkPriorityEnabled = true;
             explorationEnabled = true;
@@ -612,31 +612,31 @@ public class MainActivity extends Activity {
         updateAdvancedFeatureButtons();
         
         if (serviceRunning) {
-            EnhancedSrtlaService.setCStyleMode(cStyleMode);
+            EnhancedSrtlaService.setClassicMode(classicMode);
             EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
             EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
             EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
             EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
             
             Toast.makeText(this, 
-                cStyleMode ? "Pure C SRTLA mode enabled - all enhancements disabled" : 
+                classicMode ? "Classic SRTLA algorithm enabled - all enhancements disabled" : 
                            "Enhanced Android mode enabled - all features restored", 
                 Toast.LENGTH_LONG).show();
         }
     }
     
     private void updateAdvancedFeatureButtons() {
-        updateButtonState(buttonToggleStickiness, stickinessEnabled && !cStyleMode);
-        updateButtonState(buttonToggleQualityScoring, qualityScoringEnabled && !cStyleMode);
-        updateButtonState(buttonToggleNetworkPriority, networkPriorityEnabled && !cStyleMode);
-        updateButtonState(buttonToggleExploration, explorationEnabled && !cStyleMode);
-        updateButtonState(buttonToggleCStyle, cStyleMode);
+        updateButtonState(buttonToggleStickiness, stickinessEnabled && !classicMode);
+        updateButtonState(buttonToggleQualityScoring, qualityScoringEnabled && !classicMode);
+        updateButtonState(buttonToggleNetworkPriority, networkPriorityEnabled && !classicMode);
+        updateButtonState(buttonToggleExploration, explorationEnabled && !classicMode);
+        updateButtonState(buttonToggleClassicMode, classicMode);
         
-        // Disable individual feature buttons when in C-style mode
-        buttonToggleStickiness.setEnabled(!cStyleMode);
-        buttonToggleQualityScoring.setEnabled(!cStyleMode);
-        buttonToggleNetworkPriority.setEnabled(!cStyleMode);
-        buttonToggleExploration.setEnabled(!cStyleMode);
+        // Disable individual feature buttons when in classic mode
+        buttonToggleStickiness.setEnabled(!classicMode);
+        buttonToggleQualityScoring.setEnabled(!classicMode);
+        buttonToggleNetworkPriority.setEnabled(!classicMode);
+        buttonToggleExploration.setEnabled(!classicMode);
     }
     
     private void updateButtonState(Button button, boolean enabled) {
