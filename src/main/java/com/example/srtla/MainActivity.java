@@ -435,10 +435,10 @@ public class MainActivity extends Activity {
         String savedSrtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000");
         String savedListenPort = prefs.getString(PREF_LISTEN_PORT, "6000");
         String savedStreamId = prefs.getString(PREF_STREAM_ID, "");
-        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, true);
+        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, false);
         qualityScoringEnabled = prefs.getBoolean(PREF_QUALITY_SCORING_ENABLED, true);
         networkPriorityEnabled = prefs.getBoolean(PREF_NETWORK_PRIORITY_ENABLED, true);
-        explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, true);
+        explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, false);
         classicMode = prefs.getBoolean(PREF_CLASSIC_MODE, false);
         
         editSrtlaReceiverHost.setText(savedHost);
@@ -593,21 +593,6 @@ public class MainActivity extends Activity {
         classicMode = !classicMode;
         updateAdvancedFeatureButtons();
         savePreferences();
-        
-        // Classic mode overrides all other settings
-        if (classicMode) {
-            // When enabling classic mode, disable all enhancements
-            qualityScoringEnabled = false;
-            networkPriorityEnabled = false;
-            explorationEnabled = false;
-            stickinessEnabled = false;
-        } else {
-            // When disabling classic mode, restore enhanced defaults
-            qualityScoringEnabled = true;
-            networkPriorityEnabled = true;
-            explorationEnabled = true;
-            stickinessEnabled = true;
-        }
         
         updateAdvancedFeatureButtons();
         
