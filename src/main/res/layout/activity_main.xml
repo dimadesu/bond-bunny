@@ -203,7 +203,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Classic SRTLA algorithm\nMatches original srtla_send logic.\nDisables all enhancements."
+        android:text="Classic SRTLA algorithm that matches original srtla_send logic."
         android:textSize="12sp" />
 
       <Button
@@ -229,7 +229,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Wi-Fi > Ethernet > Cellular priority\nPlus windows > 10k and 20k get extra points."
+        android:text="Wi-Fi > Ethernet > Cellular priority. Additionally, windows above 10k and 20k get extra points."
         android:textSize="12sp" />
 
       <Button
@@ -255,7 +255,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Punish connections with recent NAKs\nMore recent = more punishment.\nDouble punishment for NAK burst."
+        android:text="Punish connections with recent NAKs.\nMore recent = more punishment.\nDouble punishment for NAK burst."
         android:textSize="12sp" />
 
       <Button
@@ -281,7 +281,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Connection exploration\n10% of the time pick 2nd best network.\nEvery ~5 seconds, explore for ~500ms."
+        android:text="Connection exploration.\n10% of the time pick 2nd best network.\nEvery ~5 seconds explore for ~500ms."
         android:textSize="12sp" />
 
       <Button
@@ -307,7 +307,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Connection stickiness\nPrevents frequent network switching.\nUses selected network for at least 500ms."
+        android:text='Connection "stickiness". Prevent frequent network switches. Use selected network for at least 500ms.'
         android:textSize="12sp" />
 
       <Button
