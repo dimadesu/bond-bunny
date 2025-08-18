@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     private static final String PREF_SRTLA_PORT = "srtla_port";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
+    private static final String PREF_STICKINESS_ENABLED = "stickiness_enabled";
     
     private EditText editSrtlaReceiverHost;
     private EditText editSrtlaReceiverPort;
@@ -45,8 +46,10 @@ public class MainActivity extends Activity {
     private TextView textSrtUrlWifi;
     private Button buttonCopyLocalhost;
     private Button buttonCopyWifi;
+    private Button buttonToggleStickiness;
     private ConnectivityManager connectivityManager;
     private boolean serviceRunning = false;
+    private boolean stickinessEnabled = true; // Default to enabled
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -95,6 +98,7 @@ public class MainActivity extends Activity {
         textSrtUrlWifi = findViewById(R.id.text_srt_url_wifi);
         buttonCopyLocalhost = findViewById(R.id.button_copy_localhost);
         buttonCopyWifi = findViewById(R.id.button_copy_wifi);
+        buttonToggleStickiness = findViewById(R.id.button_toggle_stickiness);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -108,6 +112,10 @@ public class MainActivity extends Activity {
         // Set up copy button listeners
         buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard("Localhost SRT URL", textSrtUrlLocalhost.getText().toString()));
         buttonCopyWifi.setOnClickListener(v -> copyToClipboard("WiFi SRT URL", textSrtUrlWifi.getText().toString()));
+        
+        // Set up stickiness toggle button
+        buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
+        updateStickinessButtonText();
         
         // Add text watchers to update SRT URLs when port or stream ID changes
         TextWatcher urlUpdateWatcher = new TextWatcher() {
@@ -179,6 +187,10 @@ public class MainActivity extends Activity {
         startForegroundService(serviceIntent);
         
         serviceRunning = true;
+        
+        // Apply current stickiness setting to the service
+        EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
+        
         updateUI();
         startStatsUpdates();
         
@@ -396,11 +408,13 @@ public class MainActivity extends Activity {
         String savedSrtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000");
         String savedListenPort = prefs.getString(PREF_LISTEN_PORT, "6000");
         String savedStreamId = prefs.getString(PREF_STREAM_ID, "");
+        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, true); // Default to enabled
         
         editSrtlaReceiverHost.setText(savedHost);
         editSrtlaReceiverPort.setText(savedSrtlaPort);
         editSrtListenPort.setText(savedListenPort);
         editStreamId.setText(savedStreamId);
+        updateStickinessButtonText();
     }
     
     private void savePreferences() {
@@ -411,6 +425,7 @@ public class MainActivity extends Activity {
         editor.putString(PREF_SRTLA_PORT, editSrtlaReceiverPort.getText().toString().trim());
         editor.putString(PREF_LISTEN_PORT, editSrtListenPort.getText().toString().trim());
         editor.putString(PREF_STREAM_ID, editStreamId.getText().toString().trim());
+        editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
         
         editor.apply();
     }
@@ -471,5 +486,31 @@ public class MainActivity extends Activity {
             // Ignore exceptions and return null
         }
         return null;
+    }
+    
+    private void toggleConnectionStickiness() {
+        stickinessEnabled = !stickinessEnabled;
+        updateStickinessButtonText();
+        savePreferences(); // Save the setting
+        
+        // Apply the setting to the service if it's running
+        if (serviceRunning) {
+            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
+            Toast.makeText(this, 
+                stickinessEnabled ? "Connection stickiness enabled" : "Connection stickiness disabled", 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void updateStickinessButtonText() {
+        if (stickinessEnabled) {
+            buttonToggleStickiness.setText("ON (500ms)");
+            buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(android.R.color.holo_green_light)));
+        } else {
+            buttonToggleStickiness.setText("OFF");
+            buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(android.R.color.holo_red_light)));
+        }
     }
 }

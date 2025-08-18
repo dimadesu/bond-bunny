@@ -7,47 +7,47 @@
   android:fadeScrollbars="true"
   android:scrollbarStyle="insideOverlay">
 
-<LinearLayout
-  android:layout_width="match_parent"
-  android:layout_height="wrap_content"
-  android:orientation="vertical"
-  android:padding="16dp"
-  android:paddingBottom="24dp">
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:paddingBottom="24dp">
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="SRT to SRTLA Bonding App"
       android:layout_marginBottom="4dp" />
 
-  <TextView
+    <TextView
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:text="The purpose of this app is to use multiple connections of this device, such as cellular, Wi-Fi, and Ethernet, at the same time to send SRT data packets in parallel to the SRTLA server, a process also known as bonding."
       android:textSize="12sp"
       android:layout_marginBottom="4dp" />
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="This app will listen for SRT data packets on the port you specify (6000 by default), and forward them to the SRTLA server."
       android:textSize="12sp"
       android:layout_marginBottom="4dp" />
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="Configure your livestreaming app to send SRT to the localhost or device's IP address."
       android:textSize="12sp"
       android:layout_marginBottom="4dp" />
 
-  <ScrollView
+    <ScrollView
       android:layout_width="match_parent"
       android:layout_height="0dp"
       android:layout_weight="1"
       android:layout_marginBottom="4dp">
 
-    <TextView
+      <TextView
         android:id="@+id/text_networks"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -57,15 +57,15 @@
         android:padding="8dp"
         android:background="#f0f0f0" />
 
-  </ScrollView>
+    </ScrollView>
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="Local Listen Port:"
       android:layout_marginBottom="4dp" />
 
-  <EditText
+    <EditText
       android:id="@+id/edit_listen_port"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -73,13 +73,13 @@
       android:inputType="number"
       android:layout_marginBottom="12dp" />
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="Stream ID is only used here for building SRT URL.\nYour streaming app must send it."
       android:layout_marginBottom="4dp" />
 
-  <EditText
+    <EditText
       android:id="@+id/edit_stream_id"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -87,50 +87,50 @@
       android:inputType="text"
       android:layout_marginBottom="16dp" />
 
-  <!-- SRT URL Generator Section -->
-  <TextView
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="📺 SRT URLs for your streaming app:"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:layout_marginBottom="8dp" />
+    <!-- SRT URL Generator Section -->
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="📺 SRT URLs for your streaming app:"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:layout_marginBottom="8dp" />
 
-  <TextView
-    android:id="@+id/text_srt_url_localhost"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="srt://localhost:6000"
-    android:textSize="14sp"
-    android:fontFamily="monospace"
-    android:padding="8dp"
-    android:background="#e8f5e8"
-    android:layout_marginBottom="4dp"
-    android:selectAllOnFocus="true"
-    android:focusable="true"
-    android:focusableInTouchMode="true" />
+    <TextView
+      android:id="@+id/text_srt_url_localhost"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="srt://localhost:6000"
+      android:textSize="14sp"
+      android:fontFamily="monospace"
+      android:padding="8dp"
+      android:background="#e8f5e8"
+      android:layout_marginBottom="4dp"
+      android:selectAllOnFocus="true"
+      android:focusable="true"
+      android:focusableInTouchMode="true" />
 
-  <TextView
-    android:id="@+id/text_srt_url_wifi"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="srt://192.168.1.xxx:6000"
-    android:textSize="14sp"
-    android:fontFamily="monospace"
-    android:padding="8dp"
-    android:background="#e3f2fd"
-    android:layout_marginBottom="16dp"
-    android:selectAllOnFocus="true"
-    android:focusable="true"
-    android:focusableInTouchMode="true" />
+    <TextView
+      android:id="@+id/text_srt_url_wifi"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="srt://192.168.1.xxx:6000"
+      android:textSize="14sp"
+      android:fontFamily="monospace"
+      android:padding="8dp"
+      android:background="#e3f2fd"
+      android:layout_marginBottom="16dp"
+      android:selectAllOnFocus="true"
+      android:focusable="true"
+      android:focusableInTouchMode="true" />
 
-  <LinearLayout
+    <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:orientation="horizontal"
       android:layout_marginBottom="8dp">
 
-    <Button
+      <Button
         android:id="@+id/button_copy_localhost"
         android:layout_width="0dp"
         android:layout_height="32dp"
@@ -141,7 +141,7 @@
         android:background="?android:attr/selectableItemBackground"
         android:padding="4dp" />
 
-    <Button
+      <Button
         android:id="@+id/button_copy_wifi"
         android:layout_width="0dp"
         android:layout_height="32dp"
@@ -152,15 +152,15 @@
         android:background="?android:attr/selectableItemBackground"
         android:padding="4dp" />
 
-  </LinearLayout>
+    </LinearLayout>
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="SRTLA Server:"
       android:layout_marginBottom="4dp" />
 
-  <EditText
+    <EditText
       android:id="@+id/edit_server_host"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -168,13 +168,13 @@
       android:inputType="text"
       android:layout_marginBottom="12dp" />
 
-  <TextView
+    <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="SRTLA Server Port:"
       android:layout_marginBottom="4dp" />
 
-  <EditText
+    <EditText
       android:id="@+id/edit_server_port"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -182,13 +182,13 @@
       android:inputType="number"
       android:layout_marginBottom="12dp" />
 
-  <LinearLayout
+    <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:orientation="horizontal"
       android:layout_marginBottom="24dp">
 
-    <Button
+      <Button
         android:id="@+id/button_start"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -196,7 +196,7 @@
         android:text="Start Service"
         android:layout_marginEnd="8dp" />
 
-    <Button
+      <Button
         android:id="@+id/button_stop"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -205,52 +205,79 @@
         android:layout_marginStart="8dp"
         android:enabled="false" />
 
+    </LinearLayout>
+
+    <!-- Connection Stickiness Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="16dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Connection Stickiness"
+        android:textSize="14sp"
+        android:textColor="@android:color/black" />
+
+      <Button
+        android:id="@+id/button_toggle_stickiness"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ON (500ms)"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+        android:backgroundTint="@android:color/holo_green_light" />
+
+    </LinearLayout>
+
+    <TextView
+      android:id="@+id/text_status"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Status: Stopped"
+      android:textSize="16sp"
+      android:layout_marginBottom="16dp" />
+    <!-- Connection Statistics Section -->
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="📊 Connection Statistics:"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:id="@+id/text_connection_stats"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="No active connections"
+      android:textSize="14sp"
+      android:fontFamily="monospace"
+      android:padding="12dp"
+      android:background="#e8f5e8"
+      android:layout_marginBottom="16dp" />
+
+    <!-- Connection Windows Visualization -->
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="📈 Connection Windows:"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:layout_marginBottom="8dp" />
+
+    <com.example.srtla.ConnectionWindowView
+      android:id="@+id/connection_window_view"
+      android:layout_width="match_parent"
+      android:layout_height="200dp"
+      android:layout_marginBottom="16dp"
+      android:background="#ffffff"
+      android:elevation="2dp" />
+
   </LinearLayout>
-
-  <TextView
-    android:id="@+id/text_status"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="Status: Stopped"
-    android:textSize="16sp"
-    android:layout_marginBottom="16dp" />
-  <!-- Connection Statistics Section -->
-  <TextView
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="📊 Connection Statistics:"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:layout_marginBottom="8dp" />
-
-  <TextView
-    android:id="@+id/text_connection_stats"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="No active connections"
-    android:textSize="14sp"
-    android:fontFamily="monospace"
-    android:padding="12dp"
-    android:background="#e8f5e8"
-    android:layout_marginBottom="16dp" />
-
-  <!-- Connection Windows Visualization -->
-  <TextView
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="📈 Connection Windows:"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:layout_marginBottom="8dp" />
-
-  <com.example.srtla.ConnectionWindowView
-    android:id="@+id/connection_window_view"
-    android:layout_width="match_parent"
-    android:layout_height="200dp"
-    android:layout_marginBottom="16dp"
-    android:background="#ffffff"
-    android:elevation="2dp" />
-
-</LinearLayout>
 
 </ScrollView>

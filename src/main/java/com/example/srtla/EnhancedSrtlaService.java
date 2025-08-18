@@ -83,6 +83,7 @@ public class EnhancedSrtlaService extends Service {
     // Connection stickiness to reduce switching frequency
     private long lastConnectionSwitch = 0;
     private static final long MIN_SWITCH_INTERVAL_MS = 500; // Minimum 500ms between switches
+    private static boolean stickinessEnabled = true; // Default enabled, can be toggled via UI
     private SrtlaConnection lastSelectedConnection = null;
     
     // Smart reconnection management (moblink-inspired)
@@ -545,7 +546,9 @@ public class EnhancedSrtlaService extends Service {
         }
         
         long currentTime = System.currentTimeMillis();
-        boolean canSwitch = (currentTime - lastConnectionSwitch) >= MIN_SWITCH_INTERVAL_MS;
+        boolean canSwitch = stickinessEnabled ? 
+            (currentTime - lastConnectionSwitch) >= MIN_SWITCH_INTERVAL_MS : 
+            true; // If stickiness is disabled, always allow switching
         
         // C SRTLA-style selection: Heavily favor best connection, but periodically explore others
         if (canSwitch) {
@@ -582,8 +585,10 @@ public class EnhancedSrtlaService extends Service {
             lastSelectedConnection = bestConnection;
             
             String selectionReason;
-            if (!canSwitch) {
+            if (!canSwitch && stickinessEnabled) {
                 selectionReason = "sticky best connection";
+            } else if (!stickinessEnabled) {
+                selectionReason = "quality-first selection (stickiness disabled)";
             } else {
                 selectionReason = "quality-first selection";
             }
@@ -1245,6 +1250,23 @@ public class EnhancedSrtlaService extends Service {
      */
     public static boolean isServiceRunning() {
         return instance != null && instance.isRunning.get();
+    }
+    
+    /**
+     * Enable or disable connection stickiness
+     * @param enabled true to enable stickiness, false to disable
+     */
+    public static void setStickinessEnabled(boolean enabled) {
+        stickinessEnabled = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "Connection stickiness " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Get current stickiness state
+     * @return true if stickiness is enabled
+     */
+    public static boolean isStickinessEnabled() {
+        return stickinessEnabled;
     }
     
     private SrtlaConnection getLastSelectedConnection() {
