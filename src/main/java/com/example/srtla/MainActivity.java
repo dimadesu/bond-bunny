@@ -9,16 +9,11 @@ import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.text.TextWatcher;
 import android.text.Editable;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.util.List;
@@ -128,12 +123,9 @@ public class MainActivity extends Activity {
         // Set up copy button listeners
         buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard("Localhost SRT URL", textSrtUrlLocalhost.getText().toString()));
         buttonCopyWifi.setOnClickListener(v -> copyToClipboard("WiFi SRT URL", textSrtUrlWifi.getText().toString()));
-        
-        // Set up stickiness toggle button
-        buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
-        updateStickinessButtonText();
-        
+
         // Set up advanced feature toggle buttons
+        buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
         buttonToggleQualityScoring.setOnClickListener(v -> toggleQualityScoring());
         buttonToggleNetworkPriority.setOnClickListener(v -> toggleNetworkPriority());
         buttonToggleExploration.setOnClickListener(v -> toggleExploration());
@@ -445,7 +437,6 @@ public class MainActivity extends Activity {
         editSrtlaReceiverPort.setText(savedSrtlaPort);
         editSrtListenPort.setText(savedListenPort);
         editStreamId.setText(savedStreamId);
-        updateStickinessButtonText();
         updateAdvancedFeatureButtons();
     }
     
@@ -526,7 +517,7 @@ public class MainActivity extends Activity {
     
     private void toggleConnectionStickiness() {
         stickinessEnabled = !stickinessEnabled;
-        updateStickinessButtonText();
+        updateAdvancedFeatureButtons();
         savePreferences(); // Save the setting
         
         // Apply the setting to the service if it's running
@@ -535,18 +526,6 @@ public class MainActivity extends Activity {
             Toast.makeText(this, 
                 stickinessEnabled ? "Connection stickiness enabled" : "Connection stickiness disabled", 
                 Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private void updateStickinessButtonText() {
-        if (stickinessEnabled) {
-            buttonToggleStickiness.setText("ON");
-            buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                getResources().getColor(android.R.color.holo_green_light)));
-        } else {
-            buttonToggleStickiness.setText("OFF");
-            buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                getResources().getColor(android.R.color.holo_red_light)));
         }
     }
     
@@ -593,9 +572,7 @@ public class MainActivity extends Activity {
         classicMode = !classicMode;
         updateAdvancedFeatureButtons();
         savePreferences();
-        
-        updateAdvancedFeatureButtons();
-        
+
         if (serviceRunning) {
             EnhancedSrtlaService.setClassicMode(classicMode);
             EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
@@ -631,8 +608,7 @@ public class MainActivity extends Activity {
                 getResources().getColor(android.R.color.holo_green_light)));
         } else {
             button.setText("OFF");
-            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                getResources().getColor(android.R.color.holo_red_light)));
+            button.setBackgroundTintList(null);
         }
     }
 }
