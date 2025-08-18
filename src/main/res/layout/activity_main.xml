@@ -186,7 +186,7 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="⚡ Advanced Features (Android Enhancements over C SRTLA):"
+      android:text="⚡ Connection selection algorithm"
       android:textSize="16sp"
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
@@ -203,7 +203,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Classic SRTLA algorithm\nDisables all enhancements.\nMatches original srtla_send logic."
+        android:text="Classic SRTLA algorithm\nMatches original srtla_send logic.\nDisables all enhancements."
         android:textSize="12sp" />
 
       <Button
@@ -229,7 +229,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Network priority scaling\nPrefers WiFi over Cellular.\nBoosts stable connections."
+        android:text="Wi-Fi > Ethernet > Cellular priority\nPlus extra points for windows > 10k and 20k."
         android:textSize="12sp" />
 
       <Button
@@ -255,7 +255,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Quality-based scoring\nPenalizes connections with recent NAKs.\nAvoids bad paths automatically."
+        android:text="Punish connections with recent NAKs\nMore recent = more punishment.\nDouble punishment for NAK burst.\n"
         android:textSize="12sp" />
 
       <Button
@@ -281,7 +281,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Connection exploration\nPeriodically tests alternative paths.\nDiscovers better connections."
+        android:text="Connection exploration\n10% of the time pick 2nd best network.\nEvery ~5 seconds, explore for ~500ms."
         android:textSize="12sp" />
 
       <Button
