@@ -229,7 +229,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Wi-Fi > Ethernet > Cellular priority\nPlus extra points for windows > 10k and 20k."
+        android:text="Wi-Fi > Ethernet > Cellular priority\nPlus windows > 10k and 20k get extra points."
         android:textSize="12sp" />
 
       <Button
@@ -255,7 +255,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Punish connections with recent NAKs\nMore recent = more punishment.\nDouble punishment for NAK burst.\n"
+        android:text="Punish connections with recent NAKs\nMore recent = more punishment.\nDouble punishment for NAK burst."
         android:textSize="12sp" />
 
       <Button
