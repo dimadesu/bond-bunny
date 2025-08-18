@@ -31,6 +31,10 @@ public class MainActivity extends Activity {
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
     private static final String PREF_STICKINESS_ENABLED = "stickiness_enabled";
+    private static final String PREF_QUALITY_SCORING_ENABLED = "quality_scoring_enabled";
+    private static final String PREF_NETWORK_PRIORITY_ENABLED = "network_priority_enabled";
+    private static final String PREF_EXPLORATION_ENABLED = "exploration_enabled";
+    private static final String PREF_C_STYLE_MODE = "c_style_mode";
     
     private EditText editSrtlaReceiverHost;
     private EditText editSrtlaReceiverPort;
@@ -47,9 +51,17 @@ public class MainActivity extends Activity {
     private Button buttonCopyLocalhost;
     private Button buttonCopyWifi;
     private Button buttonToggleStickiness;
+    private Button buttonToggleQualityScoring;
+    private Button buttonToggleNetworkPriority;
+    private Button buttonToggleExploration;
+    private Button buttonToggleCStyle;
     private ConnectivityManager connectivityManager;
     private boolean serviceRunning = false;
     private boolean stickinessEnabled = true; // Default to enabled
+    private boolean qualityScoringEnabled = true; // Default to enabled
+    private boolean networkPriorityEnabled = true; // Default to enabled  
+    private boolean explorationEnabled = true; // Default to enabled
+    private boolean cStyleMode = false; // Default to enhanced mode
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -99,6 +111,10 @@ public class MainActivity extends Activity {
         buttonCopyLocalhost = findViewById(R.id.button_copy_localhost);
         buttonCopyWifi = findViewById(R.id.button_copy_wifi);
         buttonToggleStickiness = findViewById(R.id.button_toggle_stickiness);
+        buttonToggleQualityScoring = findViewById(R.id.button_toggle_quality_scoring);
+        buttonToggleNetworkPriority = findViewById(R.id.button_toggle_network_priority);
+        buttonToggleExploration = findViewById(R.id.button_toggle_exploration);
+        buttonToggleCStyle = findViewById(R.id.button_toggle_c_style);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -116,6 +132,13 @@ public class MainActivity extends Activity {
         // Set up stickiness toggle button
         buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
         updateStickinessButtonText();
+        
+        // Set up advanced feature toggle buttons
+        buttonToggleQualityScoring.setOnClickListener(v -> toggleQualityScoring());
+        buttonToggleNetworkPriority.setOnClickListener(v -> toggleNetworkPriority());
+        buttonToggleExploration.setOnClickListener(v -> toggleExploration());
+        buttonToggleCStyle.setOnClickListener(v -> toggleCStyleMode());
+        updateAdvancedFeatureButtons();
         
         // Add text watchers to update SRT URLs when port or stream ID changes
         TextWatcher urlUpdateWatcher = new TextWatcher() {
@@ -188,8 +211,12 @@ public class MainActivity extends Activity {
         
         serviceRunning = true;
         
-        // Apply current stickiness setting to the service
+        // Apply all current feature settings to the service
         EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
+        EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
+        EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
+        EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
+        EnhancedSrtlaService.setCStyleMode(cStyleMode);
         
         updateUI();
         startStatsUpdates();
@@ -408,13 +435,18 @@ public class MainActivity extends Activity {
         String savedSrtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000");
         String savedListenPort = prefs.getString(PREF_LISTEN_PORT, "6000");
         String savedStreamId = prefs.getString(PREF_STREAM_ID, "");
-        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, true); // Default to enabled
+        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, true);
+        qualityScoringEnabled = prefs.getBoolean(PREF_QUALITY_SCORING_ENABLED, true);
+        networkPriorityEnabled = prefs.getBoolean(PREF_NETWORK_PRIORITY_ENABLED, true);
+        explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, true);
+        cStyleMode = prefs.getBoolean(PREF_C_STYLE_MODE, false);
         
         editSrtlaReceiverHost.setText(savedHost);
         editSrtlaReceiverPort.setText(savedSrtlaPort);
         editSrtListenPort.setText(savedListenPort);
         editStreamId.setText(savedStreamId);
         updateStickinessButtonText();
+        updateAdvancedFeatureButtons();
     }
     
     private void savePreferences() {
@@ -426,6 +458,10 @@ public class MainActivity extends Activity {
         editor.putString(PREF_LISTEN_PORT, editSrtListenPort.getText().toString().trim());
         editor.putString(PREF_STREAM_ID, editStreamId.getText().toString().trim());
         editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
+        editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);
+        editor.putBoolean(PREF_NETWORK_PRIORITY_ENABLED, networkPriorityEnabled);
+        editor.putBoolean(PREF_EXPLORATION_ENABLED, explorationEnabled);
+        editor.putBoolean(PREF_C_STYLE_MODE, cStyleMode);
         
         editor.apply();
     }
@@ -510,6 +546,107 @@ public class MainActivity extends Activity {
         } else {
             buttonToggleStickiness.setText("OFF");
             buttonToggleStickiness.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(android.R.color.holo_red_light)));
+        }
+    }
+    
+    private void toggleQualityScoring() {
+        qualityScoringEnabled = !qualityScoringEnabled;
+        updateAdvancedFeatureButtons();
+        savePreferences();
+        
+        if (serviceRunning) {
+            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
+            Toast.makeText(this, 
+                qualityScoringEnabled ? "Quality-based scoring enabled" : "Quality-based scoring disabled", 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void toggleNetworkPriority() {
+        networkPriorityEnabled = !networkPriorityEnabled;
+        updateAdvancedFeatureButtons();
+        savePreferences();
+        
+        if (serviceRunning) {
+            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
+            Toast.makeText(this, 
+                networkPriorityEnabled ? "Network priority scaling enabled" : "Network priority scaling disabled", 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void toggleExploration() {
+        explorationEnabled = !explorationEnabled;
+        updateAdvancedFeatureButtons();
+        savePreferences();
+        
+        if (serviceRunning) {
+            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
+            Toast.makeText(this, 
+                explorationEnabled ? "Connection exploration enabled" : "Connection exploration disabled", 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void toggleCStyleMode() {
+        cStyleMode = !cStyleMode;
+        updateAdvancedFeatureButtons();
+        savePreferences();
+        
+        // C-style mode overrides all other settings
+        if (cStyleMode) {
+            // When enabling C-style, disable all enhancements
+            qualityScoringEnabled = false;
+            networkPriorityEnabled = false;
+            explorationEnabled = false;
+            stickinessEnabled = false;
+        } else {
+            // When disabling C-style, restore enhanced defaults
+            qualityScoringEnabled = true;
+            networkPriorityEnabled = true;
+            explorationEnabled = true;
+            stickinessEnabled = true;
+        }
+        
+        updateAdvancedFeatureButtons();
+        
+        if (serviceRunning) {
+            EnhancedSrtlaService.setCStyleMode(cStyleMode);
+            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
+            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
+            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
+            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
+            
+            Toast.makeText(this, 
+                cStyleMode ? "Pure C SRTLA mode enabled - all enhancements disabled" : 
+                           "Enhanced Android mode enabled - all features restored", 
+                Toast.LENGTH_LONG).show();
+        }
+    }
+    
+    private void updateAdvancedFeatureButtons() {
+        updateButtonState(buttonToggleStickiness, stickinessEnabled && !cStyleMode);
+        updateButtonState(buttonToggleQualityScoring, qualityScoringEnabled && !cStyleMode);
+        updateButtonState(buttonToggleNetworkPriority, networkPriorityEnabled && !cStyleMode);
+        updateButtonState(buttonToggleExploration, explorationEnabled && !cStyleMode);
+        updateButtonState(buttonToggleCStyle, cStyleMode);
+        
+        // Disable individual feature buttons when in C-style mode
+        buttonToggleStickiness.setEnabled(!cStyleMode);
+        buttonToggleQualityScoring.setEnabled(!cStyleMode);
+        buttonToggleNetworkPriority.setEnabled(!cStyleMode);
+        buttonToggleExploration.setEnabled(!cStyleMode);
+    }
+    
+    private void updateButtonState(Button button, boolean enabled) {
+        if (enabled) {
+            button.setText("ON");
+            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                getResources().getColor(android.R.color.holo_green_light)));
+        } else {
+            button.setText("OFF");
+            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 getResources().getColor(android.R.color.holo_red_light)));
         }
     }

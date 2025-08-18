@@ -84,6 +84,10 @@ public class EnhancedSrtlaService extends Service {
     private long lastConnectionSwitch = 0;
     private static final long MIN_SWITCH_INTERVAL_MS = 500; // Minimum 500ms between switches
     private static boolean stickinessEnabled = true; // Default enabled, can be toggled via UI
+    private static boolean qualityScoringEnabled = true; // Enable NAK-based quality scoring
+    private static boolean networkPriorityEnabled = true; // Enable network type priority scaling
+    private static boolean explorationEnabled = true; // Enable connection exploration
+    private static boolean cStyleMode = false; // Pure C SRTLA mode (disables all enhancements)
     private SrtlaConnection lastSelectedConnection = null;
     
     // Smart reconnection management (moblink-inspired)
@@ -377,36 +381,45 @@ public class EnhancedSrtlaService extends Service {
      * Based on: score = windowSize / (packetsInFlight.count + 1)
      */
     /**
-     * Calculate connection score using C SRTLA algorithm with NAK-aware quality prioritization
-     * This prioritizes connections with fewer NAKs, similar to srtla_send.c
+     * Calculate connection score using configurable algorithm modes
+     * Can operate in pure C SRTLA mode or enhanced Android mode
      */
     private int calculateConnectionScore(SrtlaConnection connection) {
-        // Base Swift-style score calculation (window / in_flight + 1)
+        // Base score calculation (same for all modes)
         int window = connection.getWindow();
         int inFlight = connection.getInFlightPackets();
         int baseScore = window / (inFlight + 1);
         
-        // Get connection priority based on network type
-        float priority = getConnectionPriority(connection);
+        // In pure C SRTLA mode, return just the base score
+        if (cStyleMode) {
+            return baseScore;
+        }
         
-        // Apply Swift-style conservative scoring algorithm for base score
-        int swiftScore;
-        if (window > WINDOW_STABLE_MAXIMUM * WINDOW_MULTIPLY) {
-            // High window size - apply full priority scaling (like Swift)
-            swiftScore = (int) (baseScore * priority);
-        } else if (window > WINDOW_STABLE_MINIMUM * WINDOW_MULTIPLY) {
-            // Moderate window size - apply scaled priority (like Swift)
+        // Enhanced Android mode with configurable features
+        float priority = networkPriorityEnabled ? getConnectionPriority(connection) : 1.0f;
+        
+        // Apply network priority scaling if enabled
+        int enhancedScore;
+        if (networkPriorityEnabled && window > WINDOW_STABLE_MAXIMUM * WINDOW_MULTIPLY) {
+            // High window size - apply full priority scaling
+            enhancedScore = (int) (baseScore * priority);
+        } else if (networkPriorityEnabled && window > WINDOW_STABLE_MINIMUM * WINDOW_MULTIPLY) {
+            // Moderate window size - apply scaled priority
             float factor = (float) (window - WINDOW_STABLE_MINIMUM * WINDOW_MULTIPLY) / 
                           (float) ((WINDOW_STABLE_MAXIMUM - WINDOW_STABLE_MINIMUM) * WINDOW_MULTIPLY);
             float scaledPriority = 1 + (priority - 1) * factor;
-            swiftScore = (int) (baseScore * scaledPriority);
+            enhancedScore = (int) (baseScore * scaledPriority);
         } else {
             // Low window size - no priority scaling
-            swiftScore = baseScore;
+            enhancedScore = baseScore;
         }
         
-        // Apply C SRTLA-style NAK penalty for quality-based prioritization
-        // Connections with recent NAKs get heavily penalized to avoid bad paths
+        // Apply quality-based penalties if enabled
+        if (!qualityScoringEnabled) {
+            return enhancedScore;
+        }
+        
+        // Quality-based scoring is enabled, apply NAK penalties
         long timeSinceLastNak = connection.getTimeSinceLastNak();
         int nakCount = connection.getNakCount();
         int nakBurstCount = connection.getNakBurstCount();
@@ -436,14 +449,14 @@ public class EnhancedSrtlaService extends Service {
             qualityMultiplier *= 0.5f; // Halve score for connections with NAK bursts
         }
         
-        int finalScore = Math.max(1, (int) (swiftScore * qualityMultiplier));
+        int finalScore = Math.max(1, (int) (enhancedScore * qualityMultiplier));
         
         // Log quality analysis for debugging (only for low scores to avoid spam)
         if (qualityMultiplier < 1.0f) {
             SrtlaLogger.debug("ConnectionQuality", connection.getNetworkType() + 
                 " quality penalty: " + String.format("%.2f", qualityMultiplier) + 
                 " (NAKs: " + nakCount + ", last: " + (timeSinceLastNak/1000) + "s ago, burst: " + nakBurstCount + 
-                ") base: " + swiftScore + " → final: " + finalScore);
+                ") base: " + enhancedScore + " → final: " + finalScore);
         }
         
         return finalScore;
@@ -555,8 +568,8 @@ public class EnhancedSrtlaService extends Service {
             lastConnectionSwitch = currentTime;
             
             // 90% of the time: use best connection (quality first)
-            // 10% of the time: explore other connections to test their health
-            boolean shouldExplore = (currentTime / 5000) % 10 == 0; // Every ~5 seconds, explore for ~500ms
+            // 10% of the time: explore other connections to test their health (if exploration enabled)
+            boolean shouldExplore = explorationEnabled && (currentTime / 5000) % 10 == 0; // Every ~5 seconds, explore for ~500ms
             
             if (shouldExplore && activeConnections.size() > 1) {
                 // Exploration phase: try the second-best connection to test its current quality
@@ -1267,6 +1280,74 @@ public class EnhancedSrtlaService extends Service {
      */
     public static boolean isStickinessEnabled() {
         return stickinessEnabled;
+    }
+    
+    /**
+     * Enable or disable quality-based scoring (NAK penalties)
+     * @param enabled true to enable quality scoring, false to disable
+     */
+    public static void setQualityScoringEnabled(boolean enabled) {
+        qualityScoringEnabled = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "Quality-based scoring " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Get current quality scoring state
+     * @return true if quality scoring is enabled
+     */
+    public static boolean isQualityScoringEnabled() {
+        return qualityScoringEnabled;
+    }
+    
+    /**
+     * Enable or disable network priority scaling
+     * @param enabled true to enable network priority, false to disable
+     */
+    public static void setNetworkPriorityEnabled(boolean enabled) {
+        networkPriorityEnabled = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "Network priority scaling " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Get current network priority state
+     * @return true if network priority is enabled
+     */
+    public static boolean isNetworkPriorityEnabled() {
+        return networkPriorityEnabled;
+    }
+    
+    /**
+     * Enable or disable connection exploration
+     * @param enabled true to enable exploration, false to disable
+     */
+    public static void setExplorationEnabled(boolean enabled) {
+        explorationEnabled = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "Connection exploration " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Get current exploration state
+     * @return true if exploration is enabled
+     */
+    public static boolean isExplorationEnabled() {
+        return explorationEnabled;
+    }
+    
+    /**
+     * Enable or disable C-style mode (pure C SRTLA compatibility)
+     * @param enabled true for pure C mode, false for enhanced Android mode
+     */
+    public static void setCStyleMode(boolean enabled) {
+        cStyleMode = enabled;
+        SrtlaLogger.info("EnhancedSrtlaService", "C-style mode " + (enabled ? "enabled" : "disabled"));
+    }
+    
+    /**
+     * Get current C-style mode state
+     * @return true if C-style mode is enabled
+     */
+    public static boolean isCStyleMode() {
+        return cStyleMode;
     }
     
     private SrtlaConnection getLastSelectedConnection() {
