@@ -194,7 +194,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Connection Stickiness\nUse selected network for at least 500ms. Seems to help with period packet losses accross all connections." />
+        android:text="Connection stickiness. Experimental.\nPrevents frequent network switching.\nUses selected network for at least 500ms." />
 
       <Button
         android:id="@+id/button_toggle_stickiness"
