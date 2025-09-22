@@ -8,7 +8,7 @@ Android implementation of [SRTLA](https://github.com/BELABOX/srtla).
 
 Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblink](https://github.com/eerimoq/moblink).
 
-Discord https://discord.com/invite/3ejS5Eqx
+Discord https://discord.gg/2UzEkU2AJW
 
 ## Installation Instructions
 
