@@ -112,6 +112,21 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+# If the wrapper jar is missing, try to fall back to a system 'gradle' command
+if [ ! -f "$CLASSPATH" ]; then
+    if command -v gradle >/dev/null 2>&1; then
+        warn "Gradle wrapper JAR not found at $CLASSPATH. Falling back to system 'gradle' command."
+        exec gradle "$@"
+    else
+        die "ERROR: Gradle wrapper JAR not found at $CLASSPATH and no 'gradle' command is available on PATH.
+
+To fix this, either:
+  * Run 'gradle wrapper' locally to recreate the wrapper files (requires Gradle installed), or
+  * Restore gradle/wrapper/gradle-wrapper.jar in the repository.
+"
+    fi
+fi
+
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
