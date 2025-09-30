@@ -10,6 +10,12 @@ Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblin
 
 Discord https://discord.gg/2UzEkU2AJW
 
+## Apps that can work together
+
+- [MediaSrvr](https://github.com/dimadesu/MediaSrvr) - Runs RTMP server on Android phone. You can publish RTMP stream to it from an action camera, for example.
+- [LifeStreamer](https://github.com/dimadesu/LifeStreamer) - Can use RTMP as source: playback RTMP stream from server and restream it as SRT with great dynamic bitrate.
+- Bond Bunny - You can use LifeStreamer to publish SRT stream into Bond Bunny.
+
 ## Installation Instructions
 
 Not sure yet when app will be ready for publishing to Google Play store if ever.
