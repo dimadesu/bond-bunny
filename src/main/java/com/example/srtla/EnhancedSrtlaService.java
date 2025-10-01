@@ -4,7 +4,9 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.app.PendingIntent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -12,6 +14,8 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -35,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class EnhancedSrtlaService extends Service {
     private static final String TAG = "EnhancedSrtlaService";
-    private static final String CHANNEL_ID = "SrtlaServiceChannel";
+    public static final String CHANNEL_ID = "BondBunnyNotificationChannel";
     private static final int NOTIFICATION_ID = 1;
     private static final int HOUSEKEEPING_INTERVAL_MS = 1000;  // Dialed down from 250ms to 1000ms for conservative recovery
     
@@ -51,6 +55,7 @@ public class EnhancedSrtlaService extends Service {
     private PowerManager.WakeLock wakeLock;
     private ExecutorService executorService;
     private AtomicBoolean isRunning = new AtomicBoolean(false);
+    private NotificationManagerCompat notificationManagerCompat;
     
     // Configuration - Android app replaces srtla_send
     private String srtlaReceiverHost;  // Where to send SRTLA packets (like srtla_rec)
@@ -135,25 +140,51 @@ public class EnhancedSrtlaService extends Service {
             }
         });
         
-        createNotificationChannel();
-        
+        createNotificationChannel(getApplicationContext());
+        notificationManagerCompat = NotificationManagerCompat.from(this);
+
         Log.i(TAG, "Enhanced SRTLA Service created with protocol support");
     }
     
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            // Android app acts as srtla_send replacement
             srtlaReceiverHost = intent.getStringExtra("srtla_receiver_host");
             srtlaReceiverPort = intent.getIntExtra("srtla_receiver_port", 5000);
             srtListenAddress = intent.getStringExtra("srt_listen_address");
             srtListenPort = intent.getIntExtra("srt_listen_port", 2222);
             
-            startForeground(NOTIFICATION_ID, createNotification());
+            try {
+                Notification notif = createNotification();
+                if (notif == null) {
+                    Log.w(TAG, "createNotification() returned null - posting empty placeholder");
+                    Intent mainIntent = new Intent(this, MainActivity.class);
+                    PendingIntent pi = PendingIntent.getActivity(this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+                    notif = new NotificationCompat.Builder(this, CHANNEL_ID)
+                        .setContentTitle("Bond Bunny")
+                        .setContentText("Service running")
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setContentIntent(pi)
+                        .setOngoing(true)
+                        .build();
+                }
+
+                startForeground(NOTIFICATION_ID, notif);
+                // Ensure the notification is posted/updated via the compatibility manager as well
+                Log.i(TAG, "startForeground called - posting/updating notification via NotificationManagerCompat");
+                try {
+                    updateNotification();
+                } catch (Exception e) {
+                    Log.w(TAG, "updateNotification() failed", e);
+                }
+            } catch (Exception e) {
+                // Log but continue - we don't want a notification failure to crash the service
+                Log.e(TAG, "Failed to start foreground notification", e);
+            }
             
             if (isRunning.compareAndSet(false, true)) {
                 Log.i(TAG, "Starting Android SRTLA Sender - listening for SRT on port " + srtListenPort + 
-                      ", forwarding to " + srtlaReceiverHost + ":" + srtlaReceiverPort);
+                    ", forwarding to " + srtlaReceiverHost + ":" + srtlaReceiverPort);
                 startSrtlaSender();
             }
         }
@@ -807,6 +838,13 @@ public class EnhancedSrtlaService extends Service {
         }
         
         Log.v(TAG, "Housekeeping: " + activeConnections + " active SRTLA connections");
+        
+        // Refresh the foreground notification with latest info
+        try {
+            updateNotification();
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to update notification: " + e.getMessage());
+        }
     }
     
     /**
@@ -1353,30 +1391,67 @@ public class EnhancedSrtlaService extends Service {
     private SrtlaConnection getLastSelectedConnection() {
         return lastSelectedConnection;
     }
-    
-    private void createNotificationChannel() {
+
+    // Centralized creation of the NotificationChannel so other components (Activity) can reuse it
+    public static void createNotificationChannel(Context context) {
+        if (context == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Android SRTLA Sender",
+                "Bond Bunny Notification",
                 NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Android SRTLA bonding sender (replaces srtla_send)");
-            
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            manager.createNotificationChannel(channel);
+            channel.setDescription("Bond Bunny status notifications.");
+
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
         }
     }
     
     private Notification createNotification() {
-        String title = "Android SRTLA Sender Active";
-        String text = "Listening on :" + srtListenPort + ", " + srtlaConnections.size() + " connections";
-        
-        return new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build();
+        String title = "Listening for SRT on port " + srtListenPort;
+        String text = "Connection(s): " + srtlaConnections.size();
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+
+        return builder.build();
+    }
+
+    // Build and post an updated notification with current service state
+    private void updateNotification() {
+        if (notificationManagerCompat == null) return;
+
+        String title = "Listening for SRT on port " + srtListenPort;
+        String text = "Connection(s): " + srtlaConnections.size();
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(text));
+
+        notificationManagerCompat.notify(NOTIFICATION_ID, builder.build());
     }
     
     @Override
