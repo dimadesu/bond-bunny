@@ -18,8 +18,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 import java.util.List;
 import android.content.res.Configuration;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.util.Log;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import android.app.PendingIntent;
 
 public class MainActivity extends Activity {
+    private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
     private static final String PREFS_NAME = "SrtlaAppPrefs";
     private static final String PREF_SRTLA_HOST = "srtla_host";
     private static final String PREF_SRTLA_PORT = "srtla_port";
@@ -66,6 +76,8 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         
         initViews();
+        // Request notification permission at app start (Android 13+) so Start button doesn't trigger it
+        checkAndRequestNotificationPermissionOnLaunch();
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         
         buttonStart.setOnClickListener(v -> startSrtlaService());
@@ -181,6 +193,7 @@ public class MainActivity extends Activity {
     }
 
     private void startSrtlaService() {
+        Log.i("MainActivity", "startSrtlaService() called");
         String srtlaReceiverHost = editSrtlaReceiverHost.getText().toString().trim();
         String srtlaReceiverPort = editSrtlaReceiverPort.getText().toString().trim();
         String srtListenPort = editSrtListenPort.getText().toString().trim();
@@ -193,30 +206,56 @@ public class MainActivity extends Activity {
         // Save preferences when starting service
         savePreferences();
         
+        // On Android 13+ we must request POST_NOTIFICATIONS permission before showing notifications
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Ensure notification permission is available; the app requests it at launch.
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // Do not request here; direct the user to app notification settings instead
+                Toast.makeText(this, "Notifications are disabled for this app. Please enable them in App Settings.", Toast.LENGTH_LONG).show();
+                try {
+                    Intent intent = new Intent();
+                    intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                }
+                return;
+            }
+        }
+
+        // Permission already granted or not required - start the service now
+        startServiceNow(srtlaReceiverHost, srtlaReceiverPort, srtListenPort);
+    }
+
+    // Starts the service without requesting permissions (assumes caller has handled permission logic)
+    private void startServiceNow(String srtlaReceiverHost, String srtlaReceiverPort, String srtListenPort) {
+        Log.i("MainActivity", "startServiceNow() — starting EnhancedSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
         Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
         serviceIntent.putExtra("srtla_receiver_host", srtlaReceiverHost);
         serviceIntent.putExtra("srtla_receiver_port", Integer.parseInt(srtlaReceiverPort));
         serviceIntent.putExtra("srt_listen_address", "0.0.0.0");  // Always listen on all interfaces
         serviceIntent.putExtra("srt_listen_port", Integer.parseInt(srtListenPort));
-        
+
         startForegroundService(serviceIntent);
-        
+
         serviceRunning = true;
-        
+
         // Apply all current feature settings to the service
         EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
         EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
         EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
         EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
         EnhancedSrtlaService.setClassicMode(classicMode);
-        
+
         updateUI();
         startStatsUpdates();
-        
-        Toast.makeText(this, 
-            "Android SRTLA Sender Started\n" +
-            "• Listening for SRT on 0.0.0.0:" + srtListenPort + "\n" +
-            "• Forwarding to " + srtlaReceiverHost + ":" + srtlaReceiverPort, 
+
+        Toast.makeText(this,
+            "Port: " + srtListenPort + ". " + srtlaReceiverHost + ":" + srtlaReceiverPort,
             Toast.LENGTH_LONG).show();
     }
     
@@ -227,7 +266,7 @@ public class MainActivity extends Activity {
         serviceRunning = false;
         updateUI();
         stopStatsUpdates();
-        Toast.makeText(this, "Enhanced SRTLA Service Stopped", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show();
     }
     
     private void updateUI() {
@@ -482,7 +521,80 @@ public class MainActivity extends Activity {
         String wifiUrl = wifiIp != null ? "srt://" + wifiIp + ":" + port + streamIdParam : "srt://192.168.1.xxx:" + port + streamIdParam;
         textSrtUrlWifi.setText(wifiUrl);
     }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CODE_POST_NOTIFICATIONS) {
+            // Only inform the user of the result when permission was requested
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Notification permission granted", Toast.LENGTH_SHORT).show();
+                Log.i("MainActivity", "POST_NOTIFICATIONS granted onRequestPermissionsResult");
+                postStartupNotification();
+            } else {
+                Toast.makeText(this, "Notification permission denied. Foreground service notification may be suppressed.", Toast.LENGTH_LONG).show();
+                Log.i("MainActivity", "POST_NOTIFICATIONS denied onRequestPermissionsResult");
+                // Offer quick access to notification settings
+                try {
+                    Intent intent = new Intent();
+                    intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                }
+            }
+        }
+    }
     
+    // Check notification permission at app launch and request if necessary.
+    private void checkAndRequestNotificationPermissionOnLaunch() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS ) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_CODE_POST_NOTIFICATIONS
+                );
+                return;
+            }
+        }
+
+        // Permission is granted or not required — post a lightweight startup notification that the
+        // service will later update (same channel and notification id as the service).
+        postStartupNotification();
+    }
+
+    // Post a small notification at app launch so the service can update it later using the same id.
+    private void postStartupNotification() {
+        try {
+            final String channelId = EnhancedSrtlaService.CHANNEL_ID;
+            final int notificationId = 1;
+
+            // Ensure the shared notification channel exists. This is idempotent.
+            EnhancedSrtlaService.createNotificationChannel(this);
+
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
+                .setContentTitle("Bond Bunny started")
+                .setContentText("Service is not running")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW);
+
+            NotificationManagerCompat nm = NotificationManagerCompat.from(this);
+            nm.notify(notificationId, builder.build());
+        } catch (Exception e) {
+            Log.w("MainActivity", "Failed to post startup notification", e);
+        }
+    }
     private String getWifiIpAddress() {
         try {
             java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = 
