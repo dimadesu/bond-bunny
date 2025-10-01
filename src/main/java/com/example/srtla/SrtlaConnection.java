@@ -62,11 +62,22 @@ public class SrtlaConnection {
     private long bytesUploaded = 0;
     private long packetsUploaded = 0;
     private long connectionStartTime = 0;
-    private double estimatedRtt = 0.0; // milliseconds
-    private long lastRttMeasurement = 0;
     private double uploadSpeed = 0.0; // bits per second
     private long lastSpeedCalculation = 0;
     private long lastBytesForSpeed = 0;
+    
+    // Dual-speed RTT tracking (Moblin/Belacoder style)
+    private double smoothRtt = 0.0;      // Slow-moving baseline (primary metric for ABR)
+    private double fastRtt = 0.0;        // Quick spike detector
+    private double rttJitter = 0.0;      // Peak deviation from previous RTT
+    private double prevRtt = 0.0;        // For delta calculation
+    private double rttAvgDelta = 0.0;    // Rate of RTT change (80% old, 20% new)
+    private double rttMin = 200.0;       // Baseline minimum RTT with slow decay
+    private long lastRttMeasurement = 0;
+    
+    // Legacy field for backwards compatibility
+    @Deprecated
+    private double estimatedRtt = 0.0;   // Alias for smoothRtt
     
     // Window management tracking
     private int nakCount = 0;  // Track number of NAKs received
@@ -632,14 +643,73 @@ public class SrtlaConnection {
         }
     }
     
+    /**
+     * Update RTT with dual-speed smoothing (Moblin/Belacoder approach)
+     * Implements asymmetric averaging to catch decreases quickly while ignoring temporary spikes
+     * 
+     * @param rttMs Current RTT measurement in milliseconds
+     */
     public void updateEstimatedRtt(long rttMs) {
-        if (estimatedRtt == 0.0) {
-            estimatedRtt = rttMs;
-        } else {
-            // Exponential smoothing (87.5% old, 12.5% new)
-            estimatedRtt = (estimatedRtt * 0.875) + (rttMs * 0.125);
+        double currentRtt = (double) rttMs;
+        
+        // Initialize on first measurement
+        if (smoothRtt == 0.0) {
+            smoothRtt = currentRtt;
+            fastRtt = currentRtt;
+            prevRtt = currentRtt;
+            estimatedRtt = currentRtt;  // Legacy field
+            lastRttMeasurement = System.currentTimeMillis();
+            
+            SrtlaLogger.info(TAG, networkType + ": RTT initialized at " + rttMs + "ms");
+            return;
         }
+        
+        // Update smooth RTT (slow baseline) - asymmetric smoothing
+        if (smoothRtt > currentRtt) {
+            // Fast decrease: 60% old, 40% new - quickly adapt to improvements
+            smoothRtt = smoothRtt * 0.60 + currentRtt * 0.40;
+        } else {
+            // Slow increase: 96% old, 4% new - ignore temporary spikes
+            smoothRtt = smoothRtt * 0.96 + currentRtt * 0.04;
+        }
+        
+        // Update fast RTT (spike detector) - asymmetric smoothing
+        if (fastRtt > currentRtt) {
+            // Decrease slowly: 70% old, 30% new
+            fastRtt = fastRtt * 0.70 + currentRtt * 0.30;
+        } else {
+            // Increase faster: 90% old, 10% new - catch problems quickly
+            fastRtt = fastRtt * 0.90 + currentRtt * 0.10;
+        }
+        
+        // Update RTT delta (rate of change)
+        double deltaRtt = currentRtt - prevRtt;
+        rttAvgDelta = rttAvgDelta * 0.8 + deltaRtt * 0.2;
+        prevRtt = currentRtt;
+        
+        // Update minimum RTT (with slow decay) - only when RTT is stable
+        rttMin *= 1.001;  // Slow creep up to allow for network changes
+        if (currentRtt < rttMin && Math.abs(rttAvgDelta) < 1.0) {
+            rttMin = currentRtt;
+        }
+        
+        // Update jitter (peak deviation) - exponential decay with peak tracking
+        rttJitter *= 0.99;
+        if (Math.abs(deltaRtt) > rttJitter) {
+            rttJitter = Math.abs(deltaRtt);
+        }
+        
+        // Update legacy field for backwards compatibility
+        estimatedRtt = smoothRtt;
         lastRttMeasurement = System.currentTimeMillis();
+        
+        // Log significant RTT changes for debugging
+        if (Math.abs(deltaRtt) > 20.0 || rttJitter > 50.0) {
+            SrtlaLogger.debug(TAG, String.format(
+                "%s: RTT update - raw=%.1fms, smooth=%.1fms, fast=%.1fms, jitter=%.1fms, delta=%.1fms, stable=%s",
+                networkType, currentRtt, smoothRtt, fastRtt, rttJitter, rttAvgDelta, isRttStable()
+            ));
+        }
     }
     
     /**
@@ -678,8 +748,10 @@ public class SrtlaConnection {
             // Clamp RTT to reasonable range (like Swift SRTLA: 0-10000ms)
             if (rtt >= 0 && rtt <= 10000) {
                 updateEstimatedRtt(rtt);
-                Log.i(TAG, networkType + ": ✅ RTT measured via keepalive: " + rtt + "ms (avg: " + 
-                      String.format("%.1f", estimatedRtt) + "ms)");
+                Log.i(TAG, networkType + ": ✅ RTT measured via keepalive: " + rtt + "ms (smooth: " + 
+                      String.format("%.1f", smoothRtt) + "ms, fast: " + 
+                      String.format("%.1f", fastRtt) + "ms, jitter: " +
+                      String.format("%.1f", rttJitter) + "ms)");
             } else {
                 Log.w(TAG, networkType + ": Invalid RTT measurement: " + rtt + "ms");
             }
@@ -694,9 +766,62 @@ public class SrtlaConnection {
     public long getBytesUploaded() { return bytesUploaded; }
     public long getPacketsUploaded() { return packetsUploaded; }
     public double getUploadSpeed() { return uploadSpeed; }
-    public double getEstimatedRtt() { return estimatedRtt; }
     public long getConnectionDuration() { 
         return connected ? (System.currentTimeMillis() - connectionStartTime) : 0; 
+    }
+    
+    // RTT metrics getters (Moblin/Belacoder style)
+    
+    /**
+     * Get smooth RTT - slow-moving baseline, best for ABR decisions
+     * This is the primary RTT metric that should be reported to adaptive bitrate systems
+     */
+    public double getSmoothRtt() { return smoothRtt; }
+    
+    /**
+     * Get fast RTT - quick spike detector, useful for detecting sudden network degradation
+     */
+    public double getFastRtt() { return fastRtt; }
+    
+    /**
+     * Get RTT jitter - peak deviation, indicates connection stability
+     */
+    public double getRttJitter() { return rttJitter; }
+    
+    /**
+     * Get RTT average delta - rate of RTT change
+     */
+    public double getRttAvgDelta() { return rttAvgDelta; }
+    
+    /**
+     * Get minimum RTT - baseline RTT for this connection
+     */
+    public double getRttMin() { return rttMin; }
+    
+    /**
+     * Check if RTT is stable (delta < 1.0ms average change)
+     */
+    public boolean isRttStable() { 
+        return Math.abs(rttAvgDelta) < 1.0; 
+    }
+    
+    /**
+     * Get estimated RTT - legacy method for backwards compatibility
+     * @deprecated Use getSmoothRtt() instead
+     */
+    @Deprecated
+    public double getEstimatedRtt() { 
+        return smoothRtt; 
+    }
+    
+    /**
+     * Get comprehensive RTT report for debugging
+     */
+    public String getRttReport() {
+        return String.format(
+            "RTT[smooth=%.1f fast=%.1f jitter=%.1f delta=%.1f min=%.1f stable=%s]",
+            smoothRtt, fastRtt, rttJitter, rttAvgDelta, rttMin, isRttStable()
+        );
     }
     
     public String getFormattedStats() {
@@ -742,8 +867,8 @@ public class SrtlaConnection {
             nakInfo = String.format(" | ❌ NAKs: %d%s (last %ds ago)", nakCount, burstInfo, timeSinceLastNak / 1000);
         }
         
-        return String.format("%s:\n  📈 %s | 📦 %.2f MB | ⏱️ %.0f ms RTT\n  🔗 %d packets | ⏰ %02d:%02d uptime\n  🪟 Window: %d (%s) | 🔄 In-flight: %d%s",
-            networkType, speedDisplay, totalMB, estimatedRtt, 
+        return String.format("%s:\n  📈 %s | 📦 %.2f MB | ⏱️ %.1fms RTT (fast: %.1fms, jitter: %.1fms)\n  🔗 %d packets | ⏰ %02d:%02d uptime\n  🪟 Window: %d (%s) | 🔄 In-flight: %d%s",
+            networkType, speedDisplay, totalMB, smoothRtt, fastRtt, rttJitter,
             packetsUploaded, duration / 60, duration % 60, window, windowHealth, inFlightPackets, nakInfo);
     }
     
