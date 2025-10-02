@@ -26,6 +26,11 @@
       </intent-filter>
     </activity>
 
+    <activity
+      android:name=".AboutActivity"
+      android:exported="false"
+      android:label="About" />
+
     <service
       android:name=".EnhancedSrtlaService"
       android:enabled="true"

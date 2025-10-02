@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
     private TextView textSrtUrlWifi;
     private Button buttonCopyLocalhost;
     private Button buttonCopyWifi;
+    private Button buttonAbout;
     private Button buttonToggleStickiness;
     private Button buttonToggleQualityScoring;
     private Button buttonToggleNetworkPriority;
@@ -117,6 +118,7 @@ public class MainActivity extends Activity {
         textSrtUrlWifi = findViewById(R.id.text_srt_url_wifi);
         buttonCopyLocalhost = findViewById(R.id.button_copy_localhost);
         buttonCopyWifi = findViewById(R.id.button_copy_wifi);
+        buttonAbout = findViewById(R.id.button_about);
         buttonToggleStickiness = findViewById(R.id.button_toggle_stickiness);
         buttonToggleQualityScoring = findViewById(R.id.button_toggle_quality_scoring);
         buttonToggleNetworkPriority = findViewById(R.id.button_toggle_network_priority);
@@ -135,6 +137,7 @@ public class MainActivity extends Activity {
         // Set up copy button listeners
         buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard("Localhost SRT URL", textSrtUrlLocalhost.getText().toString()));
         buttonCopyWifi.setOnClickListener(v -> copyToClipboard("WiFi SRT URL", textSrtUrlWifi.getText().toString()));
+        buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
 
         // Set up advanced feature toggle buttons
         buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
