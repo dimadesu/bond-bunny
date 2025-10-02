@@ -43,7 +43,6 @@ public class MainActivity extends Activity {
     
     private EditText editSrtlaReceiverHost;
     private EditText editSrtlaReceiverPort;
-    private EditText editSrtListenPort;
     private EditText editStreamId;
     private Button buttonStart;
     private Button buttonStop;
@@ -107,7 +106,6 @@ public class MainActivity extends Activity {
     private void initViews() {
         editSrtlaReceiverHost = findViewById(R.id.edit_server_host);
         editSrtlaReceiverPort = findViewById(R.id.edit_server_port);
-        editSrtListenPort = findViewById(R.id.edit_listen_port);
         editStreamId = findViewById(R.id.edit_stream_id);
         buttonStart = findViewById(R.id.button_start);
         buttonStop = findViewById(R.id.button_stop);
@@ -164,7 +162,6 @@ public class MainActivity extends Activity {
             }
         };
         
-        editSrtListenPort.addTextChangedListener(urlUpdateWatcher);
         editStreamId.addTextChangedListener(urlUpdateWatcher);
         
         // Load saved preferences or use default values
@@ -180,7 +177,6 @@ public class MainActivity extends Activity {
         // Save current form values and service state
         outState.putString("srtla_host", editSrtlaReceiverHost.getText().toString());
         outState.putString("srtla_port", editSrtlaReceiverPort.getText().toString());
-        outState.putString("listen_port", editSrtListenPort.getText().toString());
         outState.putString("stream_id", editStreamId.getText().toString());
         outState.putBoolean("service_running", serviceRunning);
     }
@@ -192,7 +188,6 @@ public class MainActivity extends Activity {
         if (savedInstanceState != null) {
             editSrtlaReceiverHost.setText(savedInstanceState.getString("srtla_host", "au.srt.belabox.net"));
             editSrtlaReceiverPort.setText(savedInstanceState.getString("srtla_port", "5000"));
-            editSrtListenPort.setText(savedInstanceState.getString("listen_port", "6000"));
             editStreamId.setText(savedInstanceState.getString("stream_id", ""));
             // Service state will be checked in onResume()
         }
@@ -202,7 +197,8 @@ public class MainActivity extends Activity {
         Log.i("MainActivity", "startSrtlaService() called");
         String srtlaReceiverHost = editSrtlaReceiverHost.getText().toString().trim();
         String srtlaReceiverPort = editSrtlaReceiverPort.getText().toString().trim();
-        String srtListenPort = editSrtListenPort.getText().toString().trim();
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String srtListenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         
         if (srtlaReceiverHost.isEmpty() || srtlaReceiverPort.isEmpty() || srtListenPort.isEmpty()) {
             Toast.makeText(this, "Please fill SRTLA receiver host, port, and SRT listen port", Toast.LENGTH_SHORT).show();
@@ -480,7 +476,6 @@ public class MainActivity extends Activity {
         
         editSrtlaReceiverHost.setText(savedHost);
         editSrtlaReceiverPort.setText(savedSrtlaPort);
-        editSrtListenPort.setText(savedListenPort);
         editStreamId.setText(savedStreamId);
         updateAdvancedFeatureButtons();
     }
@@ -491,7 +486,6 @@ public class MainActivity extends Activity {
         
         editor.putString(PREF_SRTLA_HOST, editSrtlaReceiverHost.getText().toString().trim());
         editor.putString(PREF_SRTLA_PORT, editSrtlaReceiverPort.getText().toString().trim());
-        editor.putString(PREF_LISTEN_PORT, editSrtListenPort.getText().toString().trim());
         editor.putString(PREF_STREAM_ID, editStreamId.getText().toString().trim());
         editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
         editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);
@@ -510,7 +504,8 @@ public class MainActivity extends Activity {
     }
     
     private void updateSrtUrls() {
-        String port = editSrtListenPort.getText().toString().trim();
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String port = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         if (port.isEmpty()) {
             port = "6000"; // Default port
         }
