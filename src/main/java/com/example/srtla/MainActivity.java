@@ -104,8 +104,6 @@ public class MainActivity extends Activity {
     }
     
     private void initViews() {
-        editSrtlaReceiverHost = findViewById(R.id.edit_server_host);
-        editSrtlaReceiverPort = findViewById(R.id.edit_server_port);
         editStreamId = findViewById(R.id.edit_stream_id);
         buttonStart = findViewById(R.id.button_start);
         buttonStop = findViewById(R.id.button_stop);
@@ -175,8 +173,9 @@ public class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         // Save current form values and service state
-        outState.putString("srtla_host", editSrtlaReceiverHost.getText().toString());
-        outState.putString("srtla_port", editSrtlaReceiverPort.getText().toString());
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        outState.putString("srtla_host", prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net"));
+        outState.putString("srtla_port", prefs.getString(PREF_SRTLA_PORT, "5000"));
         outState.putString("stream_id", editStreamId.getText().toString());
         outState.putBoolean("service_running", serviceRunning);
     }
@@ -186,8 +185,6 @@ public class MainActivity extends Activity {
         super.onRestoreInstanceState(savedInstanceState);
         // Restore form values
         if (savedInstanceState != null) {
-            editSrtlaReceiverHost.setText(savedInstanceState.getString("srtla_host", "au.srt.belabox.net"));
-            editSrtlaReceiverPort.setText(savedInstanceState.getString("srtla_port", "5000"));
             editStreamId.setText(savedInstanceState.getString("stream_id", ""));
             // Service state will be checked in onResume()
         }
@@ -195,9 +192,9 @@ public class MainActivity extends Activity {
 
     private void startSrtlaService() {
         Log.i("MainActivity", "startSrtlaService() called");
-        String srtlaReceiverHost = editSrtlaReceiverHost.getText().toString().trim();
-        String srtlaReceiverPort = editSrtlaReceiverPort.getText().toString().trim();
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String srtlaReceiverHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
+        String srtlaReceiverPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
         String srtListenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         
         if (srtlaReceiverHost.isEmpty() || srtlaReceiverPort.isEmpty() || srtListenPort.isEmpty()) {
@@ -463,7 +460,6 @@ public class MainActivity extends Activity {
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         
-        // Load saved values or use defaults
         String savedHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net");
         String savedSrtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000");
         String savedListenPort = prefs.getString(PREF_LISTEN_PORT, "6000");
@@ -474,8 +470,6 @@ public class MainActivity extends Activity {
         explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, false);
         classicMode = prefs.getBoolean(PREF_CLASSIC_MODE, false);
         
-        editSrtlaReceiverHost.setText(savedHost);
-        editSrtlaReceiverPort.setText(savedSrtlaPort);
         editStreamId.setText(savedStreamId);
         updateAdvancedFeatureButtons();
     }
@@ -484,8 +478,6 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
         
-        editor.putString(PREF_SRTLA_HOST, editSrtlaReceiverHost.getText().toString().trim());
-        editor.putString(PREF_SRTLA_PORT, editSrtlaReceiverPort.getText().toString().trim());
         editor.putString(PREF_STREAM_ID, editStreamId.getText().toString().trim());
         editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
         editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);

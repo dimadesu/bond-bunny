@@ -143,34 +143,6 @@
 
     </LinearLayout>
 
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="SRTLA Server:"
-      android:layout_marginBottom="4dp" />
-
-    <EditText
-      android:id="@+id/edit_server_host"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:hint="10.0.0.1"
-      android:inputType="text"
-      android:layout_marginBottom="12dp" />
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="SRTLA Server Port:"
-      android:layout_marginBottom="4dp" />
-
-    <EditText
-      android:id="@+id/edit_server_port"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:hint="5000"
-      android:inputType="number"
-      android:layout_marginBottom="12dp" />
-
     <!-- Advanced Features Section -->
     <TextView
       android:layout_width="wrap_content"
