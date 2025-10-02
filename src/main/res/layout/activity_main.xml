@@ -47,15 +47,14 @@
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:orientation="horizontal"
-      android:layout_marginBottom="24dp">
+      android:layout_marginBottom="8dp">
 
       <Button
         android:id="@+id/button_start"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Start Service"
-        android:layout_marginEnd="8dp" />
+        android:text="Start Service" />
 
       <Button
         android:id="@+id/button_stop"
@@ -63,7 +62,6 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="Stop Service"
-        android:layout_marginStart="8dp"
         android:enabled="false" />
 
     </LinearLayout>
@@ -74,7 +72,8 @@
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
-      android:layout_marginBottom="16dp" />
+      android:layout_marginBottom="12dp" />
+
     <!-- Connection Statistics Section -->
     <TextView
       android:layout_width="wrap_content"
