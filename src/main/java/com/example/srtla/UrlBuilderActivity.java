@@ -28,6 +28,7 @@ public class UrlBuilderActivity extends Activity {
     private Button buttonCopyLocalhost;
     private Button buttonCopyWifi;
     private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +45,30 @@ public class UrlBuilderActivity extends Activity {
 
         // Initial update
         updateNetworkInfo();
+
+        // Register a network callback to update UI when network changes
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                runOnUiThread(() -> updateNetworkInfo());
+            }
+
+            @Override
+            public void onLost(Network network) {
+                runOnUiThread(() -> updateNetworkInfo());
+            }
+
+            @Override
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+                runOnUiThread(() -> updateNetworkInfo());
+            }
+        };
+
+        try {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback);
+        } catch (Exception ignored) {
+            // Some devices/OS versions may throw; fallback to onResume updates
+        }
 
         // Load and show saved stream id
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -76,6 +101,16 @@ public class UrlBuilderActivity extends Activity {
     protected void onResume() {
         super.onResume();
         updateNetworkInfo();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {}
+        }
     }
 
     private void updateNetworkInfo() {

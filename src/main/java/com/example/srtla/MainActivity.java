@@ -41,8 +41,6 @@ public class MainActivity extends Activity {
     private static final String PREF_EXPLORATION_ENABLED = "exploration_enabled";
     private static final String PREF_CLASSIC_MODE = "classic_mode";
     
-    private EditText editSrtlaReceiverHost;
-    private EditText editSrtlaReceiverPort;
     private Button buttonStart;
     private Button buttonStop;
     private TextView textStatus;
@@ -57,7 +55,6 @@ public class MainActivity extends Activity {
     private Button buttonToggleNetworkPriority;
     private Button buttonToggleExploration;
     private Button buttonToggleClassicMode;
-    private ConnectivityManager connectivityManager;
     private boolean serviceRunning = false;
     private boolean stickinessEnabled = true; // Default to enabled
     private boolean qualityScoringEnabled = true; // Default to enabled
@@ -331,13 +328,6 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
     }
-    
-//    @Override
-//    public void onConfigurationChanged(Configuration newConfig) {
-//        super.onConfigurationChanged(newConfig);
-//        // Activity won't be destroyed, so we just need to update the network info
-//        // which might change due to orientation (some devices switch networks)
-//    }
     
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
