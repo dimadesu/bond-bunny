@@ -31,6 +31,11 @@
       android:exported="false"
       android:label="About" />
 
+    <activity
+      android:name=".SettingsActivity"
+      android:exported="false"
+      android:label="Settings" />
+
     <service
       android:name=".EnhancedSrtlaService"
       android:enabled="true"
