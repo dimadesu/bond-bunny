@@ -83,18 +83,10 @@ public class UrlBuilderActivity extends Activity {
             }
         });
 
-        textLocal.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
-        textWifi.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
+        // Copy buttons handle clipboard operations
+        buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
 
-        buttonCopyLocalhost.setOnClickListener(v -> {
-            copyToClipboard(textLocal.getText().toString());
-            Toast.makeText(this, "Localhost URL copied", Toast.LENGTH_SHORT).show();
-        });
-
-        buttonCopyWifi.setOnClickListener(v -> {
-            copyToClipboard(textWifi.getText().toString());
-            Toast.makeText(this, "WiFi URL copied", Toast.LENGTH_SHORT).show();
-        });
+        buttonCopyWifi.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
     }
 
     @Override
@@ -217,6 +209,7 @@ public class UrlBuilderActivity extends Activity {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("SRT URL", text);
         clipboard.setPrimaryClip(clip);
-        Toast.makeText(this, "Copied URL to clipboard", Toast.LENGTH_SHORT).show();
+        // On Android 12+ (API 31+), the system automatically shows a toast/notification
+        // when content is copied to clipboard, so we don't need to show our own
     }
 }
