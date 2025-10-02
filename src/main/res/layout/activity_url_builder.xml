@@ -28,7 +28,14 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Stream ID (used in SRT URLs):"
+      android:text="Stream ID is only used here for building SRT URL. Your streaming app must send it."
+      android:textSize="16sp"
+      android:layout_marginBottom="4dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Stream ID (used only for building URLs):"
       android:layout_marginTop="8dp"
       android:layout_marginBottom="4dp" />
 
