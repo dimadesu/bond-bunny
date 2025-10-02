@@ -35,6 +35,13 @@
         android:layout_weight="1"
         android:text="Settings" />
 
+      <Button
+        android:id="@+id/button_url_builder"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="URL Builder" />
+
     </LinearLayout>
 
     <TextView
