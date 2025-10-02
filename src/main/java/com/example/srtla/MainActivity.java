@@ -41,26 +41,20 @@ public class MainActivity extends Activity {
     private static final String PREF_EXPLORATION_ENABLED = "exploration_enabled";
     private static final String PREF_CLASSIC_MODE = "classic_mode";
     
-    private EditText editSrtlaReceiverHost;
-    private EditText editSrtlaReceiverPort;
-    private EditText editSrtListenPort;
-    private EditText editStreamId;
     private Button buttonStart;
     private Button buttonStop;
     private TextView textStatus;
     private TextView textNetworks;
     private TextView textConnectionStats;
     private ConnectionWindowView connectionWindowView;
-    private TextView textSrtUrlLocalhost;
-    private TextView textSrtUrlWifi;
-    private Button buttonCopyLocalhost;
-    private Button buttonCopyWifi;
+    private Button buttonAbout;
+    private Button buttonSettings;
+    private Button buttonUrlBuilder;
     private Button buttonToggleStickiness;
     private Button buttonToggleQualityScoring;
     private Button buttonToggleNetworkPriority;
     private Button buttonToggleExploration;
     private Button buttonToggleClassicMode;
-    private ConnectivityManager connectivityManager;
     private boolean serviceRunning = false;
     private boolean stickinessEnabled = true; // Default to enabled
     private boolean qualityScoringEnabled = true; // Default to enabled
@@ -78,15 +72,12 @@ public class MainActivity extends Activity {
         initViews();
         // Request notification permission at app start (Android 13+) so Start button doesn't trigger it
         checkAndRequestNotificationPermissionOnLaunch();
-        connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         
         buttonStart.setOnClickListener(v -> startSrtlaService());
         buttonStop.setOnClickListener(v -> stopSrtlaService());
         
         // Restore service state if activity was recreated
         checkServiceState();
-        
-        updateNetworkInfo();
     }
     
     /**
@@ -103,20 +94,14 @@ public class MainActivity extends Activity {
     }
     
     private void initViews() {
-        editSrtlaReceiverHost = findViewById(R.id.edit_server_host);
-        editSrtlaReceiverPort = findViewById(R.id.edit_server_port);
-        editSrtListenPort = findViewById(R.id.edit_listen_port);
-        editStreamId = findViewById(R.id.edit_stream_id);
         buttonStart = findViewById(R.id.button_start);
         buttonStop = findViewById(R.id.button_stop);
         textStatus = findViewById(R.id.text_status);
-        textNetworks = findViewById(R.id.text_networks);
         textConnectionStats = findViewById(R.id.text_connection_stats);
         connectionWindowView = findViewById(R.id.connection_window_view);
-        textSrtUrlLocalhost = findViewById(R.id.text_srt_url_localhost);
-        textSrtUrlWifi = findViewById(R.id.text_srt_url_wifi);
-        buttonCopyLocalhost = findViewById(R.id.button_copy_localhost);
-        buttonCopyWifi = findViewById(R.id.button_copy_wifi);
+        buttonAbout = findViewById(R.id.button_about);
+        buttonSettings = findViewById(R.id.button_settings);
+        buttonUrlBuilder = findViewById(R.id.button_url_builder);
         buttonToggleStickiness = findViewById(R.id.button_toggle_stickiness);
         buttonToggleQualityScoring = findViewById(R.id.button_toggle_quality_scoring);
         buttonToggleNetworkPriority = findViewById(R.id.button_toggle_network_priority);
@@ -132,9 +117,9 @@ public class MainActivity extends Activity {
             return true;
         });
         
-        // Set up copy button listeners
-        buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard("Localhost SRT URL", textSrtUrlLocalhost.getText().toString()));
-        buttonCopyWifi.setOnClickListener(v -> copyToClipboard("WiFi SRT URL", textSrtUrlWifi.getText().toString()));
+        buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
+        buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
+        buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
 
         // Set up advanced feature toggle buttons
         buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
@@ -144,38 +129,18 @@ public class MainActivity extends Activity {
         buttonToggleClassicMode.setOnClickListener(v -> toggleClassicMode());
         updateAdvancedFeatureButtons();
         
-        // Add text watchers to update SRT URLs when port or stream ID changes
-        TextWatcher urlUpdateWatcher = new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            
-            @Override
-            public void afterTextChanged(Editable s) {
-                updateSrtUrls();
-            }
-        };
-        
-        editSrtListenPort.addTextChangedListener(urlUpdateWatcher);
-        editStreamId.addTextChangedListener(urlUpdateWatcher);
-        
         // Load saved preferences or use default values
         loadPreferences();
-        
-        // Initial SRT URL update
-        updateSrtUrls();
     }
     
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         // Save current form values and service state
-        outState.putString("srtla_host", editSrtlaReceiverHost.getText().toString());
-        outState.putString("srtla_port", editSrtlaReceiverPort.getText().toString());
-        outState.putString("listen_port", editSrtListenPort.getText().toString());
-        outState.putString("stream_id", editStreamId.getText().toString());
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        outState.putString("srtla_host", prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net"));
+        outState.putString("srtla_port", prefs.getString(PREF_SRTLA_PORT, "5000"));
+        outState.putString("stream_id", getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(PREF_STREAM_ID, ""));
         outState.putBoolean("service_running", serviceRunning);
     }
     
@@ -184,19 +149,16 @@ public class MainActivity extends Activity {
         super.onRestoreInstanceState(savedInstanceState);
         // Restore form values
         if (savedInstanceState != null) {
-            editSrtlaReceiverHost.setText(savedInstanceState.getString("srtla_host", "au.srt.belabox.net"));
-            editSrtlaReceiverPort.setText(savedInstanceState.getString("srtla_port", "5000"));
-            editSrtListenPort.setText(savedInstanceState.getString("listen_port", "6000"));
-            editStreamId.setText(savedInstanceState.getString("stream_id", ""));
             // Service state will be checked in onResume()
         }
     }
 
     private void startSrtlaService() {
         Log.i("MainActivity", "startSrtlaService() called");
-        String srtlaReceiverHost = editSrtlaReceiverHost.getText().toString().trim();
-        String srtlaReceiverPort = editSrtlaReceiverPort.getText().toString().trim();
-        String srtListenPort = editSrtListenPort.getText().toString().trim();
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String srtlaReceiverHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
+        String srtlaReceiverPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
+        String srtListenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         
         if (srtlaReceiverHost.isEmpty() || srtlaReceiverPort.isEmpty() || srtListenPort.isEmpty()) {
             Toast.makeText(this, "Please fill SRTLA receiver host, port, and SRT listen port", Toast.LENGTH_SHORT).show();
@@ -283,88 +245,6 @@ public class MainActivity extends Activity {
         }
     }
     
-    private void updateNetworkInfo() {
-        StringBuilder networkInfo = new StringBuilder("IP Addresses of this device:\n");
-        
-        // Get actual device IP addresses
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = 
-                java.net.NetworkInterface.getNetworkInterfaces();
-            
-            int interfaceCount = 0;
-            while (networkInterfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
-                
-                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
-                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                    
-                    while (addresses.hasMoreElements()) {
-                        java.net.InetAddress address = addresses.nextElement();
-                        
-                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                            interfaceCount++;
-                            String interfaceName = networkInterface.getDisplayName();
-                            String ipAddress = address.getHostAddress();
-                            
-                            networkInfo.append("• ").append(ipAddress);
-                            
-                            // Try to identify the network type
-                            if (interfaceName.toLowerCase().contains("wlan") || 
-                                interfaceName.toLowerCase().contains("wifi")) {
-                                networkInfo.append(" (WiFi)");
-                            } else if (interfaceName.toLowerCase().contains("rmnet") || 
-                                      interfaceName.toLowerCase().contains("mobile") ||
-                                      interfaceName.toLowerCase().contains("cellular")) {
-                                networkInfo.append(" (Cellular)");
-                            } else if (interfaceName.toLowerCase().contains("eth")) {
-                                networkInfo.append(" (Ethernet)");
-                            } else {
-                                networkInfo.append(" (").append(interfaceName).append(")");
-                            }
-
-                            networkInfo.append("\n");
-                        }
-                    }
-                }
-            }
-            
-            if (interfaceCount == 0) {
-                networkInfo.append("No external IP addresses found\n");
-            }
-            
-        } catch (Exception e) {
-            networkInfo.append("Error discovering addresses: ").append(e.getMessage()).append("\n");
-        }
-        
-        // Add Android ConnectivityManager info
-        networkInfo.append("\nConnected Networks:\n");
-        Network[] networks = connectivityManager.getAllNetworks();
-        int availableNetworks = 0;
-        
-        for (Network network : networks) {
-            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
-            if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                availableNetworks++;
-                
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    networkInfo.append("• WiFi Network (Internet)\n");
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    networkInfo.append("• Cellular Network (Internet)\n");
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    networkInfo.append("• Ethernet Network (Internet)\n");
-                }
-            }
-        }
-        
-        if (availableNetworks == 0) {
-            networkInfo.append("• No internet networks available\n");
-        }
-        
-        textNetworks.setText(networkInfo.toString());
-        
-        // Update SRT URLs when network info changes (WiFi IP might have changed)
-        updateSrtUrls();
-    }
     
     private void startStatsUpdates() {
         statsUpdateRunnable = new Runnable() {
@@ -437,7 +317,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        updateNetworkInfo();
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
     }
@@ -450,32 +329,15 @@ public class MainActivity extends Activity {
         savePreferences();
     }
     
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        // Activity won't be destroyed, so we just need to update the network info
-        // which might change due to orientation (some devices switch networks)
-        updateNetworkInfo();
-    }
-    
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         
-        // Load saved values or use defaults
-        String savedHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net");
-        String savedSrtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000");
-        String savedListenPort = prefs.getString(PREF_LISTEN_PORT, "6000");
-        String savedStreamId = prefs.getString(PREF_STREAM_ID, "");
         stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, false);
         qualityScoringEnabled = prefs.getBoolean(PREF_QUALITY_SCORING_ENABLED, true);
         networkPriorityEnabled = prefs.getBoolean(PREF_NETWORK_PRIORITY_ENABLED, true);
         explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, false);
         classicMode = prefs.getBoolean(PREF_CLASSIC_MODE, false);
         
-        editSrtlaReceiverHost.setText(savedHost);
-        editSrtlaReceiverPort.setText(savedSrtlaPort);
-        editSrtListenPort.setText(savedListenPort);
-        editStreamId.setText(savedStreamId);
         updateAdvancedFeatureButtons();
     }
     
@@ -483,10 +345,6 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
         
-        editor.putString(PREF_SRTLA_HOST, editSrtlaReceiverHost.getText().toString().trim());
-        editor.putString(PREF_SRTLA_PORT, editSrtlaReceiverPort.getText().toString().trim());
-        editor.putString(PREF_LISTEN_PORT, editSrtListenPort.getText().toString().trim());
-        editor.putString(PREF_STREAM_ID, editStreamId.getText().toString().trim());
         editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
         editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);
         editor.putBoolean(PREF_NETWORK_PRIORITY_ENABLED, networkPriorityEnabled);
@@ -494,32 +352,6 @@ public class MainActivity extends Activity {
         editor.putBoolean(PREF_CLASSIC_MODE, classicMode);
         
         editor.apply();
-    }
-    
-    private void copyToClipboard(String label, String text) {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText(label, text);
-        clipboard.setPrimaryClip(clip);
-        Toast.makeText(this, "📋 " + label + " copied to clipboard", Toast.LENGTH_SHORT).show();
-    }
-    
-    private void updateSrtUrls() {
-        String port = editSrtListenPort.getText().toString().trim();
-        if (port.isEmpty()) {
-            port = "6000"; // Default port
-        }
-        
-        String streamId = editStreamId.getText().toString().trim();
-        String streamIdParam = streamId.isEmpty() ? "" : "?streamid=" + streamId;
-        
-        // Update localhost URL
-        String localhostUrl = "srt://localhost:" + port + streamIdParam;
-        textSrtUrlLocalhost.setText(localhostUrl);
-        
-        // Update WiFi URL with actual WiFi IP if available
-        String wifiIp = getWifiIpAddress();
-        String wifiUrl = wifiIp != null ? "srt://" + wifiIp + ":" + port + streamIdParam : "srt://192.168.1.xxx:" + port + streamIdParam;
-        textSrtUrlWifi.setText(wifiUrl);
     }
 
     @Override
@@ -594,37 +426,6 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Log.w("MainActivity", "Failed to post startup notification", e);
         }
-    }
-    private String getWifiIpAddress() {
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = 
-                java.net.NetworkInterface.getNetworkInterfaces();
-            
-            while (networkInterfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
-                
-                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
-                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                    
-                    while (addresses.hasMoreElements()) {
-                        java.net.InetAddress address = addresses.nextElement();
-                        
-                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                            String interfaceName = networkInterface.getDisplayName().toLowerCase();
-                            String ipAddress = address.getHostAddress();
-                            
-                            // Look for WiFi interfaces
-                            if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
-                                return ipAddress;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Ignore exceptions and return null
-        }
-        return null;
     }
     
     private void toggleConnectionStickiness() {

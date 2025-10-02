@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:fillViewport="true">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Settings"
+      android:textStyle="bold"
+      android:textSize="18sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Local Listen Port:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_listen_port"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="6000 (SRT client connects here)"
+      android:inputType="number"
+      android:layout_marginBottom="12dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="SRTLA Server:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_server_host"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="10.0.0.1"
+      android:inputType="text"
+      android:layout_marginBottom="12dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="SRTLA Server Port:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_server_port"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="5000"
+      android:inputType="number"
+      android:layout_marginBottom="12dp" />
+
+  </LinearLayout>
+
+</ScrollView>
