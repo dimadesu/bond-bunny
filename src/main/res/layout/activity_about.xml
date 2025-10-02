@@ -22,14 +22,14 @@
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:text="The purpose of this app is to use multiple connections of this device, such as cellular, Wi-Fi, and Ethernet, at the same time to send SRT data packets in parallel to the SRTLA server, a process also known as bonding."
-      android:textSize="12sp"
+      android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="This app will listen for SRT data packets on the port you specify (6000 by default), and forward them to the SRTLA server."
-      android:textSize="12sp"
+      android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
   </LinearLayout>
