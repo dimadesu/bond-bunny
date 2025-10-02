@@ -60,6 +60,146 @@
       android:inputType="number"
       android:layout_marginBottom="12dp" />
 
+    <!-- Advanced Features Section -->
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="⚡ Connection selection algorithm"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:layout_marginTop="8dp"
+      android:layout_marginBottom="8dp" />
+
+    <!-- Classic SRTLA Algorithm Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Classic SRTLA algorithm that matches original srtla_send logic."
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_classic_mode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OFF"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+      />
+
+    </LinearLayout>
+
+    <!-- Network Priority Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Wi-Fi > Ethernet > Cellular priority. Additionally, windows above 10k and 20k get extra points."
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_network_priority"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ON"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+      />
+
+    </LinearLayout>
+
+    <!-- Quality-Based Scoring Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Punish connections with recent NAKs.\nMore recent = more punishment.\nDouble punishment for NAK burst."
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_quality_scoring"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ON"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+      />
+
+    </LinearLayout>
+
+    <!-- Connection Exploration Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Connection exploration.\n10% of the time pick 2nd best network.\nEvery ~5 seconds explore for ~500ms."
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_exploration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ON"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+      />
+
+    </LinearLayout>
+
+    <!-- Connection Stickiness Toggle -->
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="16dp"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text='Connection "stickiness". Prevent frequent network switches. Use selected network for at least 500ms.'
+        android:textSize="12sp" />
+
+      <Button
+        android:id="@+id/button_toggle_stickiness"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ON"
+        android:textSize="12sp"
+        android:minWidth="100dp"
+      />
+
+    </LinearLayout>
+
   </LinearLayout>
 
 </ScrollView>
