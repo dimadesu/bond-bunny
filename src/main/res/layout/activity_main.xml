@@ -14,7 +14,6 @@
     android:padding="16dp"
     android:paddingBottom="24dp">
 
-    <!-- About and Settings buttons -->
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
@@ -41,112 +40,6 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="URL Builder" />
-
-    </LinearLayout>
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Configure your livestreaming app to send SRT to the localhost or device's IP address."
-      android:textSize="12sp"
-      android:layout_marginBottom="4dp" />
-
-    <ScrollView
-      android:layout_width="match_parent"
-      android:layout_height="0dp"
-      android:layout_weight="1"
-      android:layout_marginBottom="4dp">
-
-      <TextView
-        android:id="@+id/text_networks"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Available Networks:\nScanning..."
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:padding="8dp"
-        android:background="#f0f0f0" />
-
-    </ScrollView>
-
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Stream ID is only used here for building SRT URL.\nYour streaming app must send it."
-      android:layout_marginBottom="4dp" />
-
-    <EditText
-      android:id="@+id/edit_stream_id"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:hint="yourStreamId (will be added to SRT URLs)"
-      android:inputType="text"
-      android:layout_marginBottom="16dp" />
-
-    <!-- SRT URL Generator Section -->
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="📺 SRT URLs for your streaming app:"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:layout_marginBottom="8dp" />
-
-    <TextView
-      android:id="@+id/text_srt_url_localhost"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:text="srt://localhost:6000"
-      android:textSize="14sp"
-      android:fontFamily="monospace"
-      android:padding="8dp"
-      android:background="#e8f5e8"
-      android:layout_marginBottom="4dp"
-      android:selectAllOnFocus="true"
-      android:focusable="true"
-      android:focusableInTouchMode="true" />
-
-    <TextView
-      android:id="@+id/text_srt_url_wifi"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:text="srt://192.168.1.xxx:6000"
-      android:textSize="14sp"
-      android:fontFamily="monospace"
-      android:padding="8dp"
-      android:background="#e3f2fd"
-      android:layout_marginBottom="16dp"
-      android:selectAllOnFocus="true"
-      android:focusable="true"
-      android:focusableInTouchMode="true" />
-
-    <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:layout_marginBottom="8dp">
-
-      <Button
-        android:id="@+id/button_copy_localhost"
-        android:layout_width="0dp"
-        android:layout_height="32dp"
-        android:layout_weight="1"
-        android:text="📋 Copy Localhost URL"
-        android:textSize="12sp"
-        android:layout_marginEnd="4dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:padding="4dp" />
-
-      <Button
-        android:id="@+id/button_copy_wifi"
-        android:layout_width="0dp"
-        android:layout_height="32dp"
-        android:layout_weight="1"
-        android:text="📋 Copy WiFi URL"
-        android:textSize="12sp"
-        android:layout_marginStart="4dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:padding="4dp" />
 
     </LinearLayout>
 
