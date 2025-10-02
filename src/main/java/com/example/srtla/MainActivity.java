@@ -35,11 +35,6 @@ public class MainActivity extends Activity {
     private static final String PREF_SRTLA_PORT = "srtla_port";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
-    private static final String PREF_STICKINESS_ENABLED = "stickiness_enabled";
-    private static final String PREF_QUALITY_SCORING_ENABLED = "quality_scoring_enabled";
-    private static final String PREF_NETWORK_PRIORITY_ENABLED = "network_priority_enabled";
-    private static final String PREF_EXPLORATION_ENABLED = "exploration_enabled";
-    private static final String PREF_CLASSIC_MODE = "classic_mode";
     
     private Button buttonStart;
     private Button buttonStop;
@@ -50,17 +45,7 @@ public class MainActivity extends Activity {
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
-    private Button buttonToggleStickiness;
-    private Button buttonToggleQualityScoring;
-    private Button buttonToggleNetworkPriority;
-    private Button buttonToggleExploration;
-    private Button buttonToggleClassicMode;
     private boolean serviceRunning = false;
-    private boolean stickinessEnabled = true; // Default to enabled
-    private boolean qualityScoringEnabled = true; // Default to enabled
-    private boolean networkPriorityEnabled = true; // Default to enabled  
-    private boolean explorationEnabled = true; // Default to enabled
-    private boolean classicMode = false; // Default to enhanced mode
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -102,11 +87,6 @@ public class MainActivity extends Activity {
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
-        buttonToggleStickiness = findViewById(R.id.button_toggle_stickiness);
-        buttonToggleQualityScoring = findViewById(R.id.button_toggle_quality_scoring);
-        buttonToggleNetworkPriority = findViewById(R.id.button_toggle_network_priority);
-        buttonToggleExploration = findViewById(R.id.button_toggle_exploration);
-        buttonToggleClassicMode = findViewById(R.id.button_toggle_classic_mode);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -120,14 +100,6 @@ public class MainActivity extends Activity {
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
-
-        // Set up advanced feature toggle buttons
-        buttonToggleStickiness.setOnClickListener(v -> toggleConnectionStickiness());
-        buttonToggleQualityScoring.setOnClickListener(v -> toggleQualityScoring());
-        buttonToggleNetworkPriority.setOnClickListener(v -> toggleNetworkPriority());
-        buttonToggleExploration.setOnClickListener(v -> toggleExploration());
-        buttonToggleClassicMode.setOnClickListener(v -> toggleClassicMode());
-        updateAdvancedFeatureButtons();
         
         // Load saved preferences or use default values
         loadPreferences();
@@ -206,12 +178,13 @@ public class MainActivity extends Activity {
 
         serviceRunning = true;
 
-        // Apply all current feature settings to the service
-        EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
-        EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
-        EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
-        EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-        EnhancedSrtlaService.setClassicMode(classicMode);
+        // Apply all current feature settings to the service from saved preferences
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        EnhancedSrtlaService.setStickinessEnabled(prefs.getBoolean("stickiness_enabled", false));
+        EnhancedSrtlaService.setQualityScoringEnabled(prefs.getBoolean("quality_scoring_enabled", true));
+        EnhancedSrtlaService.setNetworkPriorityEnabled(prefs.getBoolean("network_priority_enabled", true));
+        EnhancedSrtlaService.setExplorationEnabled(prefs.getBoolean("exploration_enabled", false));
+        EnhancedSrtlaService.setClassicMode(prefs.getBoolean("classic_mode", false));
 
         updateUI();
         startStatsUpdates();
@@ -331,27 +304,12 @@ public class MainActivity extends Activity {
     
     private void loadPreferences() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        
-        stickinessEnabled = prefs.getBoolean(PREF_STICKINESS_ENABLED, false);
-        qualityScoringEnabled = prefs.getBoolean(PREF_QUALITY_SCORING_ENABLED, true);
-        networkPriorityEnabled = prefs.getBoolean(PREF_NETWORK_PRIORITY_ENABLED, true);
-        explorationEnabled = prefs.getBoolean(PREF_EXPLORATION_ENABLED, false);
-        classicMode = prefs.getBoolean(PREF_CLASSIC_MODE, false);
-        
-        updateAdvancedFeatureButtons();
+        // Algorithm preferences are now managed in SettingsActivity
     }
     
     private void savePreferences() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        
-        editor.putBoolean(PREF_STICKINESS_ENABLED, stickinessEnabled);
-        editor.putBoolean(PREF_QUALITY_SCORING_ENABLED, qualityScoringEnabled);
-        editor.putBoolean(PREF_NETWORK_PRIORITY_ENABLED, networkPriorityEnabled);
-        editor.putBoolean(PREF_EXPLORATION_ENABLED, explorationEnabled);
-        editor.putBoolean(PREF_CLASSIC_MODE, classicMode);
-        
-        editor.apply();
+        // Algorithm preferences are now managed in SettingsActivity
+        // No longer saving preferences in MainActivity
     }
 
     @Override
@@ -427,101 +385,5 @@ public class MainActivity extends Activity {
             Log.w("MainActivity", "Failed to post startup notification", e);
         }
     }
-    
-    private void toggleConnectionStickiness() {
-        stickinessEnabled = !stickinessEnabled;
-        updateAdvancedFeatureButtons();
-        savePreferences(); // Save the setting
-        
-        // Apply the setting to the service if it's running
-        if (serviceRunning) {
-            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
-            Toast.makeText(this, 
-                stickinessEnabled ? "Connection stickiness enabled" : "Connection stickiness disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private void toggleQualityScoring() {
-        qualityScoringEnabled = !qualityScoringEnabled;
-        updateAdvancedFeatureButtons();
-        savePreferences();
-        
-        if (serviceRunning) {
-            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
-            Toast.makeText(this, 
-                qualityScoringEnabled ? "Quality-based scoring enabled" : "Quality-based scoring disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private void toggleNetworkPriority() {
-        networkPriorityEnabled = !networkPriorityEnabled;
-        updateAdvancedFeatureButtons();
-        savePreferences();
-        
-        if (serviceRunning) {
-            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
-            Toast.makeText(this, 
-                networkPriorityEnabled ? "Network priority scaling enabled" : "Network priority scaling disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private void toggleExploration() {
-        explorationEnabled = !explorationEnabled;
-        updateAdvancedFeatureButtons();
-        savePreferences();
-        
-        if (serviceRunning) {
-            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-            Toast.makeText(this, 
-                explorationEnabled ? "Connection exploration enabled" : "Connection exploration disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    private void toggleClassicMode() {
-        classicMode = !classicMode;
-        updateAdvancedFeatureButtons();
-        savePreferences();
-
-        if (serviceRunning) {
-            EnhancedSrtlaService.setClassicMode(classicMode);
-            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
-            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
-            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
-            
-            Toast.makeText(this, 
-                classicMode ? "Classic SRTLA algorithm enabled - all enhancements disabled" : 
-                           "Enhanced Android mode enabled - all features restored", 
-                Toast.LENGTH_LONG).show();
-        }
-    }
-    
-    private void updateAdvancedFeatureButtons() {
-        updateButtonState(buttonToggleStickiness, stickinessEnabled && !classicMode);
-        updateButtonState(buttonToggleQualityScoring, qualityScoringEnabled && !classicMode);
-        updateButtonState(buttonToggleNetworkPriority, networkPriorityEnabled && !classicMode);
-        updateButtonState(buttonToggleExploration, explorationEnabled && !classicMode);
-        updateButtonState(buttonToggleClassicMode, classicMode);
-        
-        // Disable individual feature buttons when in classic mode
-        buttonToggleStickiness.setEnabled(!classicMode);
-        buttonToggleQualityScoring.setEnabled(!classicMode);
-        buttonToggleNetworkPriority.setEnabled(!classicMode);
-        buttonToggleExploration.setEnabled(!classicMode);
-    }
-    
-    private void updateButtonState(Button button, boolean enabled) {
-        if (enabled) {
-            button.setText("ON");
-            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                getResources().getColor(android.R.color.holo_green_light)));
-        } else {
-            button.setText("OFF");
-            button.setBackgroundTintList(null);
-        }
-    }
+    // Algorithm toggle methods moved to SettingsActivity
 }
