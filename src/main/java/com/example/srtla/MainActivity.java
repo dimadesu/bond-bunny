@@ -373,7 +373,7 @@ public class MainActivity extends Activity {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle("Bond Bunny started")
                 .setContentText("Service is not running")
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
