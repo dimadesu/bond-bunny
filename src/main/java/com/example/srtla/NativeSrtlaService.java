@@ -342,6 +342,83 @@ public class NativeSrtlaService extends Service {
         }
     }
 
+    // Simple housekeeping variables (inspired by srtla_send.c)
+    private static final int HOUSEKEEPING_INTERVAL_MS = 2000; // 2 seconds
+    private static final int CONNECTION_TIMEOUT_SEC = 5; // Connection timeout
+    private long lastHousekeepingTime = 0;
+    private Thread housekeepingThread = null;
+    
+    /**
+     * Simple periodic housekeeping inspired by srtla_send.c connection_housekeeping()
+     * This runs every 2 seconds and:
+     * 1. Checks connection health 
+     * 2. Attempts reconnection for failed connections
+     * 3. Updates connection state
+     */
+    private void startSimpleHousekeeping() {
+        if (housekeepingThread != null && housekeepingThread.isAlive()) {
+            Log.i(TAG, "Housekeeping already running");
+            return;
+        }
+        
+        housekeepingThread = new Thread(() -> {
+            Log.i(TAG, "Simple housekeeping thread started");
+            
+            while (isRunning && !Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(HOUSEKEEPING_INTERVAL_MS);
+                    performHousekeeping();
+                } catch (InterruptedException e) {
+                    Log.i(TAG, "Housekeeping thread interrupted");
+                    break;
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in housekeeping", e);
+                }
+            }
+            
+            Log.i(TAG, "Simple housekeeping thread stopped");
+        }, "SRTLA-Housekeeping");
+        
+        housekeepingThread.start();
+    }
+    
+    /**
+     * Core housekeeping logic inspired by srtla_send.c
+     */
+    private void performHousekeeping() {
+        long currentTime = System.currentTimeMillis();
+        
+        // Throttle housekeeping execution
+        if (currentTime - lastHousekeepingTime < HOUSEKEEPING_INTERVAL_MS) {
+            return;
+        }
+        lastHousekeepingTime = currentTime;
+        
+        try {
+            // Basic connection health check
+            int totalConnections = connectionDataMap.size();
+            int connectedCount = getConnectedConnectionCount();
+            
+            Log.d(TAG, "Housekeeping: Total=" + totalConnections + ", Connected=" + connectedCount);
+            
+            // If we have no connections but networks are available, try to set them up
+            if (totalConnections == 0 && !availableNetworks.isEmpty()) {
+                Log.i(TAG, "No connections but networks available - attempting registration");
+                registerDetectedNetworks();
+            }
+            
+            // If we have connections but none are connected, trigger maintenance
+            if (totalConnections > 0 && connectedCount == 0) {
+                Log.w(TAG, "Connections exist but none connected - triggering maintenance");
+                // This will trigger the reconnection logic in getConns()
+                getConns();
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in performHousekeeping", e);
+        }
+    }
+    
     // Simple getter that just returns size - calls getConns() to trigger side effects
     private int getConnsSize() {
         return getConns().size();
@@ -488,6 +565,16 @@ public class NativeSrtlaService extends Service {
         isRunning = true;
 
         startConnectionManagerThread(localPort, serverHost, serverPort);
+        
+        // Start simple housekeeping after a short delay
+        new Thread(() -> {
+            try {
+                Thread.sleep(3000); // Wait 3 seconds for initial setup
+                startSimpleHousekeeping();
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Housekeeping startup interrupted", e);
+            }
+        }).start();
         
         return START_STICKY;
     }
@@ -966,6 +1053,17 @@ public class NativeSrtlaService extends Service {
         
         isRunning = false;
         shouldKill = true; // Signal main thread to stop
+        
+        // Stop housekeeping thread
+        if (housekeepingThread != null && housekeepingThread.isAlive()) {
+            try {
+                housekeepingThread.interrupt();
+                housekeepingThread.join(1000); // Wait up to 1 second
+                Log.i(TAG, "Housekeeping thread stopped");
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while waiting for housekeeping thread to stop");
+            }
+        }
         
         // Stop main thread
         if (connectionManagerThread != null) {
