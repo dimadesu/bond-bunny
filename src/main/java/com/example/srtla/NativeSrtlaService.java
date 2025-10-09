@@ -247,6 +247,9 @@ public class NativeSrtlaService extends Service {
                     conn.score = targetWeight;
                 }
                 
+                // Mark connection as active since it's enabled and being included
+                conn.isActive = true;
+                
                 // Add to active connections
                 activeConnections.add(conn);
             } else {
@@ -257,6 +260,8 @@ public class NativeSrtlaService extends Service {
                 }
                 // Set reconnect flag (standard pattern for disabled connections)
                 conn.needsReconnect = true;
+                // Mark as inactive since it's disabled
+                conn.isActive = false;
                 // Don't add to activeConnections, but keep in connectionDataMap
             }
         }
@@ -819,6 +824,19 @@ public class NativeSrtlaService extends Service {
             boolean cellularAvailable = false;
             boolean ethernetAvailable = false;
             
+            // First check our stored available networks from requestNetwork callbacks
+            for (Network network : availableNetworks) {
+                String networkType = networkTypes.get(network);
+                if ("wifi".equals(networkType)) {
+                    wifiAvailable = true;
+                } else if ("cellular".equals(networkType)) {
+                    cellularAvailable = true;
+                } else if ("ethernet".equals(networkType)) {
+                    ethernetAvailable = true;
+                }
+            }
+            
+            // Also check getAllNetworks as a backup
             Network[] networks = connectivityManager.getAllNetworks();
             Log.d(TAG, "Checking " + networks.length + " networks for availability");
             
