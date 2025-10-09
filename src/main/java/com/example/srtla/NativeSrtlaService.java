@@ -207,8 +207,9 @@ public class NativeSrtlaService extends Service {
     // Get connections with full side effects - advanced connection management
     // This triggers connection filtering, cleanup, reconnection, and enable/disable management
     private ArrayList<ConnectionData> getConns() {
+        // TODO: Temporarily disabled sync to test streaming stability
         // First sync with native layer to remove stale connections
-        syncConnectionsWithNative();
+        // syncConnectionsWithNative();
         
         // Update connection enable states from system before processing connections
         updateConnectionEnableFromSystemState();
