@@ -149,7 +149,7 @@ public class NativeSrtlaService extends Service {
     }
 
     // Connection inactivity threshold - only remove connections inactive for this long
-    private static final long STALE_CONNECTION_THRESHOLD_MS = 30000; // 30 seconds
+    private static final long STALE_CONNECTION_THRESHOLD_MS = 4000; // 4 seconds
     
     /**
      * Smart sync Java connection state with native layer reality
