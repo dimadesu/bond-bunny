@@ -11,8 +11,10 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <map>
+#include <vector>
 
-// Include SRTLA headers
+// Include original SRTLA headers
 extern "C" {
 #include "common.h"
 }
@@ -23,31 +25,34 @@ extern "C" {
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
-// Android-specific connection structure  
-struct srtla_android_connection {
-    int fd;
-    std::string virtual_ip;     // SRTLA protocol identifier (e.g. "10.0.1.1")
-    std::string real_ip;        // Actual interface IP (e.g. "172.20.10.2")
-    long network_handle;
-    struct sockaddr_in local_addr;
-    struct sockaddr_in server_addr;
-    time_t last_sent;
-    time_t last_received;
-    int window;
-    int in_flight_packets;
-    bool active;
-    std::string connection_id;
-    std::string network_type;   // "WiFi" or "Cellular"
-};
+// Use original SRTLA structures where possible, add Android-specific fields
+typedef struct android_conn {
+    struct conn base;              // Original SRTLA connection structure
+    std::string virtual_ip;        // SRTLA protocol identifier (e.g. "10.0.1.1")
+    std::string real_ip;          // Actual interface IP (e.g. "172.20.10.2")
+    long network_handle;          // Android network handle for socket binding
+    std::string network_type;     // "WiFi" or "Cellular"
+    std::string connection_id;    // Unique identifier
+} android_conn_t;
 
-// Android session structure
+// Android SRTLA session using original logic
 struct srtla_android_session {
+    // Original SRTLA global variables
+    struct sockaddr srtla_addr;   // Server address
+    struct sockaddr srt_addr;     // Local SRT listener address  
+    int listenfd;                 // SRT listener socket
+    char srtla_id[SRTLA_ID_LEN];  // Session ID
+    
+    // Android-specific fields
     std::string server_host;
     int server_port;
     int local_port;
-    int listen_fd;
-    struct sockaddr_in server_addr;
-    struct sockaddr_in client_addr;
+    bool running;
+    std::thread worker_thread;
+    
+    // Connection management using original SRTLA structures
+    std::map<std::string, android_conn_t*> connections;
+    std::mutex connections_mutex;
     
     std::vector<std::unique_ptr<srtla_android_connection>> connections;
     std::mutex connections_mutex;
