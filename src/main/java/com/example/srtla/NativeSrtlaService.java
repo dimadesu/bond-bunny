@@ -148,9 +148,13 @@ public class NativeSrtlaService extends Service {
         return connectionIndex.get();
     }
 
+    // Connection inactivity threshold - only remove connections inactive for this long
+    private static final long STALE_CONNECTION_THRESHOLD_MS = 30000; // 30 seconds
+    
     /**
-     * Sync Java connection state with native layer reality
-     * Remove connections that exist in Java but not in native
+     * Smart sync Java connection state with native layer reality
+     * Only removes connections that have been inactive for a significant time
+     * to avoid interfering with SRT handshakes and streaming establishment
      */
     private void syncConnectionsWithNative() {
         try {
@@ -165,38 +169,49 @@ public class NativeSrtlaService extends Service {
                 }
             }
             
-            Log.i(TAG, "Sync check: Native has " + nativeVirtualIps.size() + " connections, Java has " + connectionDataMap.size());
+            Log.i(TAG, "Smart sync check: Native has " + nativeVirtualIps.size() + " connections, Java has " + connectionDataMap.size());
             
-            // Find Java connections that don't exist in native
+            // Find Java connections that don't exist in native AND are stale
             Iterator<Map.Entry<String, ConnectionData>> it = connectionDataMap.entrySet().iterator();
             int removedCount = 0;
+            long currentTime = System.currentTimeMillis();
             
             while (it.hasNext()) {
                 Map.Entry<String, ConnectionData> entry = it.next();
                 String connId = entry.getKey();
+                ConnectionData connData = entry.getValue();
                 String virtualIp = connIdToVirtualIp.get(connId);
                 
                 if (virtualIp != null && !nativeVirtualIps.contains(virtualIp)) {
-                    Log.w(TAG, "Connection " + connId + " (virtualIp=" + virtualIp + ") exists in Java but not native - removing");
+                    // Check if connection has been inactive long enough to be considered stale
+                    long inactiveTime = currentTime - connData.lastUpdate;
                     
-                    // Clean up all mappings
-                    Network network = connIdToNetwork.get(connId);
-                    if (network != null) {
-                        networkToConnId.remove(network);
-                        connIdToNetwork.remove(connId);
+                    if (inactiveTime > STALE_CONNECTION_THRESHOLD_MS) {
+                        Log.w(TAG, "Connection " + connId + " (virtualIp=" + virtualIp + ") inactive for " + 
+                              inactiveTime + "ms - removing stale connection");
+                        
+                        // Clean up all mappings
+                        Network network = connIdToNetwork.get(connId);
+                        if (network != null) {
+                            networkToConnId.remove(network);
+                            connIdToNetwork.remove(connId);
+                        }
+                        connIdToVirtualIp.remove(connId);
+                        virtualIpToConnId.remove(virtualIp);
+                        
+                        // Remove from Java connection map
+                        it.remove();
+                        removedCount++;
+                    } else {
+                        Log.d(TAG, "Connection " + connId + " missing from native but only inactive for " + 
+                              inactiveTime + "ms - keeping (grace period)");
                     }
-                    connIdToVirtualIp.remove(connId);
-                    virtualIpToConnId.remove(virtualIp);
-                    
-                    // Remove from Java connection map
-                    it.remove();
-                    removedCount++;
                 }
             }
             
             if (removedCount > 0) {
                 connectionCount = connectionDataMap.size();
-                Log.i(TAG, "Sync complete: Removed " + removedCount + " stale connections, " + connectionCount + " remaining");
+                Log.i(TAG, "Smart sync complete: Removed " + removedCount + " stale connections, " + connectionCount + " remaining");
             }
             
         } catch (Exception e) {
@@ -207,9 +222,8 @@ public class NativeSrtlaService extends Service {
     // Get connections with full side effects - advanced connection management
     // This triggers connection filtering, cleanup, reconnection, and enable/disable management
     private ArrayList<ConnectionData> getConns() {
-        // TODO: Temporarily disabled sync to test streaming stability
-        // First sync with native layer to remove stale connections
-        // syncConnectionsWithNative();
+        // Smart sync with native layer to remove only truly stale connections
+        syncConnectionsWithNative();
         
         // Update connection enable states from system before processing connections
         updateConnectionEnableFromSystemState();
