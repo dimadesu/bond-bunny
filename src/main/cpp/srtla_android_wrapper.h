@@ -5,13 +5,14 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
+#include <atomic>
 
 // Forward declarations to avoid including SRTLA headers in public interface
-struct srtla_android_connection;
 struct srtla_android_session;
 
 /**
- * Android wrapper for SRTLA functionality
+ * Android wrapper for SRTLA functionality using original C implementation
  * Provides a clean C++ interface that can be called from JNI
  */
 class SRTLAAndroidWrapper {
@@ -22,24 +23,20 @@ public:
     // Session management
     bool initialize(const std::string& server_host, int server_port, int local_port);
     void shutdown();
-    bool isRunning() const { return running_; }
 
-    // Connection management  
-    bool addConnection(const std::string& real_ip, long network_handle, const std::string& network_type);
-    void removeConnection(const std::string& virtual_ip);
-    void removeAllConnections();
+    // Connection management using original SRTLA structures
+    bool addConnection(long network_handle, const std::string& network_type, 
+                      const std::string& real_ip, const std::string& virtual_ip);
+    bool removeConnection(long network_handle);
 
     // Statistics
-    int getActiveConnectionCount() const;
-    std::vector<std::string> getConnectionStats() const;
-
-    // Packet processing (called from separate threads)
-    void processSRTPacket(const uint8_t* data, size_t length);
-    void processSRTLAResponse(const uint8_t* data, size_t length, const std::string& connection_id);
+    int getActiveConnectionCount();
+    std::vector<std::string> getConnectionStats();
 
 private:
-    bool running_;
     std::unique_ptr<srtla_android_session> session_;
+    std::atomic<bool> running_;
+    std::mutex session_mutex_;
     
     // No copy/assignment
     SRTLAAndroidWrapper(const SRTLAAndroidWrapper&) = delete;
@@ -62,14 +59,15 @@ extern "C" {
     JNIEXPORT void JNICALL
     Java_com_example_srtla_SRTLANative_shutdown(JNIEnv *env, jobject thiz, jlong session_ptr);
     
-    // Connection management
+    // Connection management  
     JNIEXPORT jboolean JNICALL
     Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
-                                                     jstring real_ip, jlong network_handle, jstring network_type);
+                                                     jlong network_handle, jstring network_type, 
+                                                     jstring real_ip, jstring virtual_ip);
                                                      
     JNIEXPORT void JNICALL
     Java_com_example_srtla_SRTLANative_removeConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
-                                                        jstring local_ip);
+                                                        jlong network_handle);
     
     // Statistics
     JNIEXPORT jint JNICALL
