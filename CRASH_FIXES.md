@@ -122,6 +122,68 @@ Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlon
 
 4. **Updated C++ struct and logging** to use `long` and `%ld` format specifiers
 
+## Issue 5: Virtual IP Implementation (ENHANCEMENT)
+
+**Enhancement**: Added virtual IP support to improve network isolation and SRTLA protocol management.
+
+**Benefits**:
+
+- **Clean Separation**: Virtual IPs for SRTLA protocol (`10.0.1.1`, `10.0.2.1`) separate from real interface IPs
+- **Network Isolation**: Each connection type gets predictable virtual address space
+- **Better Debugging**: Clear distinction between protocol identifiers and actual network addresses
+- **SRTLA Compatibility**: Consistent virtual IPs improve server-side connection tracking
+
+**Implementation**:
+
+1. **Enhanced Connection Structure**:
+
+```cpp
+struct srtla_android_connection {
+    std::string virtual_ip;     // SRTLA protocol identifier (e.g. "10.0.1.1")
+    std::string real_ip;        // Actual interface IP (e.g. "172.20.10.2")
+    std::string network_type;   // "WiFi" or "Cellular"
+    long network_handle;
+    // ... other fields
+};
+```
+
+2. **Virtual IP Assignment**:
+
+```cpp
+std::string generateVirtualIP(const std::string& network_type) {
+    if (network_type == "WiFi") {
+        return "10.0.1.1";
+    } else if (network_type == "Cellular") {
+        return "10.0.2.1";
+    } else {
+        return "10.0.9.1";  // Fallback for unknown types
+    }
+}
+```
+
+3. **Updated JNI Interface**:
+
+```java
+// Java interface now accepts network type
+public native boolean addConnection(long sessionPtr, String realIp, long networkHandle, String networkType);
+
+// Service passes network type from Android ConnectivityManager
+boolean success = srtlaNative.addConnection(sessionPtr, localIp, networkHandle, networkType);
+```
+
+4. **Dual IP Binding Strategy**:
+
+- **Virtual IP**: Used for SRTLA protocol identification and server communication
+- **Real IP**: Used for actual socket binding to specific network interfaces
+- **Network Handle**: Ensures traffic routes through correct Android network interface
+
+**Expected Results**:
+
+- ✅ **Predictable Virtual IPs**: WiFi=`10.0.1.1`, Cellular=`10.0.2.1`
+- ✅ **Real Network Binding**: Sockets still bind to actual interface IPs (172.20.10.2, 192.0.0.2)
+- ✅ **Improved Logging**: Clear virtual vs real IP distinction in debug output
+- ✅ **Better SRTLA Server Compatibility**: Consistent virtual IP addresses for connection tracking
+
 ## Testing Recommendation:
 
 The fixed APK should now start the CleanSrtlaService without crashing and properly detect real local IP addresses for network binding.

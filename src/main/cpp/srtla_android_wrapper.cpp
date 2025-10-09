@@ -21,11 +21,13 @@ extern "C" {
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 
 // Android-specific connection structure  
 struct srtla_android_connection {
     int fd;
-    std::string local_ip;
+    std::string virtual_ip;     // SRTLA protocol identifier (e.g. "10.0.1.1")
+    std::string real_ip;        // Actual interface IP (e.g. "172.20.10.2")
     long network_handle;
     struct sockaddr_in local_addr;
     struct sockaddr_in server_addr;
@@ -35,6 +37,7 @@ struct srtla_android_connection {
     int in_flight_packets;
     bool active;
     std::string connection_id;
+    std::string network_type;   // "WiFi" or "Cellular"
 };
 
 // Android session structure
@@ -59,6 +62,18 @@ struct srtla_android_session {
         memset(session_id, 0, SRTLA_ID_LEN);
     }
 };
+
+// Generate virtual IP based on network type
+std::string generateVirtualIP(const std::string& network_type) {
+    if (network_type == "WiFi") {
+        return "10.0.1.1";
+    } else if (network_type == "Cellular") {
+        return "10.0.2.1";
+    } else {
+        // Fallback for unknown types
+        return "10.0.9.1";
+    }
+}
 
 SRTLAAndroidWrapper::SRTLAAndroidWrapper() : running_(false) {
     session_ = std::make_unique<srtla_android_session>();
@@ -148,33 +163,48 @@ void SRTLAAndroidWrapper::shutdown() {
     LOGI("SRTLA session shut down");
 }
 
-bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, long network_handle) {
+bool SRTLAAndroidWrapper::addConnection(const std::string& real_ip, long network_handle, const std::string& network_type) {
     if (!running_) {
         LOGE("Session not running");
         return false;
     }
     
+    // Generate virtual IP for this network type
+    std::string virtual_ip = generateVirtualIP(network_type);
+    
+    LOGI("Adding connection: real_ip=%s, virtual_ip=%s, type=%s, handle=%ld", 
+         real_ip.c_str(), virtual_ip.c_str(), network_type.c_str(), network_handle);
+    
     std::lock_guard<std::mutex> lock(session_->connections_mutex);
     
-    // Check if connection already exists
+    // Check if connection with same virtual IP already exists
     for (const auto& conn : session_->connections) {
-        if (conn->local_ip == local_ip) {
-            LOGD("Connection %s already exists", local_ip.c_str());
-            return true;
+        if (conn->virtual_ip == virtual_ip) {
+            LOGW("Connection with virtual IP %s already exists, removing old one", virtual_ip.c_str());
+            // Remove existing connection for this network type
+            session_->connections.erase(
+                std::remove_if(session_->connections.begin(), session_->connections.end(),
+                    [&virtual_ip](const std::unique_ptr<srtla_android_connection>& conn) {
+                        return conn->virtual_ip == virtual_ip;
+                    }),
+                session_->connections.end());
+            break;
         }
     }
     
     auto connection = std::make_unique<srtla_android_connection>();
-    connection->local_ip = local_ip;
+    connection->virtual_ip = virtual_ip;
+    connection->real_ip = real_ip;
     connection->network_handle = network_handle;
-    connection->connection_id = local_ip + ":" + std::to_string(network_handle);
+    connection->network_type = network_type;
+    connection->connection_id = virtual_ip + ":" + network_type;
     connection->window = 20 * 1000; // Default window from SRTLA
     connection->in_flight_packets = 0;
     connection->active = false;
     
-    // Parse local IP
-    if (inet_aton(local_ip.c_str(), &connection->local_addr.sin_addr) == 0) {
-        LOGE("Invalid local IP: %s", local_ip.c_str());
+    // Parse real IP for socket binding (use real interface IP)
+    if (inet_aton(real_ip.c_str(), &connection->local_addr.sin_addr) == 0) {
+        LOGE("Invalid real IP: %s", real_ip.c_str());
         return false;
     }
     connection->local_addr.sin_family = AF_INET;
@@ -183,7 +213,7 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, long networ
     // Create socket and bind to network
     connection->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (connection->fd < 0) {
-        LOGE("Failed to create socket for %s", local_ip.c_str());
+        LOGE("Failed to create socket for %s (%s)", virtual_ip.c_str(), real_ip.c_str());
         return false;
     }
     
@@ -191,19 +221,20 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, long networ
     if (network_handle != 0) {
         net_handle_t net_handle = static_cast<net_handle_t>(network_handle);
         if (android_setsocknetwork(net_handle, connection->fd) != 0) {
-            LOGD("Warning: Could not bind to network handle %ld for %s: %s", 
-                 network_handle, local_ip.c_str(), strerror(errno));
+            LOGD("Warning: Could not bind to network handle %ld for %s (%s): %s", 
+                 network_handle, virtual_ip.c_str(), real_ip.c_str(), strerror(errno));
             // Continue anyway - socket can still work without network binding
         } else {
-            LOGD("Successfully bound socket to network handle %ld for %s", 
-                 network_handle, local_ip.c_str());
+            LOGI("Successfully bound socket to network handle %ld for %s (%s)", 
+                 network_handle, virtual_ip.c_str(), real_ip.c_str());
         }
     }
     
-    // Bind to local address
+    // Bind to real local address
     if (bind(connection->fd, (struct sockaddr*)&connection->local_addr, 
              sizeof(connection->local_addr)) < 0) {
-        LOGE("Failed to bind socket to %s", local_ip.c_str());
+        LOGE("Failed to bind socket to real IP %s (virtual: %s): %s", 
+             real_ip.c_str(), virtual_ip.c_str(), strerror(errno));
         close(connection->fd);
         return false;
     }
@@ -213,18 +244,18 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, long networ
     
     session_->connections.push_back(std::move(connection));
     
-    LOGI("Added SRTLA connection: %s (network_handle=%ld)", 
-         local_ip.c_str(), network_handle);
+    LOGI("Added SRTLA connection: virtual=%s, real=%s, type=%s (handle=%ld)", 
+         virtual_ip.c_str(), real_ip.c_str(), network_type.c_str(), network_handle);
     
     return true;
 }
 
-void SRTLAAndroidWrapper::removeConnection(const std::string& local_ip) {
+void SRTLAAndroidWrapper::removeConnection(const std::string& virtual_ip) {
     std::lock_guard<std::mutex> lock(session_->connections_mutex);
     
     auto it = std::remove_if(session_->connections.begin(), session_->connections.end(),
-        [&local_ip](const std::unique_ptr<srtla_android_connection>& conn) {
-            if (conn->local_ip == local_ip) {
+        [&virtual_ip](const std::unique_ptr<srtla_android_connection>& conn) {
+            if (conn->virtual_ip == virtual_ip) {
                 if (conn->fd >= 0) {
                     close(conn->fd);
                 }
@@ -235,7 +266,7 @@ void SRTLAAndroidWrapper::removeConnection(const std::string& local_ip) {
     
     if (it != session_->connections.end()) {
         session_->connections.erase(it, session_->connections.end());
-        LOGI("Removed SRTLA connection: %s", local_ip.c_str());
+        LOGI("Removed SRTLA connection: %s", virtual_ip.c_str());
     }
 }
 
@@ -328,15 +359,19 @@ Java_com_example_srtla_SRTLANative_shutdown(JNIEnv *env, jobject thiz, jlong ses
 
 JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
-                                                 jstring local_ip, jlong network_handle) {
+                                                 jstring real_ip, jlong network_handle, jstring network_type) {
     auto* wrapper = reinterpret_cast<SRTLAAndroidWrapper*>(session_ptr);
     if (!wrapper) return JNI_FALSE;
     
-    const char* ip_cstr = env->GetStringUTFChars(local_ip, nullptr);
+    const char* ip_cstr = env->GetStringUTFChars(real_ip, nullptr);
     std::string ip(ip_cstr);
-    env->ReleaseStringUTFChars(local_ip, ip_cstr);
+    env->ReleaseStringUTFChars(real_ip, ip_cstr);
     
-    return wrapper->addConnection(ip, (long)network_handle) ? JNI_TRUE : JNI_FALSE;
+    const char* type_cstr = env->GetStringUTFChars(network_type, nullptr);
+    std::string type(type_cstr);
+    env->ReleaseStringUTFChars(network_type, type_cstr);
+    
+    return wrapper->addConnection(ip, (long)network_handle, type) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL

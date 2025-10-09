@@ -18,8 +18,8 @@ public class SRTLANative {
     public native void shutdown(long sessionPtr);
     
     // Connection management
-    public native boolean addConnection(long sessionPtr, String localIp, long networkHandle);
-    public native void removeConnection(long sessionPtr, String localIp);
+    public native boolean addConnection(long sessionPtr, String realIp, long networkHandle, String networkType);
+    public native void removeConnection(long sessionPtr, String virtualIp);
     
     // Statistics
     public native int getActiveConnectionCount(long sessionPtr);

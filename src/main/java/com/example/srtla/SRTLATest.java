@@ -67,8 +67,8 @@ public class SRTLATest {
             }
             Log.i(TAG, "✓ SRTLA session initialized");
             
-            // Add a mock connection
-            boolean connectionAdded = srtla.addConnection(sessionPtr, "192.168.1.100", 0);
+            // Add a mock connection with virtual IP support
+            boolean connectionAdded = srtla.addConnection(sessionPtr, "192.168.1.100", 0L, "Test");
             if (!connectionAdded) {
                 Log.e(TAG, "Failed to add connection");
                 srtla.shutdown(sessionPtr);

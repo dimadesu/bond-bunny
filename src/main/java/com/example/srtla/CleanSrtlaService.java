@@ -208,8 +208,8 @@ public class CleanSrtlaService extends Service {
                 // Get network handle for binding
                 long networkHandle = network.getNetworkHandle();
                 
-                // Add connection to SRTLA
-                boolean success = srtlaNative.addConnection(sessionPtr, localIp, networkHandle);
+                // Add connection to SRTLA with virtual IP support
+                boolean success = srtlaNative.addConnection(sessionPtr, localIp, networkHandle, networkType);
                 if (success) {
                     networkToIpMap.put(network, localIp);
                     Log.i(TAG, "Added " + networkType + " connection: " + localIp + " (handle=" + networkHandle + ")");
