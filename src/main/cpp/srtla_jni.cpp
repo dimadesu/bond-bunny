@@ -1,6 +1,14 @@
 #include <jni.h>
 #include <string>
 #include <android/log.h>
+#include <android/multinetwork.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <cstring>
 #include "include/srtla_core.h"
 #include "include/srtla_connection.h"
 
@@ -351,6 +359,110 @@ Java_com_example_srtla_NativeSrtlaService_addConnection(
     // Network binding already done in Java - just add the connection
     bool result = g_srtla_core->add_connection(fd, ip, weight, conn_type);
     return result ? JNI_TRUE : JNI_FALSE;
+}
+
+/**
+ * Add a connection using network handle for native binding
+ * Signature: boolean addConnectionWithNetworkHandle(long networkHandle, String virtualIp, int weight, String type, String serverHost, int serverPort)
+ */
+JNIEXPORT jboolean JNICALL
+Java_com_example_srtla_NativeSrtlaService_addConnectionWithNetworkHandle(
+    JNIEnv* env,
+    jobject thiz,
+    jlong network_handle,
+    jstring virtual_ip,
+    jint weight,
+    jstring type,
+    jstring server_host,
+    jint server_port) {
+    
+    (void)thiz; // Unused parameter
+    
+    if (!g_srtla_core) {
+        LOGE("SRTLA core not initialized");
+        return JNI_FALSE;
+    }
+    
+    // Extract string parameters
+    const char* ip_cstr = env->GetStringUTFChars(virtual_ip, nullptr);
+    const char* type_cstr = env->GetStringUTFChars(type, nullptr);
+    const char* host_cstr = env->GetStringUTFChars(server_host, nullptr);
+    
+    std::string ip(ip_cstr);
+    std::string conn_type(type_cstr);
+    std::string host(host_cstr);
+    
+    env->ReleaseStringUTFChars(virtual_ip, ip_cstr);
+    env->ReleaseStringUTFChars(type, type_cstr);
+    env->ReleaseStringUTFChars(server_host, host_cstr);
+    
+    LOGI("Adding connection with network handle: handle=%ld, ip=%s, weight=%d, type=%s, server=%s:%d", 
+         network_handle, ip.c_str(), weight, conn_type.c_str(), host.c_str(), server_port);
+    
+    // Create UDP socket
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) {
+        LOGE("Failed to create socket: %s", strerror(errno));
+        return JNI_FALSE;
+    }
+    
+    // Bind socket to specific network using android_setsocknetwork
+    net_handle_t net_handle = static_cast<net_handle_t>(network_handle);
+    int bind_result = android_setsocknetwork(net_handle, fd);
+    if (bind_result != 0) {
+        LOGE("Failed to bind socket to network handle %ld: %s", network_handle, strerror(errno));
+        close(fd);
+        return JNI_FALSE;
+    }
+    
+    LOGI("Successfully bound socket fd=%d to network handle %ld", fd, network_handle);
+    
+    // Set socket options (like original SRTLA)
+    int bufsize = 8 * 1024 * 1024;  // 8MB send buffer
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize)) < 0) {
+        LOGE("Failed to set send buffer size to %d on fd=%d: %s", bufsize, fd, strerror(errno));
+    }
+    
+    // Set non-blocking mode
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+    
+    // Connect to SRTLA server
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(server_port);
+    
+    if (inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr) <= 0) {
+        LOGE("Invalid server address: %s", host.c_str());
+        close(fd);
+        return JNI_FALSE;
+    }
+    
+    // Connect the socket to the SRTLA server
+    if (connect(fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        LOGE("Failed to connect socket to %s:%d: %s", host.c_str(), server_port, strerror(errno));
+        close(fd);
+        return JNI_FALSE;
+    }
+    
+    LOGI("Successfully connected socket fd=%d to SRTLA server %s:%d", fd, host.c_str(), server_port);
+    
+    // Add connection to SRTLA core
+    bool result = g_srtla_core->add_connection(fd, ip, weight, conn_type);
+    
+    if (!result) {
+        LOGE("Failed to add connection to SRTLA core");
+        close(fd);
+        return JNI_FALSE;
+    }
+    
+    LOGI("Successfully added connection: fd=%d, ip=%s, type=%s, weight=%d, networkHandle=%ld", 
+         fd, ip.c_str(), conn_type.c_str(), weight, network_handle);
+    
+    return JNI_TRUE;
 }
 
 /**

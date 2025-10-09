@@ -104,6 +104,7 @@ public class NativeSrtlaService extends Service {
     private native int initializeBonding(int localPort, String serverHost, String serverPort);
     private native void shutdownBonding();
     private native boolean addConnection(int fd, String connId, int weight, String type);
+    private native boolean addConnectionWithNetworkHandle(long networkHandle, String virtualIp, int weight, String type, String serverHost, int serverPort);
     private native boolean removeConnection(String connId);
     private native void updateConnectionWeight(String connId, int weight);
     private native void refreshConnections();
@@ -588,67 +589,15 @@ public class NativeSrtlaService extends Service {
     
     /**
      * Add a network connection - called from NetworkCallback.onAvailable()
-     * This uses the Network object from requestNetwork() callback for proper binding
+     * This passes network handle to native for binding
      */
     private void addNetworkConnection(String networkType, Network network, int weight) {
-        Log.i(TAG, "addNetworkConnection: Adding " + networkType + " connection from requestNetwork callback");
+        Log.i(TAG, "addNetworkConnection: Adding " + networkType + " connection using native binding approach");
         
         try {
-            // Create socket - socket creation INSIDE the callback
-            DatagramSocket socket = new DatagramSocket();
-            
-            // DEBUGGING: Check socket's local address BEFORE Network.bindSocket()
-            try {
-                java.net.InetAddress localBefore = socket.getLocalAddress();
-                int portBefore = socket.getLocalPort();
-                Log.i(TAG, "BEFORE Network.bindSocket(" + networkType + "): socket local address = " + 
-                      (localBefore != null ? localBefore.getHostAddress() : "null") + ":" + portBefore);
-                Log.i(TAG, "BEFORE Network.bindSocket(" + networkType + "): network object = " + network);
-            } catch (Exception e) {
-                Log.w(TAG, "Could not get socket address before binding", e);
-            }
-            
-            // Use Network.bindSocket() IMMEDIATELY after socket creation
-            try {
-                network.bindSocket(socket);
-                Log.i(TAG, "SUCCESS: Network.bindSocket() properly bound " + networkType + " socket");
-            } catch (Exception e) {
-                Log.e(TAG, "CRITICAL: Network binding failed for " + networkType, e);
-                socket.close();
-                return;
-            }
-            
-            // DEBUGGING: Check socket's local address AFTER Network.bindSocket()
-            try {
-                java.net.InetAddress localAfter = socket.getLocalAddress();
-                int portAfter = socket.getLocalPort();
-                Log.i(TAG, "AFTER Network.bindSocket(" + networkType + "): socket local address = " + 
-                      (localAfter != null ? localAfter.getHostAddress() : "null") + ":" + portAfter);
-                Log.i(TAG, "Final check: " + networkType + " socket bound to local interface = " + 
-                      (localAfter != null ? localAfter.getHostAddress() : "null"));
-            } catch (Exception e) {
-                Log.w(TAG, "Could not get socket address after binding", e);
-            }
-            
-            // CRITICAL: Connect the UDP socket to the SRTLA server BEFORE passing to native
-            // This is essential for SRTLA protocol - REG1 packets must have destination
-            if (nativeServerHost != null && nativeServerPort > 0) {
-                try {
-                    socket.connect(new java.net.InetSocketAddress(nativeServerHost, nativeServerPort));
-                    Log.i(TAG, "CONNECTED " + networkType + " socket to SRTLA server " + nativeServerHost + ":" + nativeServerPort);
-                } catch (Exception e) {
-                    Log.e(TAG, "CRITICAL: Failed to connect " + networkType + " socket to SRTLA server", e);
-                    socket.close();
-                    return;
-                }
-            } else {
-                Log.e(TAG, "CRITICAL: No SRTLA server host/port configured - cannot connect socket");
-                socket.close();
-                return;
-            }
-            
-            // Detach file descriptor (socket now owned by native code)
-            int fd = ParcelFileDescriptor.fromDatagramSocket(socket).detachFd();
+            // Get network handle for native binding
+            long networkHandle = network.getNetworkHandle();
+            Log.i(TAG, "Got network handle for " + networkType + ": " + networkHandle);
             
             // Allocate virtual IP for this connection
             String virtualIp = allocateVirtualIp();
@@ -658,10 +607,11 @@ public class NativeSrtlaService extends Service {
             virtualIpToConnId.put(virtualIp, connId);
             connIdToVirtualIp.put(connId, virtualIp);
             
-            Log.i(TAG, "addNetworkConnection: Created socket with fd=" + fd + ", connId=" + connId + ", virtualIp=" + virtualIp);
+            Log.i(TAG, "addNetworkConnection: Created connection with connId=" + connId + ", virtualIp=" + virtualIp + ", networkHandle=" + networkHandle);
             
-            // Add to native SRTLA engine with virtual IP (not connection ID)
-            boolean success = addConnection(fd, virtualIp, weight, networkType);
+            // Add to native SRTLA engine with network handle for native binding
+            boolean success = addConnectionWithNetworkHandle(networkHandle, virtualIp, weight, networkType, 
+                                                           nativeServerHost, nativeServerPort);
             
             if (success) {
                 connectionCount++;
@@ -676,8 +626,9 @@ public class NativeSrtlaService extends Service {
                 ConnectionData connData = new ConnectionData(connId, networkType, version);
                 connectionDataMap.put(connId, connData);
                 
-                Log.i(TAG, "Successfully added " + networkType + " connection via requestNetwork: fd=" + fd + 
-                      ", id=" + connId + ", virtualIp=" + virtualIp + ", version=" + version + ", weight=" + weight + ". Total connections: " + connectionCount);
+                Log.i(TAG, "Successfully added " + networkType + " connection via native binding: " + 
+                      "id=" + connId + ", virtualIp=" + virtualIp + ", version=" + version + ", weight=" + weight + 
+                      ", networkHandle=" + networkHandle + ". Total connections: " + connectionCount);
                 
                 // Increment update index so native knows state changed  
                 connectionIndex.incrementAndGet();
@@ -686,11 +637,12 @@ public class NativeSrtlaService extends Service {
                 int connectedCount = getConnectedConnectionCount();
                 Log.i(TAG, "After adding " + networkType + ": " + connectedCount + " connections are in CONNECTED state");
             } else {
-                Log.e(TAG, "Native addConnection failed for " + networkType + " (fd=" + fd + ", id=" + connId + ", virtualIp=" + virtualIp + ")");
+                Log.e(TAG, "Native addConnectionWithNetworkHandle failed for " + networkType + 
+                      " (id=" + connId + ", virtualIp=" + virtualIp + ", networkHandle=" + networkHandle + ")");
             }
             
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to create socket for " + networkType + " in requestNetwork callback", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to add connection for " + networkType + " in requestNetwork callback", e);
         }
     }
 

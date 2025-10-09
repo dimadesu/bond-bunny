@@ -12,6 +12,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3")
 
 # Find required packages
 find_library(log-lib log)
+find_library(android-lib android)
 
 # Native SRTLA library source files
 add_library(
@@ -35,4 +36,5 @@ target_include_directories(
 target_link_libraries(
     srtla_native
     ${log-lib}
+    ${android-lib}
 )
