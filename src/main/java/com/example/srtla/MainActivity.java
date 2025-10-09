@@ -69,8 +69,8 @@ public class MainActivity extends Activity {
      * Check if the SRTLA service is actually running and update UI accordingly
      */
     private void checkServiceState() {
-        // Check if the service is running
-        serviceRunning = EnhancedSrtlaService.isServiceRunning();
+        // Check if the native service is running
+        serviceRunning = NativeSrtlaService.isServiceRunning();
         updateUI();
         
         if (serviceRunning) {
@@ -167,8 +167,8 @@ public class MainActivity extends Activity {
 
     // Starts the service without requesting permissions (assumes caller has handled permission logic)
     private void startServiceNow(String srtlaReceiverHost, String srtlaReceiverPort, String srtListenPort) {
-        Log.i("MainActivity", "startServiceNow() — starting EnhancedSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
+        Log.i("MainActivity", "startServiceNow() — starting NativeSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
+        Intent serviceIntent = new Intent(this, NativeSrtlaService.class);
         serviceIntent.putExtra("srtla_receiver_host", srtlaReceiverHost);
         serviceIntent.putExtra("srtla_receiver_port", Integer.parseInt(srtlaReceiverPort));
         serviceIntent.putExtra("srt_listen_address", "0.0.0.0");  // Always listen on all interfaces
@@ -195,7 +195,7 @@ public class MainActivity extends Activity {
     }
     
     private void stopSrtlaService() {
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
+        Intent serviceIntent = new Intent(this, NativeSrtlaService.class);
         stopService(serviceIntent);
         
         serviceRunning = false;
@@ -241,17 +241,19 @@ public class MainActivity extends Activity {
     }
     
     private void updateConnectionStats() {
-        String stats = EnhancedSrtlaService.getConnectionStatistics();
+        // Use native service stats if running, otherwise fall back to enhanced service
+        String stats;
+        List<ConnectionWindowView.ConnectionWindowData> windowData;
         
-        // Add logging performance stats
-        String logStats = SrtlaLogger.getPerformanceStats();
-        String combinedStats = stats + "\n\n" + logStats;
+        if (NativeSrtlaService.isServiceRunning()) {
+            stats = NativeSrtlaService.getConnectionStatistics();
+            windowData = NativeSrtlaService.getConnectionWindowData();
+        } else {
+            stats = EnhancedSrtlaService.getConnectionStatistics();
+            windowData = EnhancedSrtlaService.getConnectionWindowData();
+        }
         
-        textConnectionStats.setText(combinedStats);
-        
-        // Update window visualization
-        List<ConnectionWindowView.ConnectionWindowData> windowData = 
-            EnhancedSrtlaService.getConnectionWindowData();
+        textConnectionStats.setText(stats);
         connectionWindowView.updateConnectionData(windowData);
     }
     
@@ -292,6 +294,10 @@ public class MainActivity extends Activity {
         super.onResume();
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
+        // Restart stats updates if service is running
+        if (serviceRunning) {
+            startStatsUpdates();
+        }
     }
     
     @Override
