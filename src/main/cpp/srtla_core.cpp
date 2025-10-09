@@ -857,9 +857,9 @@ void SrtlaCore::handle_srt_packet(const uint8_t* data, size_t len) {
         return;
     }
     
-    // TEST: Try sending raw SRT packets instead of wrapped SRTLA packets
-    // This might be what the original SRTLA server expects
-    LOGI("*** TESTING: Sending raw SRT packet (len=%d) instead of SRTLA wrapped ***", (int)len);
+    // Send SRT packet directly to SRTLA server
+    // This implementation uses raw SRT packets instead of SRTLA-wrapped packets
+    LOGI("Sending raw SRT packet (len=%d) to SRTLA server", (int)len);
     
     // Mark packet as sent with byte count (connection tracks it in its own inflight set)
     conn->mark_sent(sequence, len);
@@ -876,7 +876,7 @@ void SrtlaCore::handle_srt_packet(const uint8_t* data, size_t len) {
         LOGW("Connection %s disabled due to send failure, will attempt recovery",
              conn->get_virtual_ip().c_str());
     } else {
-        LOGI("*** SENT RAW SRT: %d bytes via %s (fd=%d, seq=%u, win=%d, inflight=%d, score=%d) ***", 
+        LOGI("*** SENT SRT PACKET: %d bytes via %s (fd=%d, seq=%u, win=%d, inflight=%d, score=%d) ***", 
              (int)sent, conn->get_virtual_ip().c_str(), conn->get_fd(), sequence,
              (int)conn->get_window(), (int)conn->get_inflight(), conn->get_score());
     }
