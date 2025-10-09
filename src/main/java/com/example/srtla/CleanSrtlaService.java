@@ -8,6 +8,8 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
@@ -15,6 +17,10 @@ import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 
@@ -35,7 +41,6 @@ public class CleanSrtlaService extends Service {
     // Network management
     private ConnectivityManager connectivityManager;
     private final Map<Network, String> networkToIpMap = new ConcurrentHashMap<>();
-    private final Map<Network, NetworkRequest.Builder> activeRequests = new ConcurrentHashMap<>();
     
     // Configuration
     private String serverHost = "srtla.belabox.net";
@@ -152,7 +157,6 @@ public class CleanSrtlaService extends Service {
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         
         connectivityManager.registerNetworkCallback(wifiBuilder.build(), new NetworkCallback("WiFi"));
-        activeRequests.put(null, wifiBuilder); // Use null as key for WiFi since we don't have the network yet
         
         // Monitor Cellular networks
         NetworkRequest.Builder cellularBuilder = new NetworkRequest.Builder()
@@ -174,7 +178,6 @@ public class CleanSrtlaService extends Service {
         }
         
         networkToIpMap.clear();
-        activeRequests.clear();
         
         Log.i(TAG, "Network monitoring cleaned up");
     }
@@ -230,17 +233,33 @@ public class CleanSrtlaService extends Service {
     }
     
     private String getLocalIpForNetwork(Network network) {
-        // This is a simplified implementation
-        // In a real implementation, you'd use the network handle to determine the local IP
-        // For now, we'll use a placeholder approach
-        
-        NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
-        if (caps == null) return null;
-        
-        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-            return "192.168.1.100"; // Placeholder WiFi IP
-        } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-            return "10.0.0.100"; // Placeholder cellular IP
+        try {
+            // Use LinkProperties to get the actual local IP address for this network
+            android.net.LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
+            if (linkProperties != null) {
+                for (android.net.LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                    java.net.InetAddress address = linkAddress.getAddress();
+                    if (!address.isLoopbackAddress() && address instanceof java.net.Inet4Address) {
+                        String localIp = address.getHostAddress();
+                        Log.d(TAG, "Found local IP for network: " + localIp);
+                        return localIp;
+                    }
+                }
+            }
+            
+            // Fallback: try to get IP through socket binding (if LinkProperties fails)
+            java.net.Socket socket = network.getSocketFactory().createSocket();
+            try {
+                socket.connect(new java.net.InetSocketAddress("8.8.8.8", 53), 3000);
+                String localIp = socket.getLocalAddress().getHostAddress();
+                Log.d(TAG, "Found local IP via socket binding: " + localIp);
+                return localIp;
+            } finally {
+                socket.close();
+            }
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Could not determine local IP for network: " + e.getMessage());
         }
         
         return null;
