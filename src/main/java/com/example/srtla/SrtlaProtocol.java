@@ -267,4 +267,46 @@ public class SrtlaProtocol {
     public static boolean isSrtAck(byte[] buffer, int length) {
         return getPacketType(buffer, length) == SRT_TYPE_ACK;
     }
+    
+    /**
+     * Check if a packet is a SRT NAK packet
+     */
+    public static boolean isNakPacket(byte[] data, int dataSize) {
+        if (dataSize < 16) return false; // Minimum SRT packet size
+        // Check for SRT NAK type in packet header
+        int type = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) | 
+                   ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+        return (type & 0x8000) != 0 && ((type & 0x7FFF) == 3); // SRT_TYPE_NAK
+    }
+    
+    /**
+     * Check if a packet is a SRT ACK packet
+     */
+    public static boolean isAckPacket(byte[] data, int dataSize) {
+        if (dataSize < 16) return false; // Minimum SRT packet size
+        // Check for SRT ACK type in packet header
+        int type = ((data[0] & 0xFF) << 24) | ((data[1] & 0xFF) << 16) | 
+                   ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+        return (type & 0x8000) != 0 && ((type & 0x7FFF) == 2); // SRT_TYPE_ACK
+    }
+    
+    /**
+     * Extract ACK sequence number from SRT ACK packet
+     */
+    public static int getAckSequenceNumber(byte[] data, int dataSize) {
+        if (dataSize < 16 || !isAckPacket(data, dataSize)) return -1;
+        // ACK sequence number is at offset 8-11
+        return ((data[8] & 0xFF) << 24) | ((data[9] & 0xFF) << 16) | 
+               ((data[10] & 0xFF) << 8) | (data[11] & 0xFF);
+    }
+    
+    /**
+     * Extract NAK sequence number from SRT NAK packet
+     */
+    public static int getNakSequenceNumber(byte[] data, int dataSize) {
+        if (dataSize < 16 || !isNakPacket(data, dataSize)) return -1;
+        // NAK sequence number is at offset 8-11
+        return ((data[8] & 0xFF) << 24) | ((data[9] & 0xFF) << 16) | 
+               ((data[10] & 0xFF) << 8) | (data[11] & 0xFF);
+    }
 }

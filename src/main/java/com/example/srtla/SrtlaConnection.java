@@ -872,6 +872,50 @@ public class SrtlaConnection {
             packetsUploaded, duration / 60, duration % 60, window, windowHealth, inFlightPackets, nakInfo);
     }
     
+    /**
+     * Record NAK for connection quality tracking
+     */
+    public void recordNak(int sequence) {
+        long currentTime = System.currentTimeMillis();
+        nakCount++;
+        lastNakTime = currentTime;
+        
+        // Track NAK bursts (multiple NAKs in short time)
+        if (currentTime - lastNakTime < 1000) {
+            nakBurstCount++;
+        } else {
+            nakBurstCount = 1;
+        }
+    }
+    
+    /**
+     * Record ACK for connection quality tracking
+     */
+    public void recordAck(int sequence) {
+        // Basic ACK tracking - could be enhanced with RTT calculation
+        // For now, just update activity timestamp
+        lastActivity = System.currentTimeMillis();
+    }
+    
+    /**
+     * Send data without sequence tracking
+     */
+    public boolean sendData(ByteBuffer data) {
+        return sendDataWithTracking(data, -1);
+    }
+    
+    /**
+     * Update connection state and perform housekeeping
+     */
+    public void updateState() {
+        long currentTime = System.currentTimeMillis();
+        
+        // Check for connection timeout
+        if (currentTime - lastActivity > 10000) { // 10 seconds
+            state = ConnectionState.FAILED;
+        }
+    }
+    
     @Override
     public String toString() {
         return networkType + " [state=" + state + ", window=" + window + 
