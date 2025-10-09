@@ -78,6 +78,50 @@ if (network_handle != 0) {
 - Successful SRTLA connection binding to actual network interfaces
 - Improved network binding success rate with proper Android network handle usage
 
+## Issue 4: Network Handle Data Type Truncation (RESOLVED)
+
+**Problem**: Network handles were being truncated from 64-bit (`long`) to 32-bit (`int`), causing both WiFi and Cellular connections to receive the same invalid handle `-889270259`.
+
+**Root Cause**:
+
+- `network.getNetworkHandle()` returns a 64-bit `long` value
+- Java code was casting to `(int)` before passing to native code
+- JNI method signature expected `jint` instead of `jlong`
+- This caused overflow and identical handles for different networks
+
+**Log Evidence**:
+
+```
+Java: Added WiFi connection: 172.20.10.2 (handle=445787328525)
+Java: Added Cellular connection: 192.0.0.2 (handle=432902426637)
+Native: network_handle=-889270259 for 172.20.10.2  // Same for both!
+Native: network_handle=-889270259 for 192.0.0.2   // Truncated!
+```
+
+**Fix Applied**:
+
+1. **Updated Java interface** to accept `long` instead of `int`:
+
+```java
+public native boolean addConnection(long sessionPtr, String localIp, long networkHandle);
+```
+
+2. **Updated JNI signature** to use `jlong`:
+
+```cpp
+Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
+                                                 jstring local_ip, jlong network_handle)
+```
+
+3. **Removed casting** in Java call:
+
+```java
+// Before: srtlaNative.addConnection(sessionPtr, localIp, (int) networkHandle);
+// After:  srtlaNative.addConnection(sessionPtr, localIp, networkHandle);
+```
+
+4. **Updated C++ struct and logging** to use `long` and `%ld` format specifiers
+
 ## Testing Recommendation:
 
 The fixed APK should now start the CleanSrtlaService without crashing and properly detect real local IP addresses for network binding.

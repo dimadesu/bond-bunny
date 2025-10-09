@@ -209,7 +209,7 @@ public class CleanSrtlaService extends Service {
                 long networkHandle = network.getNetworkHandle();
                 
                 // Add connection to SRTLA
-                boolean success = srtlaNative.addConnection(sessionPtr, localIp, (int) networkHandle);
+                boolean success = srtlaNative.addConnection(sessionPtr, localIp, networkHandle);
                 if (success) {
                     networkToIpMap.put(network, localIp);
                     Log.i(TAG, "Added " + networkType + " connection: " + localIp + " (handle=" + networkHandle + ")");

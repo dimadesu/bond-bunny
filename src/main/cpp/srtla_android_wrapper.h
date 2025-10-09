@@ -25,7 +25,7 @@ public:
     bool isRunning() const { return running_; }
 
     // Connection management  
-    bool addConnection(const std::string& local_ip, int network_handle);
+    bool addConnection(const std::string& local_ip, long network_handle);
     void removeConnection(const std::string& local_ip);
     void removeAllConnections();
 
@@ -65,7 +65,7 @@ extern "C" {
     // Connection management
     JNIEXPORT jboolean JNICALL
     Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
-                                                     jstring local_ip, jint network_handle);
+                                                     jstring local_ip, jlong network_handle);
                                                      
     JNIEXPORT void JNICALL
     Java_com_example_srtla_SRTLANative_removeConnection(JNIEnv *env, jobject thiz, jlong session_ptr,

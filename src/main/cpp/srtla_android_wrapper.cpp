@@ -26,7 +26,7 @@ extern "C" {
 struct srtla_android_connection {
     int fd;
     std::string local_ip;
-    int network_handle;
+    long network_handle;
     struct sockaddr_in local_addr;
     struct sockaddr_in server_addr;
     time_t last_sent;
@@ -148,7 +148,7 @@ void SRTLAAndroidWrapper::shutdown() {
     LOGI("SRTLA session shut down");
 }
 
-bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, int network_handle) {
+bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, long network_handle) {
     if (!running_) {
         LOGE("Session not running");
         return false;
@@ -191,11 +191,11 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, int network
     if (network_handle != 0) {
         net_handle_t net_handle = static_cast<net_handle_t>(network_handle);
         if (android_setsocknetwork(net_handle, connection->fd) != 0) {
-            LOGD("Warning: Could not bind to network handle %d for %s: %s", 
+            LOGD("Warning: Could not bind to network handle %ld for %s: %s", 
                  network_handle, local_ip.c_str(), strerror(errno));
             // Continue anyway - socket can still work without network binding
         } else {
-            LOGD("Successfully bound socket to network handle %d for %s", 
+            LOGD("Successfully bound socket to network handle %ld for %s", 
                  network_handle, local_ip.c_str());
         }
     }
@@ -213,7 +213,7 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, int network
     
     session_->connections.push_back(std::move(connection));
     
-    LOGI("Added SRTLA connection: %s (network_handle=%d)", 
+    LOGI("Added SRTLA connection: %s (network_handle=%ld)", 
          local_ip.c_str(), network_handle);
     
     return true;
@@ -328,7 +328,7 @@ Java_com_example_srtla_SRTLANative_shutdown(JNIEnv *env, jobject thiz, jlong ses
 
 JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlong session_ptr,
-                                                 jstring local_ip, jint network_handle) {
+                                                 jstring local_ip, jlong network_handle) {
     auto* wrapper = reinterpret_cast<SRTLAAndroidWrapper*>(session_ptr);
     if (!wrapper) return JNI_FALSE;
     
@@ -336,7 +336,7 @@ Java_com_example_srtla_SRTLANative_addConnection(JNIEnv *env, jobject thiz, jlon
     std::string ip(ip_cstr);
     env->ReleaseStringUTFChars(local_ip, ip_cstr);
     
-    return wrapper->addConnection(ip, network_handle) ? JNI_TRUE : JNI_FALSE;
+    return wrapper->addConnection(ip, (long)network_handle) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
