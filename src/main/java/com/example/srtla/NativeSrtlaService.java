@@ -222,8 +222,9 @@ public class NativeSrtlaService extends Service {
     // Get connections with full side effects - advanced connection management
     // This triggers connection filtering, cleanup, reconnection, and enable/disable management
     private ArrayList<ConnectionData> getConns() {
+        // TODO: Temporarily disable sync again to check if it causes duplicate stats issue
         // Smart sync with native layer to remove only truly stale connections
-        syncConnectionsWithNative();
+        // syncConnectionsWithNative();
         
         // Update connection enable states from system before processing connections
         updateConnectionEnableFromSystemState();
@@ -362,15 +363,26 @@ public class NativeSrtlaService extends Service {
             Log.i(TAG, "SRTLA connection established (first updateConn received)");
         }
         
+        // Debug: Log all incoming stats to identify duplicate issue
+        Log.d(TAG, "updateConn called with virtualIp=" + virtualIp + 
+                   ", bytes_sent=" + bytesSent + ", packets_sent=" + packetsSent + 
+                   ", bytes_recv=" + bytesReceived + ", packets_recv=" + packetsReceived + 
+                   ", score=" + score + ", window=" + window + ", inflight=" + inflight);
+        
         // Convert virtual IP to our connection ID  
         String connId = virtualIpToConnId.get(virtualIp);
         if (connId == null) {
             Log.w(TAG, "updateConn called for unknown connection: " + virtualIp);
+            Log.w(TAG, "Available mappings: " + virtualIpToConnId.keySet());
             return;
         }
         
         ConnectionData data = connectionDataMap.get(connId);
         if (data != null) {
+            // Log previous stats for comparison
+            Log.d(TAG, "BEFORE update " + connId + ": bytes_sent=" + data.bytesSent + 
+                       ", packets_sent=" + data.packetsSent + ", score=" + data.score);
+            
             // Update all statistics
             data.window = window;
             data.inflight = inflight;
@@ -383,6 +395,10 @@ public class NativeSrtlaService extends Service {
             data.rtt = (double) rtt;  // Convert int to double for storage
             data.isActive = (isActive != 0);
             data.lastUpdate = System.currentTimeMillis();
+            
+            // Log after update
+            Log.d(TAG, "AFTER update " + connId + ": bytes_sent=" + data.bytesSent + 
+                       ", packets_sent=" + data.packetsSent + ", score=" + data.score);
             
             // Increment update index so native knows state changed
             connectionIndex.incrementAndGet();
