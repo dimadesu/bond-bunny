@@ -108,6 +108,7 @@ public class NativeSrtlaService extends Service {
     private native boolean removeConnection(String connId);
     private native void updateConnectionWeight(String connId, int weight);
     private native void refreshConnections();
+    private native void forceRefreshConnections();
     private native int getConnectedConnectionCount();
     
     /**
@@ -676,6 +677,20 @@ public class NativeSrtlaService extends Service {
             if (!shouldKill && availableNetworks.size() >= 1) {
                 Log.i(TAG, "Starting SRTLA engine...");
                 
+                // EMERGENCY RECOVERY: If this is a restart (connections exist but may be stale),
+                // force refresh all connections to reset their state
+                if (connectionCount > 0) {
+                    Log.i(TAG, "*** Service restart detected - forcing emergency connection refresh ***");
+                    try {
+                        // Give a small delay to ensure native core is ready
+                        Thread.sleep(100);
+                        forceRefreshConnections();
+                        Log.i(TAG, "Emergency connection refresh completed");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Emergency refresh failed, proceeding anyway: " + e.getMessage());
+                    }
+                }
+                
                 // Start the SRTLA engine - this call blocks until SRTLA stops
                 // The native event loop runs inside this call
                 int result = initializeBonding(localPort, serverHost, serverPort);
@@ -683,6 +698,18 @@ public class NativeSrtlaService extends Service {
                     Log.w(TAG, "SRTLA returned with error: " + result);
                 } else {
                     Log.i(TAG, "SRTLA ended normally");
+                }
+                
+                // EMERGENCY RECOVERY: After SRTLA stops, force refresh connections
+                // to prepare for potential restart
+                if (connectionCount > 0) {
+                    Log.i(TAG, "*** SRTLA stopped - triggering emergency connection refresh for potential restart ***");
+                    try {
+                        forceRefreshConnections();
+                        Log.i(TAG, "Post-stop emergency refresh completed");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Post-stop refresh failed: " + e.getMessage());
+                    }
                 }
             }
             

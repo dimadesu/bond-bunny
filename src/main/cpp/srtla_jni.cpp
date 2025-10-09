@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
+#include <netdb.h>
 #include "include/srtla_core.h"
 #include "include/srtla_connection.h"
 
@@ -435,11 +436,27 @@ Java_com_example_srtla_NativeSrtlaService_addConnectionWithNetworkHandle(
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(server_port);
     
-    if (inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr) <= 0) {
-        LOGE("Invalid server address: %s", host.c_str());
+    // Resolve hostname using getaddrinfo (supports both hostnames and IP addresses)
+    struct addrinfo hints, *result = nullptr;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    
+    std::string port_str = std::to_string(server_port);
+    int ret = getaddrinfo(host.c_str(), port_str.c_str(), &hints, &result);
+    if (ret != 0 || result == nullptr) {
+        LOGE("Failed to resolve server address %s: %s", host.c_str(), gai_strerror(ret));
         close(fd);
         return JNI_FALSE;
     }
+    
+    // Copy resolved address
+    memcpy(&server_addr, result->ai_addr, sizeof(server_addr));
+    freeaddrinfo(result);
+    
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &server_addr.sin_addr, ip_str, sizeof(ip_str));
+    LOGI("Resolved %s to %s:%d", host.c_str(), ip_str, server_port);
     
     // Connect the socket to the SRTLA server
     if (connect(fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
@@ -451,9 +468,9 @@ Java_com_example_srtla_NativeSrtlaService_addConnectionWithNetworkHandle(
     LOGI("Successfully connected socket fd=%d to SRTLA server %s:%d", fd, host.c_str(), server_port);
     
     // Add connection to SRTLA core
-    bool result = g_srtla_core->add_connection(fd, ip, weight, conn_type);
+    bool add_result = g_srtla_core->add_connection(fd, ip, weight, conn_type);
     
-    if (!result) {
+    if (!add_result) {
         LOGE("Failed to add connection to SRTLA core");
         close(fd);
         return JNI_FALSE;
@@ -597,6 +614,26 @@ Java_com_example_srtla_NativeSrtlaService_releaseVirtualIP(
     
     LOGI("Releasing virtual IP: %s", ip.c_str());
     g_srtla_core->release_virtual_ip(ip);
+}
+
+/**
+ * Force refresh all connections - emergency recovery method
+ * Signature: void forceRefreshConnections()
+ */
+JNIEXPORT void JNICALL
+Java_com_example_srtla_NativeSrtlaService_forceRefreshConnections(
+    JNIEnv* env,
+    jobject thiz) {
+    
+    (void)env; (void)thiz; // Unused parameters
+    
+    if (!g_srtla_core) {
+        LOGE("SRTLA core not initialized");
+        return;
+    }
+    
+    LOGI("*** EMERGENCY: Force refreshing all connections from Java request ***");
+    g_srtla_core->refresh_all_connections();
 }
 
 /**

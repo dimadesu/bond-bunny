@@ -384,24 +384,30 @@ void SrtlaCore::update_connection_weight(const std::string& virtual_ip, int weig
 void SrtlaCore::refresh_all_connections() {
     std::lock_guard<std::mutex> lock(connections_mutex_);
     
-    LOGI("Refreshing all SRTLA connections - resetting registration state");
+    LOGI("*** FORCE REFRESHING ALL CONNECTIONS - Emergency recovery mode ***");
     
-    // Reset all connections to DISCONNECTED state to force re-registration
+    // More aggressive refresh - close and recreate connections if needed
     for (auto& conn : connections_) {
         if (conn->get_state() != Connection::State::ZOMBIE) {
-            LOGI("Resetting connection %s (%s) for re-registration", 
+            LOGI("Force-refreshing connection %s (%s) - resetting to initial state", 
                  conn->get_virtual_ip().c_str(), conn->get_type().c_str());
                  
-            // Reset connection state to force re-registration
+            // Force reset connection state to DISCONNECTED for complete re-registration
             conn->set_state(Connection::State::DISCONNECTED);
             
-            // Clear inflight packets and reset window for clean start
+            // Clear all inflight packets and reset window for completely clean start
             conn->clear_inflight();
             conn->reset_window();
             
-            // Reset activity time to prevent timeout during refresh
+            // Reset activity time to current time to prevent immediate timeout
             conn->set_last_activity(std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count());
+                
+            // Immediately start registration process
+            conn->set_state(Connection::State::REGISTERING_REG1);
+            send_reg1(conn.get());
+            
+            LOGI("Connection %s reset and REG1 sent for fresh registration", conn->get_virtual_ip().c_str());
         }
     }
     
@@ -409,7 +415,7 @@ void SrtlaCore::refresh_all_connections() {
     has_srt_client_ = false;
     std::memset(&srt_client_addr_, 0, sizeof(srt_client_addr_));
     
-    LOGI("Connection refresh complete - %d connections reset for re-registration", 
+    LOGI("*** Connection refresh complete - %d connections reset for emergency re-registration ***", 
          (int)connections_.size());
 }
 
@@ -594,10 +600,79 @@ void SrtlaCore::event_loop() {
             }
         }
         
-        // Check for and recover dead connections (SRTLA-style: aggressive recovery)
+        // Aggressive connection recovery and state management
         // Lock mutex for connection iteration
         {
             std::lock_guard<std::mutex> lock(connections_mutex_);
+            
+            // Count current connection states
+            int connected_count = 0;
+            int registering_count = 0;
+            int failed_count = 0;
+            int zombie_count = 0;
+            
+            for (const auto& conn : connections_) {
+                switch (conn->get_state()) {
+                    case Connection::State::CONNECTED:
+                        if (!conn->is_zombie()) connected_count++;
+                        break;
+                    case Connection::State::REGISTERING_REG1:
+                    case Connection::State::REGISTERING_REG2:
+                        registering_count++;
+                        break;
+                    case Connection::State::FAILED:
+                        failed_count++;
+                        break;
+                    case Connection::State::ZOMBIE:
+                        zombie_count++;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            
+            // Log connection state summary
+            static int log_counter = 0;
+            if (++log_counter % 25 == 0) { // Log every 5 seconds (25 * 200ms)
+                LOGI("Connection health: %d connected, %d registering, %d failed, %d zombie (total %d)",
+                     connected_count, registering_count, failed_count, zombie_count, (int)connections_.size());
+            }
+            
+            // CRITICAL: If no connections are CONNECTED and we have failed/timed out connections,
+            // force aggressive recovery to prevent permanent connection loss
+            if (connected_count == 0 && (failed_count > 0 || registering_count > 0)) {
+                static auto last_force_recovery = std::chrono::steady_clock::now();
+                auto now = std::chrono::steady_clock::now();
+                auto time_since_recovery = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_force_recovery).count();
+                
+                // Force recovery every 3 seconds when no connections are working
+                if (time_since_recovery > 3000) {
+                    LOGI("*** EMERGENCY RECOVERY: No connected connections! Forcing registration reset on all connections ***");
+                    
+                    for (auto& conn : connections_) {
+                        if (!conn->is_zombie()) {
+                            LOGI("Force-resetting connection %s (%s) state from %d to REGISTERING", 
+                                 conn->get_virtual_ip().c_str(), conn->get_type().c_str(), static_cast<int>(conn->get_state()));
+                            
+                            // Force reset to registration state
+                            conn->set_state(Connection::State::REGISTERING_REG1);
+                            conn->clear_inflight();
+                            conn->reset_window();
+                            
+                            // Reset activity time to prevent immediate timeout
+                            conn->set_last_activity(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now().time_since_epoch()).count());
+                            
+                            // Send fresh REG1
+                            send_reg1(conn.get());
+                        }
+                    }
+                    
+                    last_force_recovery = now;
+                }
+            }
+            
+            // Standard timeout recovery for individual connections
             for (auto& conn : connections_) {
                 if (conn->is_timed_out()) {
                     if (conn->get_state() == Connection::State::CONNECTED) {
@@ -614,7 +689,7 @@ void SrtlaCore::event_loop() {
                     }
                 }
             }
-        } // End of mutex lock scope"
+        } // End of mutex lock scope
         
         // Report connection stats to Java (for UI updates)
         static auto last_stats_report = std::chrono::steady_clock::now();
@@ -672,19 +747,32 @@ Connection* SrtlaCore::select_connection() {
     Connection* best = nullptr;
     int best_score = -1;
     
+    LOGI("*** CONNECTION SELECTION DEBUG: Evaluating %d connections ***", (int)connections_.size());
+    
     for (const auto& conn : connections_) {
         // Must be connected
         if (conn->get_state() != Connection::State::CONNECTED) {
+            LOGI("  - %s: SKIPPED (state=%d, not CONNECTED)", 
+                 conn->get_virtual_ip().c_str(), static_cast<int>(conn->get_state()));
             continue;
         }
         
         // Skip timed out connections
         if (conn->is_timed_out()) {
+            LOGI("  - %s: SKIPPED (TIMED OUT)", conn->get_virtual_ip().c_str());
             continue;
         }
         
         // SRTLA formula: score = window / (inflight + 1)
         int score = conn->get_window() / (conn->get_inflight() + 1);
+        
+        LOGI("  - %s (%s): window=%d, inflight=%d, score=%d %s", 
+             conn->get_virtual_ip().c_str(), 
+             conn->get_type().c_str(),
+             conn->get_window(), 
+             (int)conn->get_inflight(), 
+             score,
+             (score > best_score) ? "*** NEW BEST ***" : "");
         
         if (score > best_score) {
             best = conn.get();
@@ -693,9 +781,12 @@ Connection* SrtlaCore::select_connection() {
     }
     
     if (!best) {
-        LOGW("No valid connection available! total=%d", (int)connections_.size());
+        LOGW("*** NO VALID CONNECTION AVAILABLE! total=%d ***", (int)connections_.size());
         return nullptr;
     }
+    
+    LOGI("*** SELECTED CONNECTION: %s (%s) with score=%d ***", 
+         best->get_virtual_ip().c_str(), best->get_type().c_str(), best_score);
     
     return best;
 }
@@ -1053,13 +1144,65 @@ bool SrtlaCore::handle_registration_packet(Connection* conn, const uint8_t* data
 }
 
 void SrtlaCore::connection_housekeeping() {
-    // Remove timed out connections
-    connections_.erase(
-        std::remove_if(connections_.begin(), connections_.end(),
-                      [](const std::unique_ptr<Connection>& conn) {
-                          return conn->is_timed_out();
-                      }),
-        connections_.end());
+    // More intelligent connection removal - don't remove connections too aggressively
+    // during registration phase as server response might be delayed
+    
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    
+    std::vector<std::string> connections_to_remove;
+    int connected_count = 0;
+    
+    // First, count connected connections
+    for (const auto& conn : connections_) {
+        if (conn->get_state() == Connection::State::CONNECTED && !conn->is_zombie()) {
+            connected_count++;
+        }
+    }
+    
+    // Only remove timed out connections if we have other working connections,
+    // or if the connection has been timed out for a very long time (more than 30 seconds)
+    for (const auto& conn : connections_) {
+        if (conn->is_timed_out()) {
+            int64_t now = get_current_time_ms();
+            int64_t time_since_activity = now - conn->get_last_activity();
+            
+            // If this connection has been dead for more than 30 seconds, remove it
+            if (time_since_activity > 30000) {
+                LOGI("Removing connection %s - dead for %lld seconds", 
+                     conn->get_virtual_ip().c_str(), time_since_activity / 1000);
+                connections_to_remove.push_back(conn->get_virtual_ip());
+            }
+            // If we have other connected connections, remove failed ones after 10 seconds
+            else if (connected_count > 0 && time_since_activity > 10000) {
+                LOGI("Removing failed connection %s - have %d other connections working", 
+                     conn->get_virtual_ip().c_str(), connected_count);
+                connections_to_remove.push_back(conn->get_virtual_ip());
+            }
+            // Otherwise, keep it alive - it might still register
+            else {
+                LOGI("Keeping connection %s alive despite timeout - might still register (dead for %lld seconds, %d connected)", 
+                     conn->get_virtual_ip().c_str(), time_since_activity / 1000, connected_count);
+            }
+        }
+    }
+    
+    // Remove the identified connections
+    for (const std::string& virtual_ip : connections_to_remove) {
+        connections_.erase(
+            std::remove_if(connections_.begin(), connections_.end(),
+                          [&virtual_ip](const std::unique_ptr<Connection>& conn) {
+                              return conn->get_virtual_ip() == virtual_ip;
+                          }),
+            connections_.end());
+        
+        connections_by_ip_.erase(virtual_ip);
+        release_virtual_ip(virtual_ip);
+    }
+    
+    if (!connections_to_remove.empty()) {
+        LOGI("Connection housekeeping: removed %d connections, %d remaining", 
+             (int)connections_to_remove.size(), (int)connections_.size());
+    }
 }
 
 void SrtlaCore::update_statistics() {

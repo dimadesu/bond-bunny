@@ -35,6 +35,7 @@ public:
     State get_state() const { return state_; }
     int get_window() const { return window_; }
     int get_inflight() const { return packets_in_flight_.size(); }
+    int64_t get_last_activity() const { return last_activity_; }
     bool is_timed_out() const;
     
     // Window management (moblin-style: each connection checks its own inflight set)
