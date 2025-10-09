@@ -43,7 +43,7 @@ public class CleanSrtlaService extends Service {
     private final Map<Network, String> networkToIpMap = new ConcurrentHashMap<>();
     
     // Configuration
-    private String serverHost = "srtla.belabox.net";
+    private String serverHost = "au.srt.belabox.net";
     private int serverPort = 5000;
     private int localPort = 6000;
     
