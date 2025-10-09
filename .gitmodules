@@ -1,0 +1,3 @@
+[submodule "srtla"]
+	path = srtla
+	url = git@github.com:dimadesu/srtla.git
