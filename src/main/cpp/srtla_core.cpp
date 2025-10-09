@@ -460,6 +460,41 @@ int SrtlaCore::get_connected_connection_count() const {
     return connected_count;
 }
 
+std::vector<std::string> SrtlaCore::get_native_connection_list() const {
+    std::lock_guard<std::mutex> lock(const_cast<std::mutex&>(connections_mutex_));
+    
+    std::vector<std::string> connection_list;
+    
+    LOGI("Getting native connection list: %d total connections", (int)connections_.size());
+    
+    for (const auto& conn : connections_) {
+        // Skip zombie connections as they're being cleaned up
+        if (conn->is_zombie()) {
+            LOGI("  Skipping zombie connection %s", conn->get_virtual_ip().c_str());
+            continue;
+        }
+        
+        std::string virtual_ip = conn->get_virtual_ip();
+        connection_list.push_back(virtual_ip);
+        
+        const char* state_str = "UNKNOWN";
+        switch (conn->get_state()) {
+            case Connection::State::DISCONNECTED: state_str = "DISCONNECTED"; break;
+            case Connection::State::REGISTERING_REG1: state_str = "REGISTERING_REG1"; break;
+            case Connection::State::REGISTERING_REG2: state_str = "REGISTERING_REG2"; break;
+            case Connection::State::CONNECTED: state_str = "CONNECTED"; break;
+            case Connection::State::ZOMBIE: state_str = "ZOMBIE"; break;
+            case Connection::State::FAILED: state_str = "FAILED"; break;
+        }
+        
+        LOGI("  Active connection %s (fd=%d): state=%s", 
+             virtual_ip.c_str(), conn->get_fd(), state_str);
+    }
+    
+    LOGI("Native connection list complete: %d active connections", (int)connection_list.size());
+    return connection_list;
+}
+
 std::string SrtlaCore::add_connection_auto_ip(int fd, int weight, const std::string& type) {
     // Automatically allocate a virtual IP
     std::string virtual_ip = allocate_virtual_ip();

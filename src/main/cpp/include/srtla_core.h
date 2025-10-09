@@ -46,6 +46,7 @@ public:
     
     // Connection state queries
     int get_connected_connection_count() const;
+    std::vector<std::string> get_native_connection_list() const;
     
     // Statistics callbacks (calls back to Java)
     void set_stats_callback(void (*callback)(const char* ip, int* stats, int stats_count));

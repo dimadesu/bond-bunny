@@ -657,4 +657,50 @@ Java_com_example_srtla_NativeSrtlaService_getConnectedConnectionCount(
     return connected_count;
 }
 
+/**
+ * Get list of virtual IPs for connections that exist in native code
+ * Signature: String[] getNativeConnectionList()
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_com_example_srtla_NativeSrtlaService_getNativeConnectionList(
+    JNIEnv* env,
+    jobject thiz) {
+    
+    (void)thiz; // Unused parameter
+    
+    if (!g_srtla_core) {
+        LOGE("SRTLA core not initialized");
+        return nullptr;
+    }
+    
+    std::vector<std::string> native_connections = g_srtla_core->get_native_connection_list();
+    
+    LOGI("Retrieved %d native connections", (int)native_connections.size());
+    
+    // Create Java String array
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) {
+        LOGE("Failed to find String class");
+        return nullptr;
+    }
+    
+    jobjectArray result = env->NewObjectArray(native_connections.size(), stringClass, nullptr);
+    if (!result) {
+        LOGE("Failed to create String array");
+        return nullptr;
+    }
+    
+    // Fill the array with virtual IPs
+    for (size_t i = 0; i < native_connections.size(); i++) {
+        jstring virtualIp = env->NewStringUTF(native_connections[i].c_str());
+        if (virtualIp) {
+            env->SetObjectArrayElement(result, i, virtualIp);
+            env->DeleteLocalRef(virtualIp);
+            LOGI("  Added native connection: %s", native_connections[i].c_str());
+        }
+    }
+    
+    return result;
+}
+
 } // extern "C"

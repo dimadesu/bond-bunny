@@ -110,6 +110,7 @@ public class NativeSrtlaService extends Service {
     private native void refreshConnections();
     private native void forceRefreshConnections();
     private native int getConnectedConnectionCount();
+    private native String[] getNativeConnectionList(); // Get actual connections from native layer
     
     /**
      * Get connection string for native code
@@ -147,9 +148,68 @@ public class NativeSrtlaService extends Service {
         return connectionIndex.get();
     }
 
+    /**
+     * Sync Java connection state with native layer reality
+     * Remove connections that exist in Java but not in native
+     */
+    private void syncConnectionsWithNative() {
+        try {
+            // Get actual connections from native layer
+            String[] nativeConnections = getNativeConnectionList();
+            Set<String> nativeVirtualIps = new HashSet<>();
+            
+            if (nativeConnections != null) {
+                for (String nativeConn : nativeConnections) {
+                    nativeVirtualIps.add(nativeConn);
+                    Log.d(TAG, "Native has connection: " + nativeConn);
+                }
+            }
+            
+            Log.i(TAG, "Sync check: Native has " + nativeVirtualIps.size() + " connections, Java has " + connectionDataMap.size());
+            
+            // Find Java connections that don't exist in native
+            Iterator<Map.Entry<String, ConnectionData>> it = connectionDataMap.entrySet().iterator();
+            int removedCount = 0;
+            
+            while (it.hasNext()) {
+                Map.Entry<String, ConnectionData> entry = it.next();
+                String connId = entry.getKey();
+                String virtualIp = connIdToVirtualIp.get(connId);
+                
+                if (virtualIp != null && !nativeVirtualIps.contains(virtualIp)) {
+                    Log.w(TAG, "Connection " + connId + " (virtualIp=" + virtualIp + ") exists in Java but not native - removing");
+                    
+                    // Clean up all mappings
+                    Network network = connIdToNetwork.get(connId);
+                    if (network != null) {
+                        networkToConnId.remove(network);
+                        connIdToNetwork.remove(connId);
+                    }
+                    connIdToVirtualIp.remove(connId);
+                    virtualIpToConnId.remove(virtualIp);
+                    
+                    // Remove from Java connection map
+                    it.remove();
+                    removedCount++;
+                }
+            }
+            
+            if (removedCount > 0) {
+                connectionCount = connectionDataMap.size();
+                Log.i(TAG, "Sync complete: Removed " + removedCount + " stale connections, " + connectionCount + " remaining");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error syncing connections with native", e);
+        }
+    }
+
     // Get connections with full side effects - advanced connection management
     // This triggers connection filtering, cleanup, reconnection, and enable/disable management
     private ArrayList<ConnectionData> getConns() {
+        // First sync with native layer to remove stale connections
+        syncConnectionsWithNative();
+        
         // Update connection enable states from system before processing connections
         updateConnectionEnableFromSystemState();
         
@@ -417,6 +477,13 @@ public class NativeSrtlaService extends Service {
                 Log.w(TAG, "Connections exist but none connected - triggering maintenance");
                 // This will trigger the reconnection logic in getConns()
                 getConns();
+            }
+            
+            // Check if we have fewer connections than available networks (some may have been destroyed)
+            int expectedConnections = availableNetworks.size();
+            if (totalConnections < expectedConnections && expectedConnections > 0) {
+                Log.w(TAG, "Have " + totalConnections + " connections but " + expectedConnections + " networks available - attempting re-registration");
+                registerDetectedNetworks();
             }
             
         } catch (Exception e) {
