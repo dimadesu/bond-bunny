@@ -17,7 +17,7 @@
     android:theme="@style/AppTheme">
 
     <activity
-      android:name=".MainActivity"
+      android:name=".CleanMainActivity"
       android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
@@ -39,6 +39,12 @@
       android:name=".UrlBuilderActivity"
       android:exported="false"
       android:label="URL Builder" />
+
+    <service
+      android:name=".CleanSrtlaService"
+      android:enabled="true"
+      android:exported="false"
+      android:foregroundServiceType="dataSync" />
 
     <service
       android:name=".EnhancedSrtlaService"

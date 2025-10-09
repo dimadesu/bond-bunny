@@ -10,6 +10,25 @@ Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblin
 
 Discord https://discord.gg/2UzEkU2AJW
 
+## Clean SRTLA Implementation
+
+Bond Bunny now includes a **clean SRTLA implementation** that uses the battle-tested BELABOX SRTLA code as a git submodule. This provides:
+
+- ✅ **Proven reliability**: Uses the original, well-tested SRTLA protocol implementation
+- ✅ **Simple architecture**: Clean JNI wrapper around proven C code
+- ✅ **Better performance**: Direct integration without complex custom logic
+- ✅ **Easy maintenance**: Submodule approach keeps SRTLA code pristine
+
+The clean implementation is now the default when you launch the app. It uses `CleanMainActivity` and `CleanSrtlaService` for a streamlined experience.
+
+### Technical Architecture
+
+- **srtla/**: Git submodule containing original BELABOX SRTLA C code
+- **srtla_android_wrapper.cpp**: JNI bridge for Android integration
+- **SRTLANative.java**: Clean Java interface to native functions
+- **CleanSrtlaService.java**: Simplified Android service
+- **CleanMainActivity.java**: Streamlined UI
+
 ## Apps that can work together
 
 - [MediaSrvr](https://github.com/dimadesu/MediaSrvr) - Runs RTMP server on Android phone. You can publish RTMP stream to it from an action camera, for example.
@@ -28,6 +47,7 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
 - Enjoy!
 
 ## Apps that can stream SRT on Android
+
 - IRL Pro (free)
 - Larix Broadcaster (subscription)
 - Larix Screencaster (subscription)
