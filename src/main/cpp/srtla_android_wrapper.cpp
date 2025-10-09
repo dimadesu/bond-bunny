@@ -1,5 +1,6 @@
 #include "srtla_android_wrapper.h"
 #include <android/log.h>
+#include <android/multinetwork.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -187,11 +188,16 @@ bool SRTLAAndroidWrapper::addConnection(const std::string& local_ip, int network
     }
     
     // Bind to specific network interface (Android network handle)
-    if (setsockopt(connection->fd, SOL_SOCKET, SO_BINDTODEVICE, 
-                   &network_handle, sizeof(network_handle)) < 0) {
-        LOGD("Warning: Could not bind to network handle %d for %s", 
-             network_handle, local_ip.c_str());
-        // Continue anyway - not all Android versions support this
+    if (network_handle != 0) {
+        net_handle_t net_handle = static_cast<net_handle_t>(network_handle);
+        if (android_setsocknetwork(net_handle, connection->fd) != 0) {
+            LOGD("Warning: Could not bind to network handle %d for %s: %s", 
+                 network_handle, local_ip.c_str(), strerror(errno));
+            // Continue anyway - socket can still work without network binding
+        } else {
+            LOGD("Successfully bound socket to network handle %d for %s", 
+                 network_handle, local_ip.c_str());
+        }
     }
     
     // Bind to local address
