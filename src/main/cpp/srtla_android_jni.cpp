@@ -25,6 +25,10 @@ extern "C" int srtla_get_total_in_flight_packets(void);
 extern "C" int srtla_get_total_window_size(void);
 extern "C" int srtla_get_connection_details(char* buffer, int buffer_size);
 
+// Virtual IP functions
+extern "C" void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
+                                        int network_type, int socket_fd);
+
 static pthread_t srtla_thread;
 static bool srtla_running = false;
 
@@ -199,4 +203,18 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
                        (detailsLen > 0) ? detailsBuffer : "No connection details available");
     
     return env->NewStringUTF(statsBuffer);
+}
+
+// Virtual IP JNI function
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz,
+                                                      jstring virtual_ip, jstring real_ip,
+                                                      jint network_type, jint socket_fd) {
+    const char *virtual_ip_str = env->GetStringUTFChars(virtual_ip, nullptr);
+    const char *real_ip_str = env->GetStringUTFChars(real_ip, nullptr);
+    
+    srtla_set_network_socket(virtual_ip_str, real_ip_str, network_type, socket_fd);
+    
+    env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
+    env->ReleaseStringUTFChars(real_ip, real_ip_str);
 }

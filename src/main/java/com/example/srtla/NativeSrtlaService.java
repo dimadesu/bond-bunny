@@ -15,10 +15,13 @@ import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -104,8 +107,11 @@ public class NativeSrtlaService extends Service {
         try {
             Log.i(TAG, "Starting native SRTLA process...");
             
-            // Create IPs file with real network interfaces
-            File ipsFile = createNetworkIpsFile();
+            // Setup Application-Level Virtual IPs
+            setupVirtualConnections();
+            
+            // Create IPs file with virtual IPs instead of real IPs
+            File ipsFile = createVirtualIpsFile();
             
             // Update notification
             updateNotification("Starting native SRTLA...");
@@ -201,6 +207,111 @@ public class NativeSrtlaService extends Service {
               " (size: " + ipsFile.length() + " bytes)");
         
         return ipsFile;
+    }
+    
+    private void setupVirtualConnections() {
+        Log.i(TAG, "Setting up Application-Level Virtual IP connections...");
+        
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network[] networks = connectivityManager.getAllNetworks();
+                
+                for (Network network : networks) {
+                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+                    if (capabilities != null && 
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        
+                        String realIP = getNetworkIP(network);
+                        if (realIP != null) {
+                            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                                // Setup WiFi virtual connection
+                                int wifiSocket = createNetworkSocket(network);
+                                if (wifiSocket >= 0) {
+                                    NativeSrtlaJni.setNetworkSocket("10.0.1.1", realIP, 1, wifiSocket);
+                                    Log.i(TAG, "Setup virtual WiFi connection: 10.0.1.1 -> " + realIP);
+                                }
+                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                                // Setup Cellular virtual connection
+                                int cellularSocket = createNetworkSocket(network);
+                                if (cellularSocket >= 0) {
+                                    NativeSrtlaJni.setNetworkSocket("10.0.2.1", realIP, 2, cellularSocket);
+                                    Log.i(TAG, "Setup virtual Cellular connection: 10.0.2.1 -> " + realIP);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting up virtual connections", e);
+        }
+    }
+    
+    private File createVirtualIpsFile() throws IOException {
+        File ipsFile = new File(getFilesDir(), "native_srtla_virtual_ips.txt");
+        
+        // Delete existing file
+        if (ipsFile.exists()) {
+            ipsFile.delete();
+            Log.i(TAG, "Deleted existing virtual IPs file");
+        }
+        
+        try (FileWriter writer = new FileWriter(ipsFile, false)) {
+            // Write virtual IPs instead of real IPs
+            writer.write("10.0.1.1\n");  // WiFi virtual IP
+            writer.write("10.0.2.1\n");  // Cellular virtual IP
+            writer.flush();
+        }
+        
+        Log.i(TAG, "Created virtual IPs file: " + ipsFile.getAbsolutePath() + 
+              " (size: " + ipsFile.length() + " bytes)");
+        
+        return ipsFile;
+    }
+    
+    private int createNetworkSocket(Network network) {
+        try {
+            java.net.DatagramSocket socket = new java.net.DatagramSocket();
+            network.bindSocket(socket);
+            
+            // Extract the native socket file descriptor
+            java.lang.reflect.Field field = socket.getClass().getDeclaredField("impl");
+            field.setAccessible(true);
+            Object impl = field.get(socket);
+            
+            java.lang.reflect.Field fdField = impl.getClass().getDeclaredField("fd");
+            fdField.setAccessible(true);
+            java.io.FileDescriptor fd = (java.io.FileDescriptor) fdField.get(impl);
+            
+            java.lang.reflect.Field intField = java.io.FileDescriptor.class.getDeclaredField("descriptor");
+            intField.setAccessible(true);
+            int socketFD = intField.getInt(fd);
+            
+            Log.i(TAG, "Created network-bound socket, FD: " + socketFD);
+            return socketFD;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create network socket", e);
+            return -1;
+        }
+    }
+    
+    private String getNetworkIP(Network network) {
+        try {
+            LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
+            if (linkProperties != null) {
+                for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                    InetAddress address = linkAddress.getAddress();
+                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        return address.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting network IP", e);
+        }
+        return null;
     }
     
     private List<String> getRealNetworkIPs() {

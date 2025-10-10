@@ -36,4 +36,8 @@ public class NativeSrtlaJni {
     
     // Network change notification
     public static native void notifyNetworkChange();
+    
+    // Virtual IP support for Application-Level Virtual IPs
+    public static native void setNetworkSocket(String virtualIP, String realIP, 
+                                             int networkType, int socketFD);
 }
