@@ -27,6 +27,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
@@ -48,6 +50,18 @@ public class MainActivity extends Activity {
     private Button buttonNativeSrtla;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
+    
+    // Network change receiver
+    private BroadcastReceiver networkChangeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String reason = intent.getStringExtra("reason");
+            Log.i("MainActivity", "Network change received: " + reason);
+            
+            // Immediately update stats when network changes
+            updateConnectionStats();
+        }
+    };
     private Runnable statsUpdateRunnable;
 
     @Override
@@ -347,6 +361,11 @@ public class MainActivity extends Activity {
         checkServiceState();
         // Also check native SRTLA state
         updateNativeSrtlaUI();
+        
+        // Register network change receiver
+        IntentFilter networkFilter = new IntentFilter("com.example.srtla.NETWORK_CHANGED");
+        registerReceiver(networkChangeReceiver, networkFilter);
+        Log.i("MainActivity", "Registered network change receiver");
     }
     
     @Override
@@ -361,6 +380,14 @@ public class MainActivity extends Activity {
         }
         // Save current form values when app is paused
         savePreferences();
+        
+        // Unregister network change receiver
+        try {
+            unregisterReceiver(networkChangeReceiver);
+            Log.i("MainActivity", "Unregistered network change receiver");
+        } catch (IllegalArgumentException e) {
+            Log.w("MainActivity", "Network change receiver was not registered");
+        }
     }
     
     private void loadPreferences() {

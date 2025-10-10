@@ -243,3 +243,17 @@ Java_com_example_srtla_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, job
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Created native UDP socket with FD: %d", sockfd);
     return sockfd;
 }
+
+// Native socket close for NativeSrtlaService
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_srtla_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject thiz, jint sockfd) {
+    if (sockfd >= 0) {
+        if (close(sockfd) == 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Successfully closed socket FD: %d", sockfd);
+        } else {
+            __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Failed to close socket FD %d: %s", sockfd, strerror(errno));
+        }
+    } else {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Attempted to close invalid socket FD: %d", sockfd);
+    }
+}

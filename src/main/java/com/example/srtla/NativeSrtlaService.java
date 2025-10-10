@@ -44,6 +44,9 @@ public class NativeSrtlaService extends Service {
     // Native method for creating UDP socket
     private native int createUdpSocketNative();
     
+    // Native method for closing socket
+    private native void closeSocketNative(int socketFD);
+    
     // Service state
     private static boolean isServiceRunning = false;
     private String srtlaHost;
@@ -53,6 +56,9 @@ public class NativeSrtlaService extends Service {
     // Network monitoring
     private ConnectivityManager connectivityManager;
     private NetworkCallback networkCallback;
+    
+    // Virtual connection tracking
+    private java.util.Map<String, Integer> virtualConnections = new java.util.concurrent.ConcurrentHashMap<>();
     
     // Native methods are accessed through NativeSrtlaJni wrapper
     
@@ -97,6 +103,7 @@ public class NativeSrtlaService extends Service {
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
         stopNativeSrtla();
+        cleanupVirtualConnections();
         teardownNetworkMonitoring();
         isServiceRunning = false;
         super.onDestroy();
@@ -217,6 +224,9 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "Setting up Application-Level Virtual IP connections...");
         
         try {
+            // Clean up old virtual connections
+            cleanupVirtualConnections();
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 Network[] networks = connectivityManager.getAllNetworks();
                 
@@ -232,15 +242,17 @@ public class NativeSrtlaService extends Service {
                                 // Setup WiFi virtual connection
                                 int wifiSocket = createNetworkSocket(network);
                                 if (wifiSocket >= 0) {
+                                    virtualConnections.put("10.0.1.1", wifiSocket);
                                     NativeSrtlaJni.setNetworkSocket("10.0.1.1", realIP, 1, wifiSocket);
-                                    Log.i(TAG, "Setup virtual WiFi connection: 10.0.1.1 -> " + realIP);
+                                    Log.i(TAG, "Setup virtual WiFi connection: 10.0.1.1 -> " + realIP + " (socket: " + wifiSocket + ")");
                                 }
                             } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                                 // Setup Cellular virtual connection
                                 int cellularSocket = createNetworkSocket(network);
                                 if (cellularSocket >= 0) {
+                                    virtualConnections.put("10.0.2.1", cellularSocket);
                                     NativeSrtlaJni.setNetworkSocket("10.0.2.1", realIP, 2, cellularSocket);
-                                    Log.i(TAG, "Setup virtual Cellular connection: 10.0.2.1 -> " + realIP);
+                                    Log.i(TAG, "Setup virtual Cellular connection: 10.0.2.1 -> " + realIP + " (socket: " + cellularSocket + ")");
                                 }
                             }
                         }
@@ -249,6 +261,123 @@ public class NativeSrtlaService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error setting up virtual connections", e);
+        }
+        
+        Log.i(TAG, "Virtual connections setup complete. Active connections: " + virtualConnections.size());
+    }
+    
+    private void cleanupVirtualConnections() {
+        Log.i(TAG, "Cleaning up old virtual connections...");
+        
+        for (java.util.Map.Entry<String, Integer> entry : virtualConnections.entrySet()) {
+            int socketFD = entry.getValue();
+            try {
+                // Close the socket file descriptor using native close
+                if (socketFD >= 0) {
+                    closeSocketNative(socketFD);
+                    Log.i(TAG, "Closed socket FD " + socketFD + " for virtual IP " + entry.getKey());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error closing socket FD " + socketFD, e);
+            }
+        }
+        
+        virtualConnections.clear();
+        Log.i(TAG, "Virtual connections cleanup complete");
+    }
+    
+    private void updateVirtualConnections() {
+        Log.i(TAG, "Updating virtual connections (keeping existing where possible)...");
+        
+        try {
+            // Get current network state
+            java.util.Set<String> currentVirtualIPs = new java.util.HashSet<>();
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network[] networks = connectivityManager.getAllNetworks();
+                
+                for (Network network : networks) {
+                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+                    if (capabilities != null && 
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        
+                        String realIP = getNetworkIP(network);
+                        if (realIP != null) {
+                            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                                currentVirtualIPs.add("10.0.1.1");
+                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                                currentVirtualIPs.add("10.0.2.1");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Remove virtual connections that are no longer valid
+            java.util.Iterator<java.util.Map.Entry<String, Integer>> iterator = virtualConnections.entrySet().iterator();
+            while (iterator.hasNext()) {
+                java.util.Map.Entry<String, Integer> entry = iterator.next();
+                if (!currentVirtualIPs.contains(entry.getKey())) {
+                    Log.i(TAG, "Removing virtual connection for " + entry.getKey());
+                    closeSocketNative(entry.getValue());
+                    iterator.remove();
+                }
+            }
+            
+            // Add new virtual connections for networks we don't have yet
+            for (String virtualIP : currentVirtualIPs) {
+                if (!virtualConnections.containsKey(virtualIP)) {
+                    Log.i(TAG, "Adding new virtual connection for " + virtualIP);
+                    // Re-setup this specific virtual connection
+                    setupSpecificVirtualConnection(virtualIP);
+                }
+            }
+            
+            // Update the virtual IPs file
+            createVirtualIpsFile();
+            
+            Log.i(TAG, "Virtual connections update complete. Active: " + virtualConnections.size());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating virtual connections", e);
+        }
+    }
+    
+    private void setupSpecificVirtualConnection(String virtualIP) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network[] networks = connectivityManager.getAllNetworks();
+                
+                for (Network network : networks) {
+                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+                    if (capabilities != null && 
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        
+                        String realIP = getNetworkIP(network);
+                        if (realIP != null) {
+                            boolean isWiFiRequest = virtualIP.equals("10.0.1.1");
+                            boolean isCellularRequest = virtualIP.equals("10.0.2.1");
+                            boolean isWiFiNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+                            boolean isCellularNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+                            
+                            if ((isWiFiRequest && isWiFiNetwork) || (isCellularRequest && isCellularNetwork)) {
+                                int socket = createNetworkSocket(network);
+                                if (socket >= 0) {
+                                    virtualConnections.put(virtualIP, socket);
+                                    int networkType = isWiFiNetwork ? 1 : 2;
+                                    NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkType, socket);
+                                    Log.i(TAG, "Setup virtual connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting up virtual connection for " + virtualIP, e);
         }
     }
     
@@ -262,14 +391,16 @@ public class NativeSrtlaService extends Service {
         }
         
         try (FileWriter writer = new FileWriter(ipsFile, false)) {
-            // Write virtual IPs instead of real IPs
-            writer.write("10.0.1.1\n");  // WiFi virtual IP
-            writer.write("10.0.2.1\n");  // Cellular virtual IP
+            // Write only virtual IPs that have active connections
+            for (String virtualIP : virtualConnections.keySet()) {
+                writer.write(virtualIP + "\n");
+                Log.i(TAG, "Writing active virtual IP to file: " + virtualIP);
+            }
             writer.flush();
         }
         
         Log.i(TAG, "Created virtual IPs file: " + ipsFile.getAbsolutePath() + 
-              " (size: " + ipsFile.length() + " bytes)");
+              " (size: " + ipsFile.length() + " bytes, " + virtualConnections.size() + " virtual IPs)");
         
         return ipsFile;
     }
@@ -611,16 +742,29 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "Handling network change: " + reason);
         
         try {
-            // Re-create the IPs file with current network interfaces
-            File ipsFile = createNetworkIpsFile();
-            Log.i(TAG, "Updated IPs file with current network interfaces");
+            // Check if SRTLA is actively running before disrupting connections
+            boolean srtlaRunning = isServiceRunning && NativeSrtlaJni.isRunningSrtlaNative();
             
-            // Notify native SRTLA about the network change
-            NativeSrtlaJni.notifyNetworkChange();
-            Log.i(TAG, "Notified native SRTLA about network change");
+            if (srtlaRunning) {
+                // For running SRTLA, use conservative update approach
+                Log.i(TAG, "SRTLA is running - using conservative virtual connection update");
+                updateVirtualConnections();
+                NativeSrtlaJni.notifyNetworkChange();
+            } else {
+                // SRTLA not running - safe to recreate virtual connections from scratch
+                Log.i(TAG, "SRTLA not running - recreating virtual connections from scratch");
+                setupVirtualConnections();
+            }
+            
+            Log.i(TAG, "Completed network change handling");
             
             // Update notification to show network change
             updateNotification("Network changed - updating connections...");
+            
+            // Broadcast network change to update UI immediately
+            Intent networkChangeIntent = new Intent("com.example.srtla.NETWORK_CHANGED");
+            networkChangeIntent.putExtra("reason", reason);
+            sendBroadcast(networkChangeIntent);
             
         } catch (Exception e) {
             Log.e(TAG, "Error handling network change", e);
