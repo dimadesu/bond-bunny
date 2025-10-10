@@ -24,4 +24,10 @@ public class NativeSrtlaJni {
                                              String srtlaPort, String ipsFile);
     public static native int stopSrtlaNative();
     public static native boolean isRunningSrtlaNative();
+    
+    // Stats methods for minimal UI integration
+    public static native int getConnectionCount();
+    public static native int getActiveConnectionCount();
+    public static native int getTotalInFlightPackets();
+    public static native int getTotalWindowSize();
 }

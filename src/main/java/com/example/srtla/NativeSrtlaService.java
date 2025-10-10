@@ -310,4 +310,39 @@ public class NativeSrtlaService extends Service {
             Log.w(TAG, "Error syncing state", e);
         }
     }
+    
+    /**
+     * Get simple statistics from native SRTLA
+     * @return formatted statistics string
+     */
+    public static String getNativeStats() {
+        try {
+            if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
+                return "No native SRTLA connections";
+            }
+            
+            int totalConnections = NativeSrtlaJni.getConnectionCount();
+            int activeConnections = NativeSrtlaJni.getActiveConnectionCount();
+            int inFlightPackets = NativeSrtlaJni.getTotalInFlightPackets();
+            int totalWindow = NativeSrtlaJni.getTotalWindowSize();
+            
+            StringBuilder stats = new StringBuilder();
+            stats.append("📡 Native SRTLA Stats\n");
+            stats.append(String.format("Connections: %d total, %d active\n", 
+                                     totalConnections, activeConnections));
+            stats.append(String.format("In-flight packets: %d\n", inFlightPackets));
+            stats.append(String.format("Total window size: %d\n", totalWindow));
+            
+            if (activeConnections > 0) {
+                int avgWindow = totalWindow / activeConnections;
+                stats.append(String.format("Avg window per connection: %d", avgWindow));
+            }
+            
+            return stats.toString();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting native stats", e);
+            return "Error getting native stats: " + e.getMessage();
+        }
+    }
 }

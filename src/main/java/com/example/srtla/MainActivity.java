@@ -247,18 +247,28 @@ public class MainActivity extends Activity {
     }
     
     private void updateConnectionStats() {
-        String stats = EnhancedSrtlaService.getConnectionStatistics();
-        
-        // Add logging performance stats
-        String logStats = SrtlaLogger.getPerformanceStats();
-        String combinedStats = stats + "\n\n" + logStats;
-        
-        textConnectionStats.setText(combinedStats);
-        
-        // Update window visualization
-        List<ConnectionWindowView.ConnectionWindowData> windowData = 
-            EnhancedSrtlaService.getConnectionWindowData();
-        connectionWindowView.updateConnectionData(windowData);
+        // Check if native SRTLA is running and show its stats instead
+        if (NativeSrtlaService.isServiceRunning()) {
+            String nativeStats = NativeSrtlaService.getNativeStats();
+            textConnectionStats.setText(nativeStats);
+            
+            // Clear the connection window view for native SRTLA (simplified UI)
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        } else {
+            // Show Java SRTLA stats
+            String stats = EnhancedSrtlaService.getConnectionStatistics();
+            
+            // Add logging performance stats
+            String logStats = SrtlaLogger.getPerformanceStats();
+            String combinedStats = stats + "\n\n" + logStats;
+            
+            textConnectionStats.setText(combinedStats);
+            
+            // Update window visualization
+            List<ConnectionWindowView.ConnectionWindowData> windowData = 
+                EnhancedSrtlaService.getConnectionWindowData();
+            connectionWindowView.updateConnectionData(windowData);
+        }
         
         // Periodically refresh native SRTLA UI state (handles crashes)
         updateNativeSrtlaUI();
