@@ -45,7 +45,6 @@ public class MainActivity extends Activity {
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
-    private Button buttonNativeTest;
     private Button buttonDirectSrtlaTest;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
@@ -89,7 +88,6 @@ public class MainActivity extends Activity {
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
-        buttonNativeTest = findViewById(R.id.button_native_test);
         buttonDirectSrtlaTest = findViewById(R.id.button_direct_srtla_test);
         
         // Set initial logging level for performance
@@ -104,9 +102,6 @@ public class MainActivity extends Activity {
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
-        // Remove old test button - only SRTLA fork is needed
-        buttonNativeTest.setVisibility(android.view.View.GONE);
-        // SRTLA Fork Test - modified to test your fork
         buttonDirectSrtlaTest.setOnClickListener(v -> testSrtlaFork());
         
         // Load saved preferences or use default values

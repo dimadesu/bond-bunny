@@ -43,21 +43,6 @@
 
     </LinearLayout>
 
-    <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:layout_marginBottom="8dp">
-
-      <Button
-        android:id="@+id/button_native_test"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Test Native SRTLA"
-        android:background="#4CAF50"
-        android:textColor="#FFFFFF" />
-
-    </LinearLayout>
 
     <LinearLayout
       android:layout_width="match_parent"
