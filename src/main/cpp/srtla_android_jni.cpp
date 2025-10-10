@@ -11,6 +11,9 @@
 #include <cstring>  // For strncpy
 #include <cstdio>   // For snprintf
 #include <unistd.h>  // For sleep
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <errno.h>
 
 // Forward declare the Android SRTLA functions from patched srtla_send.c
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
@@ -217,4 +220,26 @@ Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz
     
     env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
     env->ReleaseStringUTFChars(real_ip, real_ip_str);
+}
+
+// Native UDP socket creation for NativeSrtlaService
+extern "C" JNIEXPORT jint JNICALL
+Java_com_example_srtla_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, jobject thiz) {
+    int sockfd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+    if (sockfd < 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Failed to create UDP socket: %s", strerror(errno));
+        return -1;
+    }
+    
+    // Set socket options
+    int bufsize = 212992;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize)) != 0) {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Failed to set send buffer size: %s", strerror(errno));
+    }
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize)) != 0) {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Failed to set recv buffer size: %s", strerror(errno));
+    }
+    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Created native UDP socket with FD: %d", sockfd);
+    return sockfd;
 }
