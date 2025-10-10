@@ -278,23 +278,6 @@ public class NativeSrtlaService extends Service {
         context.stopService(intent);
     }
     
-    public static String getServiceStatus() {
-        try {
-            boolean serviceState = isServiceRunning;
-            boolean nativeState = NativeSrtlaJni.isRunningSrtlaNative();
-            
-            if (serviceState && nativeState) {
-                return "Native SRTLA service is running";
-            } else if (serviceState && !nativeState) {
-                return "Native SRTLA service starting/stopping";
-            } else {
-                return "Native SRTLA service is stopped";
-            }
-        } catch (Exception e) {
-            return "Native SRTLA service status unknown";
-        }
-    }
-    
     /**
      * Sync internal state with actual native state
      * Call this periodically to ensure consistency
