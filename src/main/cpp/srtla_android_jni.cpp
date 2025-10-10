@@ -16,6 +16,7 @@
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
                                   const char* srtla_port, const char* ips_file);
 extern "C" void srtla_stop_android(void);
+extern "C" void schedule_update_conns(int signal);
 
 // Stats functions
 extern "C" int srtla_get_connection_count(void);
@@ -114,6 +115,16 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass clazz) {
     return srtla_running;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_srtla_NativeSrtlaJni_notifyNetworkChange(JNIEnv *env, jclass clazz) {
+    if (srtla_running) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Network change notification received");
+        schedule_update_conns(0);  // Pass 0 as dummy signal parameter
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Network change notification ignored - SRTLA not running");
+    }
 }
 
 extern "C" JNIEXPORT jint JNICALL
