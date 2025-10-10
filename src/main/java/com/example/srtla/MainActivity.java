@@ -397,35 +397,10 @@ public class MainActivity extends Activity {
         }
     }
     
-    // Native SRTLA methods for testing
-    static {
-        try {
-            System.loadLibrary("srtla_android");
-        } catch (UnsatisfiedLinkError e) {
-            Log.e("MainActivity", "Failed to load native SRTLA library", e);
-        }
-    }
-    
-    // Native methods calling Android-patched SRTLA
-    public native int startSrtlaNative(String listenPort, String srtlaHost, 
-                                      String srtlaPort, String ipsFile);
-    public native int stopSrtlaNative();
-    public native boolean isRunningSrtlaNative();
-    
-    /**
-     * Check if native SRTLA is running with error handling
-     */
-    private boolean isNativeSrtlaRunning() {
-        try {
-            return isRunningSrtlaNative();
-        } catch (Exception e) {
-            Log.w("MainActivity", "Failed to check native SRTLA state", e);
-            return false; // Assume stopped on error
-        }
-    }
+    // Native SRTLA is now handled by NativeSrtlaService using NativeSrtlaJni
     
     private void toggleNativeSrtla() {
-        if (isNativeSrtlaRunning()) {
+        if (NativeSrtlaService.isServiceRunning()) {
             stopNativeSrtla();
         } else {
             startNativeSrtla();
@@ -433,93 +408,53 @@ public class MainActivity extends Activity {
     }
     
     private void startNativeSrtla() {
-        textStatus.setText("Starting native SRTLA process...");
+        textStatus.setText("Starting native SRTLA service...");
         
         try {
-            // Create fresh IPs file (overwrite any existing)
-            java.io.File ipsFile = new java.io.File(getFilesDir(), "real_network_ips.txt");
+            // Get configuration from preferences (similar to regular SRTLA service)
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            String srtlaHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
+            String srtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
+            String listenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
             
-            // Delete existing file to ensure clean start
-            if (ipsFile.exists()) {
-                ipsFile.delete();
-                Log.i("MainActivity", "Deleted existing IPs file");
+            if (srtlaHost.isEmpty() || srtlaPort.isEmpty() || listenPort.isEmpty()) {
+                textStatus.setText("❌ Please configure SRTLA settings first");
+                return;
             }
             
-            try (java.io.FileWriter writer = new java.io.FileWriter(ipsFile, false)) { // false = overwrite
-                // Get actual network interface IPs
-                java.util.List<String> networkIps = getRealNetworkIPs();
-                if (networkIps.isEmpty()) {
-                    throw new RuntimeException("No network interfaces found - device may not be connected to any networks");
-                }
-                
-                for (String ip : networkIps) {
-                    writer.write(ip + "\n");
-                    Log.i("MainActivity", "Writing IP to file: " + ip);
-                }
-                writer.flush(); // Ensure data is written
-            }
+            // Start the native SRTLA service
+            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             
-            Log.i("MainActivity", "Created IPs file: " + ipsFile.getAbsolutePath() + 
-                  " (size: " + ipsFile.length() + " bytes)");
+            // Update UI immediately
+            updateNativeSrtlaUI();
+            textStatus.setText("✅ Native SRTLA service starting...");
             
-            int result = startSrtlaNative(
-                // Listen port (SRT)
-                "6000",
-                // SRTLA host
-                "au.srt.belabox.net",
-                // SRTLA port
-                "5000",
-                // IPs file
-                ipsFile.getAbsolutePath()
-            );
-            
-            if (result == 0) {
-                updateNativeSrtlaUI();
-                textStatus.setText("✅ Native SRTLA process started");
-            } else {
-                String errorMsg = "❌ Native SRTLA Failed to Start\n\n";
-                switch (result) {
-                    case -1:
-                        errorMsg += "Network or DNS resolution error";
-                        break;
-                    case -2:
-                        errorMsg += "SRTLA receiver unreachable";
-                        break;
-                    default:
-                        errorMsg += "Error code: " + result;
-                        break;
-                }
-                textStatus.setText(errorMsg);
-            }
+            Toast.makeText(this, "Native SRTLA service started on port " + listenPort, Toast.LENGTH_LONG).show();
             
         } catch (Exception e) {
-            textStatus.setText("❌ Error starting native SRTLA: " + e.getMessage());
-            Log.e("MainActivity", "Native SRTLA start error", e);
+            textStatus.setText("❌ Error starting native SRTLA service: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA service start error", e);
         }
     }
     
     private void stopNativeSrtla() {
-        textStatus.setText("Stopping native SRTLA process...");
+        textStatus.setText("Stopping native SRTLA service...");
         
         try {
-            int result = stopSrtlaNative();
+            NativeSrtlaService.stopService(this);
             updateNativeSrtlaUI();
-            
-            if (result == 0) {
-                textStatus.setText("✅ Native SRTLA Stopped");
-            } else {
-                textStatus.setText("⚠️ Native SRTLA stopped with code: " + result);
-            }
+            textStatus.setText("✅ Native SRTLA service stopped");
+            Toast.makeText(this, "Native SRTLA service stopped", Toast.LENGTH_SHORT).show();
             
         } catch (Exception e) {
             updateNativeSrtlaUI();
-            textStatus.setText("❌ Error stopping native SRTLA: " + e.getMessage());
-            Log.e("MainActivity", "Native SRTLA stop error", e);
+            textStatus.setText("❌ Error stopping native SRTLA service: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA service stop error", e);
         }
     }
     
     private void updateNativeSrtlaUI() {
-        if (isNativeSrtlaRunning()) {
+        if (NativeSrtlaService.isServiceRunning()) {
             buttonNativeSrtla.setText("Stop Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
         } else {
@@ -528,48 +463,7 @@ public class MainActivity extends Activity {
         }
     }
     
-    /**
-     * Get real network interface IP addresses from the device
-     */
-    private java.util.List<String> getRealNetworkIPs() {
-        java.util.List<String> ips = new java.util.ArrayList<>();
-        
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> interfaces = 
-                java.net.NetworkInterface.getNetworkInterfaces();
-            
-            while (interfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = interfaces.nextElement();
-                
-                // Skip loopback and inactive interfaces
-                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                    continue;
-                }
-                
-                java.util.Enumeration<java.net.InetAddress> addresses = 
-                    networkInterface.getInetAddresses();
-                
-                while (addresses.hasMoreElements()) {
-                    java.net.InetAddress address = addresses.nextElement();
-                    
-                    // Only IPv4, not loopback, not link-local
-                    if (address instanceof java.net.Inet4Address && 
-                        !address.isLoopbackAddress() && 
-                        !address.isLinkLocalAddress()) {
-                        
-                        String ip = address.getHostAddress();
-                        ips.add(ip);
-                        Log.i("MainActivity", "Found network IP: " + ip + 
-                              " on interface: " + networkInterface.getName());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e("MainActivity", "Error getting network IPs", e);
-        }
-        
-        return ips;
-    }
+    // Network IP detection is now handled by NativeSrtlaService
     
     // Algorithm toggle methods moved to SettingsActivity
 }

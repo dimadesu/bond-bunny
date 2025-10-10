@@ -43,7 +43,7 @@ static void* srtla_thread_func(void* args) {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_MainActivity_startSrtlaNative(JNIEnv *env, jobject thiz,
+Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz,
                                                      jstring listen_port, jstring srtla_host,
                                                      jstring srtla_port, jstring ips_file) {
     if (srtla_running) {
@@ -81,7 +81,7 @@ Java_com_example_srtla_MainActivity_startSrtlaNative(JNIEnv *env, jobject thiz,
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_MainActivity_stopSrtlaNative(JNIEnv *env, jobject thiz) {
+Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz) {
     if (!srtla_running) {
         return 0;
     }
@@ -101,6 +101,6 @@ Java_com_example_srtla_MainActivity_stopSrtlaNative(JNIEnv *env, jobject thiz) {
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_MainActivity_isRunningSrtlaNative(JNIEnv *env, jobject thiz) {
+Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass clazz) {
     return srtla_running;
 }
