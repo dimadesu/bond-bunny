@@ -19,6 +19,11 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.NetworkInterface;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
@@ -202,30 +207,72 @@ public class NativeSrtlaService extends Service {
         List<String> ips = new ArrayList<>();
         
         try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = interfaces.nextElement();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Use ConnectivityManager to get only actually connected networks
+                Network[] networks = connectivityManager.getAllNetworks();
                 
-                // Skip loopback and inactive interfaces
-                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                    continue;
-                }
-                
-                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
-                
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    
-                    // Only IPv4, not loopback, not link-local
-                    if (address instanceof Inet4Address && 
-                        !address.isLoopbackAddress() && 
-                        !address.isLinkLocalAddress()) {
+                for (Network network : networks) {
+                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+                    if (capabilities != null && 
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
                         
-                        String ip = address.getHostAddress();
-                        ips.add(ip);
-                        Log.i(TAG, "Found network IP: " + ip + 
-                              " on interface: " + networkInterface.getName());
+                        // Get the network's interface
+                        android.net.LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
+                        if (linkProperties != null) {
+                            for (android.net.LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                                java.net.InetAddress address = linkAddress.getAddress();
+                                if (address instanceof Inet4Address && 
+                                    !address.isLoopbackAddress() && 
+                                    !address.isLinkLocalAddress()) {
+                                    
+                                    String ip = address.getHostAddress();
+                                    String interfaceName = linkProperties.getInterfaceName();
+                                    
+                                    // Determine network type
+                                    String networkType = "unknown";
+                                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                                        networkType = "WiFi";
+                                    } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                                        networkType = "Cellular";
+                                    }
+                                    
+                                    ips.add(ip);
+                                    Log.i(TAG, "Found active network IP: " + ip + 
+                                          " on interface: " + interfaceName + 
+                                          " type: " + networkType);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Fallback for older Android versions
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                
+                while (interfaces.hasMoreElements()) {
+                    NetworkInterface networkInterface = interfaces.nextElement();
+                    
+                    // Skip loopback and inactive interfaces
+                    if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                        continue;
+                    }
+                    
+                    Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                    
+                    while (addresses.hasMoreElements()) {
+                        InetAddress address = addresses.nextElement();
+                        
+                        // Only IPv4, not loopback, not link-local
+                        if (address instanceof Inet4Address && 
+                            !address.isLoopbackAddress() && 
+                            !address.isLinkLocalAddress()) {
+                            
+                            String ip = address.getHostAddress();
+                            ips.add(ip);
+                            Log.i(TAG, "Found network IP (fallback): " + ip + 
+                                  " on interface: " + networkInterface.getName());
+                        }
                     }
                 }
             }
@@ -233,6 +280,7 @@ public class NativeSrtlaService extends Service {
             Log.e(TAG, "Error getting network IPs", e);
         }
         
+        Log.i(TAG, "Total active network IPs found: " + ips.size());
         return ips;
     }
     
