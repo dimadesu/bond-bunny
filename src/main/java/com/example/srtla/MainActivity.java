@@ -219,19 +219,29 @@ public class MainActivity extends Activity {
             textStatus.setText("Status: Stopped");
             buttonStart.setEnabled(true);
             buttonStop.setEnabled(false);
-            textConnectionStats.setText("No active connections");
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            // Only clear connection stats if native SRTLA is also not running
+            if (!NativeSrtlaService.isServiceRunning()) {
+                Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
+                textConnectionStats.setText("No active connections");
+                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            } else {
+                Log.i("MainActivity", "updateUI: Not clearing connection stats - native SRTLA still running");
+            }
         }
     }
     
     
     private void startStatsUpdates() {
+        Log.i("MainActivity", "Starting stats updates");
         statsUpdateRunnable = new Runnable() {
             @Override
             public void run() {
-                if (serviceRunning) {
+                Log.i("MainActivity", "Stats update tick - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
+                if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
                     updateConnectionStats();
                     uiHandler.postDelayed(this, 1000); // Update every second
+                } else {
+                    Log.i("MainActivity", "No services running, stopping stats updates");
                 }
             }
         };
@@ -239,18 +249,30 @@ public class MainActivity extends Activity {
     }
     
     private void stopStatsUpdates() {
+        Log.i("MainActivity", "stopStatsUpdates called - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
         if (statsUpdateRunnable != null) {
             uiHandler.removeCallbacks(statsUpdateRunnable);
-            textConnectionStats.setText("No active connections");
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            // Only clear stats if no services are running
+            if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
+                Log.i("MainActivity", "Clearing stats display - no services running");
+                textConnectionStats.setText("No active connections");
+                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            } else {
+                Log.i("MainActivity", "Not clearing stats - service still running");
+            }
         }
     }
     
     private void updateConnectionStats() {
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
             String nativeStats = NativeSrtlaService.getNativeStats();
+            Log.i("MainActivity", "Native stats: " + nativeStats);
             textConnectionStats.setText(nativeStats);
+            
+            // Also update the status to show we're getting stats (for visibility test)
+            textStatus.setText("✅ Native SRTLA running - Stats updating");
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
@@ -440,10 +462,15 @@ public class MainActivity extends Activity {
             
             // Update UI after a short delay to allow service to start
             uiHandler.postDelayed(() -> {
+                Log.i("MainActivity", "Delayed callback: checking native SRTLA status");
                 updateNativeSrtlaUI();
                 if (NativeSrtlaService.isServiceRunning()) {
+                    Log.i("MainActivity", "Native SRTLA is running, starting stats updates");
                     textStatus.setText("✅ Native SRTLA service running");
+                    // Start stats updates for native SRTLA
+                    startStatsUpdates();
                 } else {
+                    Log.i("MainActivity", "Native SRTLA is not running");
                     textStatus.setText("❌ Native SRTLA service failed to start");
                 }
             }, 2000); // Wait 2 seconds for service to start

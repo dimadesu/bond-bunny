@@ -317,14 +317,21 @@ public class NativeSrtlaService extends Service {
      */
     public static String getNativeStats() {
         try {
+            Log.i(TAG, "getNativeStats called, isServiceRunning=" + isServiceRunning);
+            
             if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
+                Log.i(TAG, "Native SRTLA not running, returning default message");
                 return "No native SRTLA connections";
             }
             
+            Log.i(TAG, "Calling native stats functions...");
             int totalConnections = NativeSrtlaJni.getConnectionCount();
             int activeConnections = NativeSrtlaJni.getActiveConnectionCount();
             int inFlightPackets = NativeSrtlaJni.getTotalInFlightPackets();
             int totalWindow = NativeSrtlaJni.getTotalWindowSize();
+            
+            Log.i(TAG, String.format("Native stats: total=%d, active=%d, inflight=%d, window=%d", 
+                                   totalConnections, activeConnections, inFlightPackets, totalWindow));
             
             StringBuilder stats = new StringBuilder();
             stats.append("📡 Native SRTLA Stats\n");
