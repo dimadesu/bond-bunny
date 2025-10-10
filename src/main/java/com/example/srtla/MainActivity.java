@@ -389,12 +389,12 @@ public class MainActivity extends Activity {
         }
     }
     
-    // SRTLA Fork Test - Native methods for testing your fork
+    // Native SRTLA methods for testing
     static {
         try {
             System.loadLibrary("srtla_android");
         } catch (UnsatisfiedLinkError e) {
-            Log.e("MainActivity", "Failed to load SRTLA fork library", e);
+            Log.e("MainActivity", "Failed to load native SRTLA library", e);
         }
     }
     
@@ -405,39 +405,38 @@ public class MainActivity extends Activity {
     public native boolean isRunningSrtlaNative();
     
     private void testSrtlaFork() {
-        textStatus.setText("Testing SRTLA Fork with Real Network Interfaces...");
+        textStatus.setText("Testing native SRTLA process...");
         
         try {
-            // Create IPs file with REAL device network interfaces
+            // Create IPs file
             java.io.File ipsFile = new java.io.File(getFilesDir(), "real_network_ips.txt");
             try (java.io.FileWriter writer = new java.io.FileWriter(ipsFile)) {
-                // writer.write("127.0.0.1\n");       // Loopback - always works
-                writer.write("172.20.10.2\n");     // Wi-Fi interface (wlan0)
-                writer.write("192.0.0.2\n");       // Cellular interface (rmnet_data0)
+                // Wi-Fi interface (wlan0)
+                writer.write("172.20.10.2\n");
+                // Cellular interface (rmnet_data0)
+                writer.write("192.0.0.2\n");
             }
             
-            // Test your SRTLA fork with minimal Android patches
             int result = startSrtlaNative(
-                "6000",                           // Listen port (SRT)
-                "au.srt.belabox.net",            // SRTLA host
-                "5000",                          // SRTLA port (your receiver)
-                ipsFile.getAbsolutePath()        // IPs file
+                // Listen port (SRT)
+                "6000",
+                // SRTLA host
+                "au.srt.belabox.net",
+                // SRTLA port
+                "5000",
+                // IPs file
+                ipsFile.getAbsolutePath()
             );
             
             if (result == 0) {
-                textStatus.setText("✅ SRTLA Fork Started with Real Networks!\n\n" +
-                    // "📡 Loopback: 127.0.0.1 (local)\n" +
-                    "� Wi-Fi: 172.20.10.2 (wlan0)\n" +
-                    "� Cellular: 192.0.0.2 (rmnet_data0)\n\n" +
-                    "🎯 99% Original SRTLA Code\n" +
-                    "🚀 Real Network Binding Active!");
+                textStatus.setText("✅ Native SRTLA process started");
             } else {
-                textStatus.setText("❌ SRTLA Fork failed to start: " + result);
+                textStatus.setText("❌ Native SRTLA process failed to start: " + result);
             }
             
         } catch (Exception e) {
-            textStatus.setText("❌ Error testing SRTLA Fork: " + e.getMessage());
-            Log.e("MainActivity", "SRTLA Fork test error", e);
+            textStatus.setText("❌ Error testing native SRTLA process: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA process test error", e);
         }
     }
     

@@ -4,7 +4,7 @@ project("srtla_android")
 
 find_library(log-lib log)
 
-# Set path to SRTLA source (your fork with Android patches)
+# Set path to SRTLA source (fork with Android patches)
 set(SRTLA_DIR ${CMAKE_SOURCE_DIR}/../../../srtla)
 
 # Build SRTLA with Android patches - minimal JNI wrapper + original code
