@@ -425,11 +425,18 @@ public class MainActivity extends Activity {
             // Start the native SRTLA service
             NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             
-            // Update UI immediately
-            updateNativeSrtlaUI();
-            textStatus.setText("✅ Native SRTLA service starting...");
+            textStatus.setText("⏳ Native SRTLA service starting...");
+            Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
             
-            Toast.makeText(this, "Native SRTLA service started on port " + listenPort, Toast.LENGTH_LONG).show();
+            // Update UI after a short delay to allow service to start
+            uiHandler.postDelayed(() -> {
+                updateNativeSrtlaUI();
+                if (NativeSrtlaService.isServiceRunning()) {
+                    textStatus.setText("✅ Native SRTLA service running");
+                } else {
+                    textStatus.setText("❌ Native SRTLA service failed to start");
+                }
+            }, 2000); // Wait 2 seconds for service to start
             
         } catch (Exception e) {
             textStatus.setText("❌ Error starting native SRTLA service: " + e.getMessage());
@@ -438,13 +445,30 @@ public class MainActivity extends Activity {
     }
     
     private void stopNativeSrtla() {
-        textStatus.setText("Stopping native SRTLA service...");
+        textStatus.setText("⏳ Stopping native SRTLA service...");
         
         try {
             NativeSrtlaService.stopService(this);
-            updateNativeSrtlaUI();
-            textStatus.setText("✅ Native SRTLA service stopped");
-            Toast.makeText(this, "Native SRTLA service stopped", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
+            
+            // Update UI after a short delay to allow service to stop
+            uiHandler.postDelayed(() -> {
+                updateNativeSrtlaUI();
+                if (!NativeSrtlaService.isServiceRunning()) {
+                    textStatus.setText("✅ Native SRTLA service stopped");
+                } else {
+                    textStatus.setText("⏳ Native SRTLA service stopping...");
+                    // Try again after another delay
+                    uiHandler.postDelayed(() -> {
+                        updateNativeSrtlaUI();
+                        if (!NativeSrtlaService.isServiceRunning()) {
+                            textStatus.setText("✅ Native SRTLA service stopped");
+                        } else {
+                            textStatus.setText("⚠️ Native SRTLA service may still be running");
+                        }
+                    }, 2000);
+                }
+            }, 1500); // Wait 1.5 seconds for service to stop
             
         } catch (Exception e) {
             updateNativeSrtlaUI();
@@ -454,12 +478,20 @@ public class MainActivity extends Activity {
     }
     
     private void updateNativeSrtlaUI() {
-        if (NativeSrtlaService.isServiceRunning()) {
+        // Sync state before checking to ensure accuracy
+        NativeSrtlaService.syncState();
+        
+        boolean isRunning = NativeSrtlaService.isServiceRunning();
+        Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
+        
+        if (isRunning) {
             buttonNativeSrtla.setText("Stop Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
+            Log.i("MainActivity", "UI updated to STOP state");
         } else {
             buttonNativeSrtla.setText("Start Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
+            Log.i("MainActivity", "UI updated to START state");
         }
     }
     

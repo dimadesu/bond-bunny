@@ -97,8 +97,15 @@ public class NativeSrtlaService extends Service {
             
             if (result == 0) {
                 Log.i(TAG, "Native SRTLA started successfully");
-                isServiceRunning = true;
-                updateNotification("Native SRTLA running on port " + listenPort);
+                // Verify native state before marking as running
+                if (NativeSrtlaJni.isRunningSrtlaNative()) {
+                    isServiceRunning = true;
+                    updateNotification("Native SRTLA running on port " + listenPort);
+                } else {
+                    Log.w(TAG, "Native SRTLA start returned 0 but process is not running");
+                    updateNotification("Native SRTLA failed to start");
+                    stopSelf();
+                }
             } else {
                 Log.e(TAG, "Native SRTLA failed to start with code: " + result);
                 updateNotification("Native SRTLA failed to start (code: " + result + ")");
@@ -119,7 +126,26 @@ public class NativeSrtlaService extends Service {
             
             int result = NativeSrtlaJni.stopSrtlaNative();
             if (result == 0) {
-                Log.i(TAG, "Native SRTLA stopped successfully");
+                Log.i(TAG, "Native SRTLA stop signal sent successfully");
+                
+                // Wait a moment for the native process to actually stop
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(1000); // Wait 1 second
+                        
+                        // Check if native process actually stopped
+                        if (!NativeSrtlaJni.isRunningSrtlaNative()) {
+                            Log.i(TAG, "Native SRTLA process confirmed stopped");
+                            updateNotification("Native SRTLA stopped");
+                        } else {
+                            Log.w(TAG, "Native SRTLA process still running after stop signal");
+                            updateNotification("Native SRTLA stopping...");
+                        }
+                    } catch (InterruptedException e) {
+                        Log.w(TAG, "Stop monitoring interrupted", e);
+                    }
+                }).start();
+                
             } else {
                 Log.w(TAG, "Native SRTLA stop returned code: " + result);
             }
@@ -225,7 +251,13 @@ public class NativeSrtlaService extends Service {
     
     // Static methods for external access
     public static boolean isServiceRunning() {
-        return isServiceRunning;
+        // Check both service state and native state for accuracy
+        try {
+            return isServiceRunning && NativeSrtlaJni.isRunningSrtlaNative();
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking native SRTLA state", e);
+            return isServiceRunning;
+        }
     }
     
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
@@ -247,10 +279,35 @@ public class NativeSrtlaService extends Service {
     }
     
     public static String getServiceStatus() {
-        if (isServiceRunning) {
-            return "Native SRTLA service is running";
-        } else {
-            return "Native SRTLA service is stopped";
+        try {
+            boolean serviceState = isServiceRunning;
+            boolean nativeState = NativeSrtlaJni.isRunningSrtlaNative();
+            
+            if (serviceState && nativeState) {
+                return "Native SRTLA service is running";
+            } else if (serviceState && !nativeState) {
+                return "Native SRTLA service starting/stopping";
+            } else {
+                return "Native SRTLA service is stopped";
+            }
+        } catch (Exception e) {
+            return "Native SRTLA service status unknown";
+        }
+    }
+    
+    /**
+     * Sync internal state with actual native state
+     * Call this periodically to ensure consistency
+     */
+    public static void syncState() {
+        try {
+            boolean nativeRunning = NativeSrtlaJni.isRunningSrtlaNative();
+            if (isServiceRunning && !nativeRunning) {
+                Log.w(TAG, "State sync: Service thinks it's running but native is stopped");
+                isServiceRunning = false;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error syncing state", e);
         }
     }
 }

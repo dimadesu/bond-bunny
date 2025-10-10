@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <android/log.h>
 #include <cstring>  // For strncpy
+#include <unistd.h>  // For sleep
 
 // Forward declare the Android SRTLA functions from patched srtla_send.c
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
@@ -91,11 +92,13 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     // Signal the SRTLA process to stop gracefully
     srtla_stop_android();
     
-    // Wait for thread to finish
-    pthread_join(srtla_thread, nullptr);
+    // Mark as not running immediately - the thread will finish cleanup
     srtla_running = false;
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA process stopped");
+    // Detach the thread so it can clean up itself without blocking the UI
+    pthread_detach(srtla_thread);
+    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stop signal sent, thread detached");
     
     return 0;
 }
