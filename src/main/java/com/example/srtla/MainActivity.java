@@ -449,15 +449,12 @@ public class MainActivity extends Activity {
                 // Get actual network interface IPs
                 java.util.List<String> networkIps = getRealNetworkIPs();
                 if (networkIps.isEmpty()) {
-                    // Fallback to some common private network ranges
-                    writer.write("192.168.1.100\n");
-                    writer.write("10.0.0.100\n");
-                    Log.w("MainActivity", "No real network IPs found, using fallback IPs");
-                } else {
-                    for (String ip : networkIps) {
-                        writer.write(ip + "\n");
-                        Log.i("MainActivity", "Writing IP to file: " + ip);
-                    }
+                    throw new RuntimeException("No network interfaces found - device may not be connected to any networks");
+                }
+                
+                for (String ip : networkIps) {
+                    writer.write(ip + "\n");
+                    Log.i("MainActivity", "Writing IP to file: " + ip);
                 }
                 writer.flush(); // Ensure data is written
             }
