@@ -45,8 +45,9 @@ public class MainActivity extends Activity {
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
-    private Button buttonDirectSrtlaTest;
+    private Button buttonNativeSrtla;
     private boolean serviceRunning = false;
+    private boolean nativeSrtlaRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -88,7 +89,7 @@ public class MainActivity extends Activity {
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
-        buttonDirectSrtlaTest = findViewById(R.id.button_direct_srtla_test);
+        buttonNativeSrtla = findViewById(R.id.button_native_srtla);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -102,7 +103,10 @@ public class MainActivity extends Activity {
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
-        buttonDirectSrtlaTest.setOnClickListener(v -> testSrtlaFork());
+        buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
+        
+        // Initialize native SRTLA UI state
+        updateNativeSrtlaUI();
         
         // Load saved preferences or use default values
         loadPreferences();
@@ -404,8 +408,16 @@ public class MainActivity extends Activity {
     public native int stopSrtlaNative();
     public native boolean isRunningSrtlaNative();
     
-    private void testSrtlaFork() {
-        textStatus.setText("Testing native SRTLA process...");
+    private void toggleNativeSrtla() {
+        if (nativeSrtlaRunning) {
+            stopNativeSrtla();
+        } else {
+            startNativeSrtla();
+        }
+    }
+    
+    private void startNativeSrtla() {
+        textStatus.setText("Starting native SRTLA process...");
         
         try {
             // Create IPs file
@@ -429,14 +441,60 @@ public class MainActivity extends Activity {
             );
             
             if (result == 0) {
+                nativeSrtlaRunning = true;
+                updateNativeSrtlaUI();
                 textStatus.setText("✅ Native SRTLA process started");
             } else {
-                textStatus.setText("❌ Native SRTLA process failed to start: " + result);
+                String errorMsg = "❌ Native SRTLA Failed to Start\n\n";
+                switch (result) {
+                    case -1:
+                        errorMsg += "Network or DNS resolution error";
+                        break;
+                    case -2:
+                        errorMsg += "SRTLA receiver unreachable";
+                        break;
+                    default:
+                        errorMsg += "Error code: " + result;
+                        break;
+                }
+                textStatus.setText(errorMsg);
             }
             
         } catch (Exception e) {
-            textStatus.setText("❌ Error testing native SRTLA process: " + e.getMessage());
-            Log.e("MainActivity", "Native SRTLA process test error", e);
+            textStatus.setText("❌ Error starting native SRTLA: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA start error", e);
+        }
+    }
+    
+    private void stopNativeSrtla() {
+        textStatus.setText("Stopping native SRTLA process...");
+        
+        try {
+            int result = stopSrtlaNative();
+            nativeSrtlaRunning = false;
+            updateNativeSrtlaUI();
+            
+            if (result == 0) {
+                textStatus.setText("✅ Native SRTLA Stopped");
+            } else {
+                textStatus.setText("⚠️ Native SRTLA stopped with code: " + result);
+            }
+            
+        } catch (Exception e) {
+            nativeSrtlaRunning = false;
+            updateNativeSrtlaUI();
+            textStatus.setText("❌ Error stopping native SRTLA: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA stop error", e);
+        }
+    }
+    
+    private void updateNativeSrtlaUI() {
+        if (nativeSrtlaRunning) {
+            buttonNativeSrtla.setText("Stop Native SRTLA");
+            buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
+        } else {
+            buttonNativeSrtla.setText("Start Native SRTLA");
+            buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
         }
     }
     

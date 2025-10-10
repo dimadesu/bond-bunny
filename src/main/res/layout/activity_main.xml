@@ -51,11 +51,11 @@
       android:layout_marginBottom="8dp">
 
       <Button
-        android:id="@+id/button_direct_srtla_test"
+        android:id="@+id/button_native_srtla"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Direct SRTLA Test"
-        android:background="#FF5722"
+        android:text="Start Native SRTLA"
+        android:background="#4CAF50"
         android:textColor="#FFFFFF" />
 
     </LinearLayout>
