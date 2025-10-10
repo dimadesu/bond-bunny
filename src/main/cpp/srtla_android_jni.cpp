@@ -10,9 +10,10 @@
 #include <android/log.h>
 #include <cstring>  // For strncpy
 
-// Forward declare the Android SRTLA function from patched srtla_send.c
+// Forward declare the Android SRTLA functions from patched srtla_send.c
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
                                   const char* srtla_port, const char* ips_file);
+extern "C" void srtla_stop_android(void);
 
 static pthread_t srtla_thread;
 static bool srtla_running = false;
@@ -85,10 +86,16 @@ Java_com_example_srtla_MainActivity_stopSrtlaNative(JNIEnv *env, jobject thiz) {
         return 0;
     }
     
-    // Note: Original SRTLA runs in infinite loop, so stopping requires process termination
-    // For production use, you'd add graceful shutdown to the SRTLA patches
-    pthread_detach(srtla_thread);
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Stopping SRTLA process...");
+    
+    // Signal the SRTLA process to stop gracefully
+    srtla_stop_android();
+    
+    // Wait for thread to finish
+    pthread_join(srtla_thread, nullptr);
     srtla_running = false;
+    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA process stopped");
     
     return 0;
 }
