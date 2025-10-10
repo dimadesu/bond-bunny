@@ -30,4 +30,7 @@ public class NativeSrtlaJni {
     public static native int getActiveConnectionCount();
     public static native int getTotalInFlightPackets();
     public static native int getTotalWindowSize();
+    
+    // Optimized single-call stats method
+    public static native String getAllStats();
 }

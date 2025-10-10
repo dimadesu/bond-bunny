@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <android/log.h>
 #include <cstring>  // For strncpy
+#include <cstdio>   // For snprintf
 #include <unistd.h>  // For sleep
 
 // Forward declare the Android SRTLA functions from patched srtla_send.c
@@ -153,4 +154,37 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalWindowSize(JNIEnv *env, jclass cla
     int size = srtla_get_total_window_size();
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getTotalWindowSize: %d", size);
     return size;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
+    if (!srtla_running) {
+        return env->NewStringUTF("No native SRTLA connections");
+    }
+    
+    // Get all stats in one go
+    int totalConnections = srtla_get_connection_count();
+    int activeConnections = srtla_get_active_connection_count();
+    int inFlightPackets = srtla_get_total_in_flight_packets();
+    int totalWindow = srtla_get_total_window_size();
+    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d, window=%d", 
+                       totalConnections, activeConnections, inFlightPackets, totalWindow);
+    
+    // Format the stats string
+    char statsBuffer[512];
+    int len = snprintf(statsBuffer, sizeof(statsBuffer),
+                       "📡 Native SRTLA Stats\n"
+                       "Connections: %d total, %d active\n"
+                       "In-flight packets: %d\n"
+                       "Total window size: %d",
+                       totalConnections, activeConnections, inFlightPackets, totalWindow);
+    
+    // Add average window if there are active connections
+    if (activeConnections > 0 && len < sizeof(statsBuffer) - 50) {
+        snprintf(statsBuffer + len, sizeof(statsBuffer) - len,
+                 "\nAvg window per connection: %d", totalWindow / activeConnections);
+    }
+    
+    return env->NewStringUTF(statsBuffer);
 }

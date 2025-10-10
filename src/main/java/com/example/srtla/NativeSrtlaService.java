@@ -307,31 +307,15 @@ public class NativeSrtlaService extends Service {
                 return "No native SRTLA connections";
             }
             
-            Log.i(TAG, "Calling native stats functions...");
-            int totalConnections = NativeSrtlaJni.getConnectionCount();
-            int activeConnections = NativeSrtlaJni.getActiveConnectionCount();
-            int inFlightPackets = NativeSrtlaJni.getTotalInFlightPackets();
-            int totalWindow = NativeSrtlaJni.getTotalWindowSize();
-            
-            Log.i(TAG, String.format("Native stats: total=%d, active=%d, inflight=%d, window=%d", 
-                                   totalConnections, activeConnections, inFlightPackets, totalWindow));
+            Log.i(TAG, "Calling optimized native stats function...");
+            // Single JNI call instead of 4 separate calls - much more efficient!
+            String nativeStats = NativeSrtlaJni.getAllStats();
             
             // Add timestamp to see if values change over time
             Log.i(TAG, "Stats timestamp: " + System.currentTimeMillis());
+            Log.i(TAG, "Native stats result: " + nativeStats);
             
-            StringBuilder stats = new StringBuilder();
-            stats.append("📡 Native SRTLA Stats\n");
-            stats.append(String.format("Connections: %d total, %d active\n", 
-                                     totalConnections, activeConnections));
-            stats.append(String.format("In-flight packets: %d\n", inFlightPackets));
-            stats.append(String.format("Total window size: %d\n", totalWindow));
-            
-            if (activeConnections > 0) {
-                int avgWindow = totalWindow / activeConnections;
-                stats.append(String.format("Avg window per connection: %d", avgWindow));
-            }
-            
-            return stats.toString();
+            return nativeStats;
             
         } catch (Exception e) {
             Log.e(TAG, "Error getting native stats", e);
