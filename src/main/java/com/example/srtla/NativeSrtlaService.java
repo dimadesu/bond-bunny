@@ -7,6 +7,10 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -34,6 +38,10 @@ public class NativeSrtlaService extends Service {
     private String srtlaPort;
     private String listenPort;
     
+    // Network monitoring
+    private ConnectivityManager connectivityManager;
+    private NetworkCallback networkCallback;
+    
     // Native methods are accessed through NativeSrtlaJni wrapper
     
     @Override
@@ -42,6 +50,10 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "NativeSrtlaService created");
         // Use the same notification channel as EnhancedSrtlaService
         EnhancedSrtlaService.createNotificationChannel(this);
+        
+        // Initialize network monitoring
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        setupNetworkMonitoring();
     }
     
     @Override
@@ -73,6 +85,7 @@ public class NativeSrtlaService extends Service {
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
         stopNativeSrtla();
+        teardownNetworkMonitoring();
         isServiceRunning = false;
         super.onDestroy();
     }
@@ -320,6 +333,91 @@ public class NativeSrtlaService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Error getting native stats", e);
             return "Error getting native stats: " + e.getMessage();
+        }
+    }
+    
+    /**
+     * Set up network monitoring to detect WiFi/cellular changes
+     */
+    private void setupNetworkMonitoring() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            networkCallback = new NetworkCallback();
+            
+            // Monitor all networks (WiFi, cellular, etc.)
+            NetworkRequest.Builder builder = new NetworkRequest.Builder();
+            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            
+            connectivityManager.registerNetworkCallback(builder.build(), networkCallback);
+            Log.i(TAG, "Network monitoring enabled");
+        } else {
+            Log.w(TAG, "Network monitoring not available on this Android version");
+        }
+    }
+    
+    /**
+     * Clean up network monitoring
+     */
+    private void teardownNetworkMonitoring() {
+        if (networkCallback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+                Log.i(TAG, "Network monitoring disabled");
+            } catch (Exception e) {
+                Log.w(TAG, "Error unregistering network callback", e);
+            }
+            networkCallback = null;
+        }
+    }
+    
+    /**
+     * Network callback to detect connectivity changes
+     */
+    private class NetworkCallback extends ConnectivityManager.NetworkCallback {
+        @Override
+        public void onAvailable(Network network) {
+            Log.i(TAG, "Network available: " + network);
+            if (isServiceRunning) {
+                handleNetworkChange("Network available");
+            }
+        }
+        
+        @Override
+        public void onLost(Network network) {
+            Log.i(TAG, "Network lost: " + network);
+            if (isServiceRunning) {
+                handleNetworkChange("Network lost");
+            }
+        }
+        
+        @Override
+        public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+            Log.i(TAG, "Network capabilities changed: " + network);
+            if (isServiceRunning) {
+                handleNetworkChange("Network capabilities changed");
+            }
+        }
+    }
+    
+    /**
+     * Handle network changes by updating SRTLA connections
+     */
+    private void handleNetworkChange(String reason) {
+        Log.i(TAG, "Handling network change: " + reason);
+        
+        try {
+            // Re-create the IPs file with current network interfaces
+            File ipsFile = createNetworkIpsFile();
+            Log.i(TAG, "Updated IPs file with current network interfaces");
+            
+            // Notify native SRTLA about the network change
+            NativeSrtlaJni.notifyNetworkChange();
+            Log.i(TAG, "Notified native SRTLA about network change");
+            
+            // Update notification to show network change
+            updateNotification("Network changed - updating connections...");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling network change", e);
         }
     }
 }

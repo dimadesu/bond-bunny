@@ -33,4 +33,7 @@ public class NativeSrtlaJni {
     
     // Optimized single-call stats method
     public static native String getAllStats();
+    
+    // Network change notification
+    public static native void notifyNetworkChange();
 }
