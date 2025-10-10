@@ -40,53 +40,11 @@
       android:exported="false"
       android:label="URL Builder" />
 
-    <activity
-      android:name=".TestActivity"
-      android:exported="false"
-      android:label="SRTLA Native Test" />
-
-    <activity
-      android:name=".DirectSrtlaTestActivity"
-      android:exported="true"
-      android:label="Direct SRTLA Test">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
-    </activity>
-
-    <activity
-      android:name=".AndroidSrtlaTestActivity"
-      android:exported="true"
-      android:label="SRTLA Fork Test">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
-    </activity>
-
     <service
       android:name=".EnhancedSrtlaService"
       android:enabled="true"
       android:exported="false"
       android:foregroundServiceType="dataSync" />
 
-    <service
-      android:name=".UltraSimpleSrtlaService"
-      android:enabled="true"
-      android:exported="true"
-      android:foregroundServiceType="dataSync" />
-
-    <service
-      android:name=".DirectSrtlaTestService"
-      android:enabled="true"
-      android:exported="false"
-      android:foregroundServiceType="dataSync" />
-
-    <service
-      android:name=".AndroidSrtlaService"
-      android:enabled="true"
-      android:exported="false"
-      android:foregroundServiceType="dataSync" />
   </application>
 </manifest>
