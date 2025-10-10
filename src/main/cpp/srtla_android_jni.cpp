@@ -22,6 +22,7 @@ extern "C" int srtla_get_connection_count(void);
 extern "C" int srtla_get_active_connection_count(void);
 extern "C" int srtla_get_total_in_flight_packets(void);
 extern "C" int srtla_get_total_window_size(void);
+extern "C" int srtla_get_connection_details(char* buffer, int buffer_size);
 
 static pthread_t srtla_thread;
 static bool srtla_running = false;
@@ -162,29 +163,28 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         return env->NewStringUTF("No native SRTLA connections");
     }
     
-    // Get all stats in one go
+    // Get summary stats
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
     int inFlightPackets = srtla_get_total_in_flight_packets();
     int totalWindow = srtla_get_total_window_size();
     
+    // Get detailed per-connection stats
+    char detailsBuffer[1024];
+    int detailsLen = srtla_get_connection_details(detailsBuffer, sizeof(detailsBuffer));
+    
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d, window=%d", 
                        totalConnections, activeConnections, inFlightPackets, totalWindow);
     
-    // Format the stats string
-    char statsBuffer[512];
+    // Format combined stats string
+    char statsBuffer[1536];
     int len = snprintf(statsBuffer, sizeof(statsBuffer),
                        "📡 Native SRTLA Stats\n"
-                       "Connections: %d total, %d active\n"
-                       "In-flight packets: %d\n"
-                       "Total window size: %d",
-                       totalConnections, activeConnections, inFlightPackets, totalWindow);
-    
-    // Add average window if there are active connections
-    if (activeConnections > 0 && len < sizeof(statsBuffer) - 50) {
-        snprintf(statsBuffer + len, sizeof(statsBuffer) - len,
-                 "\nAvg window per connection: %d", totalWindow / activeConnections);
-    }
+                       "Summary: %d total, %d active\n"
+                       "Total in-flight: %d, Total window: %d\n\n"
+                       "Per-Connection Details:\n%s",
+                       totalConnections, activeConnections, inFlightPackets, totalWindow,
+                       (detailsLen > 0) ? detailsBuffer : "No connection details available");
     
     return env->NewStringUTF(statsBuffer);
 }
