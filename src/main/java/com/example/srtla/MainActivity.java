@@ -74,8 +74,11 @@ public class MainActivity extends Activity {
         serviceRunning = EnhancedSrtlaService.isServiceRunning();
         updateUI();
         
-        if (serviceRunning) {
+        if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "checkServiceState: Service running, starting stats updates");
             startStatsUpdates();
+        } else {
+            Log.i("MainActivity", "checkServiceState: No services running");
         }
     }
     
@@ -233,6 +236,12 @@ public class MainActivity extends Activity {
     
     private void startStatsUpdates() {
         Log.i("MainActivity", "Starting stats updates");
+        
+        // Stop any existing stats updates first to avoid multiple concurrent loops
+        if (statsUpdateRunnable != null) {
+            uiHandler.removeCallbacks(statsUpdateRunnable);
+        }
+        
         statsUpdateRunnable = new Runnable() {
             @Override
             public void run() {
@@ -264,6 +273,9 @@ public class MainActivity extends Activity {
     }
     
     private void updateConnectionStats() {
+        long currentTime = System.currentTimeMillis();
+        Log.i("MainActivity", "updateConnectionStats called at " + currentTime);
+        
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaService.isServiceRunning()) {
             Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
@@ -272,7 +284,7 @@ public class MainActivity extends Activity {
             textConnectionStats.setText(nativeStats);
             
             // Also update the status to show we're getting stats (for visibility test)
-            textStatus.setText("✅ Native SRTLA running - Stats updating");
+            textStatus.setText("✅ Native SRTLA running - Stats updating at " + (currentTime % 100000));
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
@@ -340,7 +352,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        stopStatsUpdates();
+        // Don't stop stats updates if services are still running
+        if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "onPause: No services running, stopping stats updates");
+            stopStatsUpdates();
+        } else {
+            Log.i("MainActivity", "onPause: Services still running, keeping stats updates active");
+        }
         // Save current form values when app is paused
         savePreferences();
     }

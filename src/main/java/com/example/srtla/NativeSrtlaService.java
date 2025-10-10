@@ -333,6 +333,9 @@ public class NativeSrtlaService extends Service {
             Log.i(TAG, String.format("Native stats: total=%d, active=%d, inflight=%d, window=%d", 
                                    totalConnections, activeConnections, inFlightPackets, totalWindow));
             
+            // Add timestamp to see if values change over time
+            Log.i(TAG, "Stats timestamp: " + System.currentTimeMillis());
+            
             StringBuilder stats = new StringBuilder();
             stats.append("📡 Native SRTLA Stats\n");
             stats.append(String.format("Connections: %d total, %d active\n", 

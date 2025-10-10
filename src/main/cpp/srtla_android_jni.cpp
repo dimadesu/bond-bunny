@@ -117,9 +117,12 @@ Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass c
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_srtla_NativeSrtlaJni_getConnectionCount(JNIEnv *env, jclass clazz) {
     if (!srtla_running) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getConnectionCount: SRTLA not running");
         return 0;
     }
-    return srtla_get_connection_count();
+    int count = srtla_get_connection_count();
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getConnectionCount: %d", count);
+    return count;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -127,7 +130,9 @@ Java_com_example_srtla_NativeSrtlaJni_getActiveConnectionCount(JNIEnv *env, jcla
     if (!srtla_running) {
         return 0;
     }
-    return srtla_get_active_connection_count();
+    int count = srtla_get_active_connection_count();
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getActiveConnectionCount: %d", count);
+    return count;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -135,7 +140,9 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclas
     if (!srtla_running) {
         return 0;
     }
-    return srtla_get_total_in_flight_packets();
+    int count = srtla_get_total_in_flight_packets();
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getTotalInFlightPackets: %d", count);
+    return count;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -143,5 +150,7 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalWindowSize(JNIEnv *env, jclass cla
     if (!srtla_running) {
         return 0;
     }
-    return srtla_get_total_window_size();
+    int size = srtla_get_total_window_size();
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getTotalWindowSize: %d", size);
+    return size;
 }
