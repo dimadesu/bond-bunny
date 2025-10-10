@@ -26,8 +26,7 @@ import java.util.List;
  */
 public class NativeSrtlaService extends Service {
     private static final String TAG = "NativeSrtlaService";
-    public static final String CHANNEL_ID = "NativeSrtlaServiceChannel";
-    private static final int NOTIFICATION_ID = 2; // Different from EnhancedSrtlaService
+    private static final int NOTIFICATION_ID = 1; // Same as startup notification - will update it
     
     // Service state
     private static boolean isServiceRunning = false;
@@ -41,7 +40,8 @@ public class NativeSrtlaService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "NativeSrtlaService created");
-        createNotificationChannel();
+        // Use the same notification channel as EnhancedSrtlaService
+        EnhancedSrtlaService.createNotificationChannel(this);
     }
     
     @Override
@@ -197,20 +197,7 @@ public class NativeSrtlaService extends Service {
         return ips;
     }
     
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "Native SRTLA Service",
-                NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Native SRTLA background service");
-            channel.setShowBadge(false);
-            
-            NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
-        }
-    }
+
     
     private Notification createNotification(String contentText) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
@@ -219,8 +206,8 @@ public class NativeSrtlaService extends Service {
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
         
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Native SRTLA Service")
+        return new NotificationCompat.Builder(this, EnhancedSrtlaService.CHANNEL_ID)
+            .setContentTitle("Bond Bunny")
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
