@@ -436,14 +436,34 @@ public class MainActivity extends Activity {
         textStatus.setText("Starting native SRTLA process...");
         
         try {
-            // Create IPs file
+            // Create fresh IPs file (overwrite any existing)
             java.io.File ipsFile = new java.io.File(getFilesDir(), "real_network_ips.txt");
-            try (java.io.FileWriter writer = new java.io.FileWriter(ipsFile)) {
-                // Wi-Fi interface (wlan0)
-                writer.write("172.20.10.2\n");
-                // Cellular interface (rmnet_data0)
-                writer.write("192.0.0.2\n");
+            
+            // Delete existing file to ensure clean start
+            if (ipsFile.exists()) {
+                ipsFile.delete();
+                Log.i("MainActivity", "Deleted existing IPs file");
             }
+            
+            try (java.io.FileWriter writer = new java.io.FileWriter(ipsFile, false)) { // false = overwrite
+                // Get actual network interface IPs
+                java.util.List<String> networkIps = getRealNetworkIPs();
+                if (networkIps.isEmpty()) {
+                    // Fallback to some common private network ranges
+                    writer.write("192.168.1.100\n");
+                    writer.write("10.0.0.100\n");
+                    Log.w("MainActivity", "No real network IPs found, using fallback IPs");
+                } else {
+                    for (String ip : networkIps) {
+                        writer.write(ip + "\n");
+                        Log.i("MainActivity", "Writing IP to file: " + ip);
+                    }
+                }
+                writer.flush(); // Ensure data is written
+            }
+            
+            Log.i("MainActivity", "Created IPs file: " + ipsFile.getAbsolutePath() + 
+                  " (size: " + ipsFile.length() + " bytes)");
             
             int result = startSrtlaNative(
                 // Listen port (SRT)
@@ -509,6 +529,49 @@ public class MainActivity extends Activity {
             buttonNativeSrtla.setText("Start Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
         }
+    }
+    
+    /**
+     * Get real network interface IP addresses from the device
+     */
+    private java.util.List<String> getRealNetworkIPs() {
+        java.util.List<String> ips = new java.util.ArrayList<>();
+        
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = 
+                java.net.NetworkInterface.getNetworkInterfaces();
+            
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface networkInterface = interfaces.nextElement();
+                
+                // Skip loopback and inactive interfaces
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+                
+                java.util.Enumeration<java.net.InetAddress> addresses = 
+                    networkInterface.getInetAddresses();
+                
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress address = addresses.nextElement();
+                    
+                    // Only IPv4, not loopback, not link-local
+                    if (address instanceof java.net.Inet4Address && 
+                        !address.isLoopbackAddress() && 
+                        !address.isLinkLocalAddress()) {
+                        
+                        String ip = address.getHostAddress();
+                        ips.add(ip);
+                        Log.i("MainActivity", "Found network IP: " + ip + 
+                              " on interface: " + networkInterface.getName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error getting network IPs", e);
+        }
+        
+        return ips;
     }
     
     // Algorithm toggle methods moved to SettingsActivity
