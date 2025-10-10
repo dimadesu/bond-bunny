@@ -45,6 +45,8 @@ public class MainActivity extends Activity {
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
+    private Button buttonNativeTest;
+    private Button buttonDirectSrtlaTest;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
@@ -87,6 +89,8 @@ public class MainActivity extends Activity {
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
+        buttonNativeTest = findViewById(R.id.button_native_test);
+        buttonDirectSrtlaTest = findViewById(R.id.button_direct_srtla_test);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -100,6 +104,10 @@ public class MainActivity extends Activity {
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
+        // Remove old test button - only SRTLA fork is needed
+        buttonNativeTest.setVisibility(android.view.View.GONE);
+        // SRTLA Fork Test - modified to test your fork
+        buttonDirectSrtlaTest.setOnClickListener(v -> testSrtlaFork());
         
         // Load saved preferences or use default values
         loadPreferences();
@@ -385,5 +393,58 @@ public class MainActivity extends Activity {
             Log.w("MainActivity", "Failed to post startup notification", e);
         }
     }
+    
+    // SRTLA Fork Test - Native methods for testing your fork
+    static {
+        try {
+            System.loadLibrary("srtla_android");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e("MainActivity", "Failed to load SRTLA fork library", e);
+        }
+    }
+    
+    // Native methods calling Android-patched SRTLA
+    public native int startSrtlaNative(String listenPort, String srtlaHost, 
+                                      String srtlaPort, String ipsFile);
+    public native int stopSrtlaNative();
+    public native boolean isRunningSrtlaNative();
+    
+    private void testSrtlaFork() {
+        textStatus.setText("Testing SRTLA Fork with Real Network Interfaces...");
+        
+        try {
+            // Create IPs file with REAL device network interfaces
+            java.io.File ipsFile = new java.io.File(getFilesDir(), "real_network_ips.txt");
+            try (java.io.FileWriter writer = new java.io.FileWriter(ipsFile)) {
+                // writer.write("127.0.0.1\n");       // Loopback - always works
+                writer.write("172.20.10.2\n");     // Wi-Fi interface (wlan0)
+                writer.write("192.0.0.2\n");       // Cellular interface (rmnet_data0)
+            }
+            
+            // Test your SRTLA fork with minimal Android patches
+            int result = startSrtlaNative(
+                "6000",                           // Listen port (SRT)
+                "au.srt.belabox.net",            // SRTLA host
+                "5000",                          // SRTLA port (your receiver)
+                ipsFile.getAbsolutePath()        // IPs file
+            );
+            
+            if (result == 0) {
+                textStatus.setText("✅ SRTLA Fork Started with Real Networks!\n\n" +
+                    // "📡 Loopback: 127.0.0.1 (local)\n" +
+                    "� Wi-Fi: 172.20.10.2 (wlan0)\n" +
+                    "� Cellular: 192.0.0.2 (rmnet_data0)\n\n" +
+                    "🎯 99% Original SRTLA Code\n" +
+                    "🚀 Real Network Binding Active!");
+            } else {
+                textStatus.setText("❌ SRTLA Fork failed to start: " + result);
+            }
+            
+        } catch (Exception e) {
+            textStatus.setText("❌ Error testing SRTLA Fork: " + e.getMessage());
+            Log.e("MainActivity", "SRTLA Fork test error", e);
+        }
+    }
+    
     // Algorithm toggle methods moved to SettingsActivity
 }
