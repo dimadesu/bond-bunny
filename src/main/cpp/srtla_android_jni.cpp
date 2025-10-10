@@ -180,10 +180,11 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     char statsBuffer[1536];
     int len = snprintf(statsBuffer, sizeof(statsBuffer),
                        "📡 Native SRTLA Stats\n"
-                       "Summary: %d total, %d active\n"
+                       "Connections: %d total, %d active\n"
                        "Total in-flight: %d, Total window: %d\n\n"
                        "Per-Connection Details:\n%s",
-                       totalConnections, activeConnections, inFlightPackets, totalWindow,
+                       totalConnections, activeConnections, 
+                       inFlightPackets, totalWindow,
                        (detailsLen > 0) ? detailsBuffer : "No connection details available");
     
     return env->NewStringUTF(statsBuffer);
