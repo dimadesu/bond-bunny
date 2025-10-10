@@ -47,7 +47,6 @@ public class MainActivity extends Activity {
     private Button buttonUrlBuilder;
     private Button buttonNativeSrtla;
     private boolean serviceRunning = false;
-    private boolean nativeSrtlaRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
     private Runnable statsUpdateRunnable;
 
@@ -260,6 +259,9 @@ public class MainActivity extends Activity {
         List<ConnectionWindowView.ConnectionWindowData> windowData = 
             EnhancedSrtlaService.getConnectionWindowData();
         connectionWindowView.updateConnectionData(windowData);
+        
+        // Periodically refresh native SRTLA UI state (handles crashes)
+        updateNativeSrtlaUI();
     }
     
     /**
@@ -299,6 +301,8 @@ public class MainActivity extends Activity {
         super.onResume();
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
+        // Also check native SRTLA state
+        updateNativeSrtlaUI();
     }
     
     @Override
@@ -408,8 +412,20 @@ public class MainActivity extends Activity {
     public native int stopSrtlaNative();
     public native boolean isRunningSrtlaNative();
     
+    /**
+     * Check if native SRTLA is running with error handling
+     */
+    private boolean isNativeSrtlaRunning() {
+        try {
+            return isRunningSrtlaNative();
+        } catch (Exception e) {
+            Log.w("MainActivity", "Failed to check native SRTLA state", e);
+            return false; // Assume stopped on error
+        }
+    }
+    
     private void toggleNativeSrtla() {
-        if (nativeSrtlaRunning) {
+        if (isNativeSrtlaRunning()) {
             stopNativeSrtla();
         } else {
             startNativeSrtla();
@@ -441,7 +457,6 @@ public class MainActivity extends Activity {
             );
             
             if (result == 0) {
-                nativeSrtlaRunning = true;
                 updateNativeSrtlaUI();
                 textStatus.setText("✅ Native SRTLA process started");
             } else {
@@ -471,7 +486,6 @@ public class MainActivity extends Activity {
         
         try {
             int result = stopSrtlaNative();
-            nativeSrtlaRunning = false;
             updateNativeSrtlaUI();
             
             if (result == 0) {
@@ -481,7 +495,6 @@ public class MainActivity extends Activity {
             }
             
         } catch (Exception e) {
-            nativeSrtlaRunning = false;
             updateNativeSrtlaUI();
             textStatus.setText("❌ Error stopping native SRTLA: " + e.getMessage());
             Log.e("MainActivity", "Native SRTLA stop error", e);
@@ -489,7 +502,7 @@ public class MainActivity extends Activity {
     }
     
     private void updateNativeSrtlaUI() {
-        if (nativeSrtlaRunning) {
+        if (isNativeSrtlaRunning()) {
             buttonNativeSrtla.setText("Stop Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
         } else {
