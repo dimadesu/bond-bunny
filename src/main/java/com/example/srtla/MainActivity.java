@@ -29,6 +29,7 @@ import androidx.core.app.NotificationManagerCompat;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
+import android.content.Context;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
@@ -364,7 +365,11 @@ public class MainActivity extends Activity {
         
         // Register network change receiver
         IntentFilter networkFilter = new IntentFilter("com.example.srtla.NETWORK_CHANGED");
-        registerReceiver(networkChangeReceiver, networkFilter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(networkChangeReceiver, networkFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(networkChangeReceiver, networkFilter);
+        }
         Log.i("MainActivity", "Registered network change receiver");
     }
     
