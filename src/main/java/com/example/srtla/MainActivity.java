@@ -261,7 +261,7 @@ public class MainActivity extends Activity {
         statsUpdateRunnable = new Runnable() {
             @Override
             public void run() {
-                Log.i("MainActivity", "Stats update tick - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
+                // Log.i("MainActivity", "Stats update tick - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
                 if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
                     updateConnectionStats();
                     uiHandler.postDelayed(this, 1000); // Update every second
@@ -290,13 +290,13 @@ public class MainActivity extends Activity {
     
     private void updateConnectionStats() {
         long currentTime = System.currentTimeMillis();
-        Log.i("MainActivity", "updateConnectionStats called at " + currentTime);
+        // Log.i("MainActivity", "updateConnectionStats called at " + currentTime);
         
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaService.isServiceRunning()) {
-            Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
+            // Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
             String nativeStats = NativeSrtlaService.getNativeStats();
-            Log.i("MainActivity", "Native stats: " + nativeStats);
+            // Log.i("MainActivity", "Native stats: " + nativeStats);
             textConnectionStats.setText(nativeStats);
             
             // Also update the status to show we're getting stats (for visibility test)
@@ -570,19 +570,19 @@ public class MainActivity extends Activity {
         NativeSrtlaService.syncState();
         
         boolean isRunning = NativeSrtlaService.isServiceRunning();
-        Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
+        // Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
         
         if (isRunning) {
             buttonNativeSrtla.setText("Stop Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
-            Log.i("MainActivity", "UI updated to STOP state");
+            // Log.i("MainActivity", "UI updated to STOP state");
             
             // Update connection window visualization with native data
             updateNativeConnectionWindows();
         } else {
             buttonNativeSrtla.setText("Start Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
-            Log.i("MainActivity", "UI updated to START state");
+            // Log.i("MainActivity", "UI updated to START state");
             
             // Clear connection windows when not running
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
