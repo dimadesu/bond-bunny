@@ -54,7 +54,7 @@
         android:id="@+id/button_native_srtla"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Native SRTLA"
+        android:text="Start Service"
         android:background="#4CAF50"
         android:textColor="#FFFFFF" />
 

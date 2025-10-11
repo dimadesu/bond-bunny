@@ -573,14 +573,14 @@ public class MainActivity extends Activity {
         // Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
         
         if (isRunning) {
-            buttonNativeSrtla.setText("Stop Native SRTLA");
-            buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
+            buttonNativeSrtla.setText("Stop Service");
+            buttonNativeSrtla.setBackgroundColor(0xFFD32F2F); // Proper red color
             // Log.i("MainActivity", "UI updated to STOP state");
             
             // Update connection window visualization with native data
             updateNativeConnectionWindows();
         } else {
-            buttonNativeSrtla.setText("Start Native SRTLA");
+            buttonNativeSrtla.setText("Start Service");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
             // Log.i("MainActivity", "UI updated to START state");
             
