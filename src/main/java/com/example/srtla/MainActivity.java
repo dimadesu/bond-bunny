@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.util.List;
+import java.util.ArrayList;
 import android.content.res.Configuration;
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -575,10 +576,50 @@ public class MainActivity extends Activity {
             buttonNativeSrtla.setText("Stop Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
             Log.i("MainActivity", "UI updated to STOP state");
+            
+            // Update connection window visualization with native data
+            updateNativeConnectionWindows();
         } else {
             buttonNativeSrtla.setText("Start Native SRTLA");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
             Log.i("MainActivity", "UI updated to START state");
+            
+            // Clear connection windows when not running
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        }
+    }
+    
+    private void updateNativeConnectionWindows() {
+        try {
+            // Get native connection data
+            ConnectionBitrateData[] nativeConnections = NativeSrtlaJni.getAllConnectionBitrates();
+            
+            // Convert to ConnectionWindowData format (keeping it simple)
+            List<ConnectionWindowView.ConnectionWindowData> windowData = new ArrayList<>();
+            
+            for (ConnectionBitrateData conn : nativeConnections) {
+                // Use actual native data for accurate visualization
+                ConnectionWindowView.ConnectionWindowData data = new ConnectionWindowView.ConnectionWindowData(
+                    conn.connectionType,           // networkType (WIFI, CELLULAR, etc.)
+                    conn.windowSize,               // window (actual native window size in packets)
+                    conn.inFlightPackets,          // inFlightPackets (actual native in-flight count)
+                    conn.loadPercentage,           // score (using load percentage)
+                    conn.bitrateMbps > 0.1,        // isActive (active if bitrate > 0.1 Mbps)
+                    false,                         // isSelected (keep simple, always false)
+                    50,                            // rtt (placeholder value in ms)
+                    "ACTIVE",                      // state (keep simple)
+                    conn.bitrateMbps * 1000000     // bitrateBps (convert Mbps to bps)
+                );
+                windowData.add(data);
+            }
+            
+            // Update the connection window view
+            connectionWindowView.updateConnectionData(windowData);
+            
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error updating native connection windows", e);
+            // Fallback to empty data on error
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
         }
     }
     

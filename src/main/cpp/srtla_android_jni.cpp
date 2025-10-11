@@ -37,6 +37,12 @@ extern "C" int srtla_get_connection_bitrates(double* bitrates_mbps, char connect
                                             char connection_ips[][64], int* load_percentages,
                                             int max_connections);
 
+// Comprehensive connection window data function
+extern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char connection_types[][16], 
+                                               char connection_ips[][64], int* load_percentages,
+                                               int* window_sizes, int* inflight_packets,
+                                               int max_connections);
+
 static pthread_t srtla_thread;
 static bool srtla_running = false;
 
@@ -346,5 +352,54 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionLoadPercentages(JNIEnv *env, 
     
     jintArray result = env->NewIntArray(conn_count);
     env->SetIntArrayRegion(result, 0, conn_count, load_percentages);
+    return result;
+}
+
+// New JNI functions for comprehensive window data
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionWindowSizes(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    int window_sizes[MAX_CONNECTIONS];
+    int inflight_packets[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_window_data(bitrates, connection_types, 
+                                                     connection_ips, load_percentages,
+                                                     window_sizes, inflight_packets,
+                                                     MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewIntArray(0);
+    }
+    
+    jintArray result = env->NewIntArray(conn_count);
+    env->SetIntArrayRegion(result, 0, conn_count, window_sizes);
+    return result;
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionInFlightPackets(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    int window_sizes[MAX_CONNECTIONS];
+    int inflight_packets[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_window_data(bitrates, connection_types, 
+                                                     connection_ips, load_percentages,
+                                                     window_sizes, inflight_packets,
+                                                     MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewIntArray(0);
+    }
+    
+    jintArray result = env->NewIntArray(conn_count);
+    env->SetIntArrayRegion(result, 0, conn_count, inflight_packets);
     return result;
 }
