@@ -17,6 +17,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.util.List;
+import java.util.ArrayList;
 import android.content.res.Configuration;
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -27,6 +28,9 @@ import androidx.core.content.ContextCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.content.Context;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
@@ -45,8 +49,21 @@ public class MainActivity extends Activity {
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
+    private Button buttonNativeSrtla;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
+    
+    // Network change receiver
+    private BroadcastReceiver networkChangeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String reason = intent.getStringExtra("reason");
+            Log.i("MainActivity", "Network change received: " + reason);
+            
+            // Immediately update stats when network changes
+            updateConnectionStats();
+        }
+    };
     private Runnable statsUpdateRunnable;
 
     @Override
@@ -73,8 +90,11 @@ public class MainActivity extends Activity {
         serviceRunning = EnhancedSrtlaService.isServiceRunning();
         updateUI();
         
-        if (serviceRunning) {
+        if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "checkServiceState: Service running, starting stats updates");
             startStatsUpdates();
+        } else {
+            Log.i("MainActivity", "checkServiceState: No services running");
         }
     }
     
@@ -87,6 +107,7 @@ public class MainActivity extends Activity {
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
+        buttonNativeSrtla = findViewById(R.id.button_native_srtla);
         
         // Set initial logging level for performance
         SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
@@ -100,6 +121,10 @@ public class MainActivity extends Activity {
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
+        buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
+        
+        // Initialize native SRTLA UI state
+        updateNativeSrtlaUI();
         
         // Load saved preferences or use default values
         loadPreferences();
@@ -213,19 +238,35 @@ public class MainActivity extends Activity {
             textStatus.setText("Status: Stopped");
             buttonStart.setEnabled(true);
             buttonStop.setEnabled(false);
-            textConnectionStats.setText("No active connections");
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            // Only clear connection stats if native SRTLA is also not running
+            if (!NativeSrtlaService.isServiceRunning()) {
+                Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
+                textConnectionStats.setText("No active connections");
+                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            } else {
+                Log.i("MainActivity", "updateUI: Not clearing connection stats - native SRTLA still running");
+            }
         }
     }
     
     
     private void startStatsUpdates() {
+        Log.i("MainActivity", "Starting stats updates");
+        
+        // Stop any existing stats updates first to avoid multiple concurrent loops
+        if (statsUpdateRunnable != null) {
+            uiHandler.removeCallbacks(statsUpdateRunnable);
+        }
+        
         statsUpdateRunnable = new Runnable() {
             @Override
             public void run() {
-                if (serviceRunning) {
+                // Log.i("MainActivity", "Stats update tick - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
+                if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
                     updateConnectionStats();
                     uiHandler.postDelayed(this, 1000); // Update every second
+                } else {
+                    Log.i("MainActivity", "No services running, stopping stats updates");
                 }
             }
         };
@@ -233,26 +274,54 @@ public class MainActivity extends Activity {
     }
     
     private void stopStatsUpdates() {
+        Log.i("MainActivity", "stopStatsUpdates called - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
         if (statsUpdateRunnable != null) {
             uiHandler.removeCallbacks(statsUpdateRunnable);
-            textConnectionStats.setText("No active connections");
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            // Only clear stats if no services are running
+            if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
+                Log.i("MainActivity", "Clearing stats display - no services running");
+                textConnectionStats.setText("No active connections");
+                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            } else {
+                Log.i("MainActivity", "Not clearing stats - service still running");
+            }
         }
     }
     
     private void updateConnectionStats() {
-        String stats = EnhancedSrtlaService.getConnectionStatistics();
+        long currentTime = System.currentTimeMillis();
+        // Log.i("MainActivity", "updateConnectionStats called at " + currentTime);
         
-        // Add logging performance stats
-        String logStats = SrtlaLogger.getPerformanceStats();
-        String combinedStats = stats + "\n\n" + logStats;
+        // Check if native SRTLA is running and show its stats instead
+        if (NativeSrtlaService.isServiceRunning()) {
+            // Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
+            String nativeStats = NativeSrtlaService.getNativeStats();
+            // Log.i("MainActivity", "Native stats: " + nativeStats);
+            textConnectionStats.setText(nativeStats);
+            
+            // Also update the status to show we're getting stats (for visibility test)
+            textStatus.setText("✅ Native SRTLA running - Stats updating at " + (currentTime % 100000));
+            
+            // Clear the connection window view for native SRTLA (simplified UI)
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        } else {
+            // Show Java SRTLA stats
+            String stats = EnhancedSrtlaService.getConnectionStatistics();
+            
+            // Add logging performance stats
+            String logStats = SrtlaLogger.getPerformanceStats();
+            String combinedStats = stats + "\n\n" + logStats;
+            
+            textConnectionStats.setText(combinedStats);
+            
+            // Update window visualization
+            List<ConnectionWindowView.ConnectionWindowData> windowData = 
+                EnhancedSrtlaService.getConnectionWindowData();
+            connectionWindowView.updateConnectionData(windowData);
+        }
         
-        textConnectionStats.setText(combinedStats);
-        
-        // Update window visualization
-        List<ConnectionWindowView.ConnectionWindowData> windowData = 
-            EnhancedSrtlaService.getConnectionWindowData();
-        connectionWindowView.updateConnectionData(windowData);
+        // Periodically refresh native SRTLA UI state (handles crashes)
+        updateNativeSrtlaUI();
     }
     
     /**
@@ -292,14 +361,39 @@ public class MainActivity extends Activity {
         super.onResume();
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
+        // Also check native SRTLA state
+        updateNativeSrtlaUI();
+        
+        // Register network change receiver
+        IntentFilter networkFilter = new IntentFilter("com.example.srtla.NETWORK_CHANGED");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(networkChangeReceiver, networkFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(networkChangeReceiver, networkFilter);
+        }
+        Log.i("MainActivity", "Registered network change receiver");
     }
     
     @Override
     protected void onPause() {
         super.onPause();
-        stopStatsUpdates();
+        // Don't stop stats updates if services are still running
+        if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "onPause: No services running, stopping stats updates");
+            stopStatsUpdates();
+        } else {
+            Log.i("MainActivity", "onPause: Services still running, keeping stats updates active");
+        }
         // Save current form values when app is paused
         savePreferences();
+        
+        // Unregister network change receiver
+        try {
+            unregisterReceiver(networkChangeReceiver);
+            Log.i("MainActivity", "Unregistered network change receiver");
+        } catch (IllegalArgumentException e) {
+            Log.w("MainActivity", "Network change receiver was not registered");
+        }
     }
     
     private void loadPreferences() {
@@ -385,5 +479,151 @@ public class MainActivity extends Activity {
             Log.w("MainActivity", "Failed to post startup notification", e);
         }
     }
+    
+    // Native SRTLA is now handled by NativeSrtlaService using NativeSrtlaJni
+    
+    private void toggleNativeSrtla() {
+        if (NativeSrtlaService.isServiceRunning()) {
+            stopNativeSrtla();
+        } else {
+            startNativeSrtla();
+        }
+    }
+    
+    private void startNativeSrtla() {
+        textStatus.setText("Starting native SRTLA service...");
+        
+        try {
+            // Get configuration from preferences (similar to regular SRTLA service)
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            String srtlaHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
+            String srtlaPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
+            String listenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
+            
+            if (srtlaHost.isEmpty() || srtlaPort.isEmpty() || listenPort.isEmpty()) {
+                textStatus.setText("❌ Please configure SRTLA settings first");
+                return;
+            }
+            
+            // Start the native SRTLA service
+            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
+            
+            textStatus.setText("⏳ Native SRTLA service starting...");
+            Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
+            
+            // Update UI after a short delay to allow service to start
+            uiHandler.postDelayed(() -> {
+                Log.i("MainActivity", "Delayed callback: checking native SRTLA status");
+                updateNativeSrtlaUI();
+                if (NativeSrtlaService.isServiceRunning()) {
+                    Log.i("MainActivity", "Native SRTLA is running, starting stats updates");
+                    textStatus.setText("✅ Native SRTLA service running");
+                    // Start stats updates for native SRTLA
+                    startStatsUpdates();
+                } else {
+                    Log.i("MainActivity", "Native SRTLA is not running");
+                    textStatus.setText("❌ Native SRTLA service failed to start");
+                }
+            }, 2000); // Wait 2 seconds for service to start
+            
+        } catch (Exception e) {
+            textStatus.setText("❌ Error starting native SRTLA service: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA service start error", e);
+        }
+    }
+    
+    private void stopNativeSrtla() {
+        textStatus.setText("⏳ Stopping native SRTLA service...");
+        
+        try {
+            NativeSrtlaService.stopService(this);
+            Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
+            
+            // Update UI after a short delay to allow service to stop
+            uiHandler.postDelayed(() -> {
+                updateNativeSrtlaUI();
+                if (!NativeSrtlaService.isServiceRunning()) {
+                    textStatus.setText("✅ Native SRTLA service stopped");
+                } else {
+                    textStatus.setText("⏳ Native SRTLA service stopping...");
+                    // Try again after another delay
+                    uiHandler.postDelayed(() -> {
+                        updateNativeSrtlaUI();
+                        if (!NativeSrtlaService.isServiceRunning()) {
+                            textStatus.setText("✅ Native SRTLA service stopped");
+                        } else {
+                            textStatus.setText("⚠️ Native SRTLA service may still be running");
+                        }
+                    }, 2000);
+                }
+            }, 1500); // Wait 1.5 seconds for service to stop
+            
+        } catch (Exception e) {
+            updateNativeSrtlaUI();
+            textStatus.setText("❌ Error stopping native SRTLA service: " + e.getMessage());
+            Log.e("MainActivity", "Native SRTLA service stop error", e);
+        }
+    }
+    
+    private void updateNativeSrtlaUI() {
+        // Sync state before checking to ensure accuracy
+        NativeSrtlaService.syncState();
+        
+        boolean isRunning = NativeSrtlaService.isServiceRunning();
+        // Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
+        
+        if (isRunning) {
+            buttonNativeSrtla.setText("Stop Native SRTLA");
+            buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
+            // Log.i("MainActivity", "UI updated to STOP state");
+            
+            // Update connection window visualization with native data
+            updateNativeConnectionWindows();
+        } else {
+            buttonNativeSrtla.setText("Start Native SRTLA");
+            buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
+            // Log.i("MainActivity", "UI updated to START state");
+            
+            // Clear connection windows when not running
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        }
+    }
+    
+    private void updateNativeConnectionWindows() {
+        try {
+            // Get native connection data
+            ConnectionBitrateData[] nativeConnections = NativeSrtlaJni.getAllConnectionBitrates();
+            
+            // Convert to ConnectionWindowData format (keeping it simple)
+            List<ConnectionWindowView.ConnectionWindowData> windowData = new ArrayList<>();
+            
+            for (ConnectionBitrateData conn : nativeConnections) {
+                // Use actual native data for accurate visualization
+                ConnectionWindowView.ConnectionWindowData data = new ConnectionWindowView.ConnectionWindowData(
+                    conn.connectionType,           // networkType (WIFI, CELLULAR, etc.)
+                    conn.windowSize,               // window (actual native window size in packets)
+                    conn.inFlightPackets,          // inFlightPackets (actual native in-flight count)
+                    0,                             // score (0 since we don't have real scoring data)
+                    conn.bitrateMbps > 0.1,        // isActive (active if bitrate > 0.1 Mbps)
+                    false,                         // isSelected (keep simple, always false)
+                    0,                             // rtt (0 since we don't have real RTT data)
+                    "ACTIVE",                      // state (keep simple)
+                    conn.bitrateMbps * 1000000     // bitrateBps (convert Mbps to bps)
+                );
+                windowData.add(data);
+            }
+            
+            // Update the connection window view
+            connectionWindowView.updateConnectionData(windowData);
+            
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error updating native connection windows", e);
+            // Fallback to empty data on error
+            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        }
+    }
+    
+    // Network IP detection is now handled by NativeSrtlaService
+    
     // Algorithm toggle methods moved to SettingsActivity
 }

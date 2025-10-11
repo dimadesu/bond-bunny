@@ -43,11 +43,29 @@
 
     </LinearLayout>
 
+
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:orientation="horizontal"
       android:layout_marginBottom="8dp">
+
+      <Button
+        android:id="@+id/button_native_srtla"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Start Native SRTLA"
+        android:background="#4CAF50"
+        android:textColor="#FFFFFF" />
+
+    </LinearLayout>
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:layout_marginBottom="8dp"
+      android:visibility="gone">
 
       <Button
         android:id="@+id/button_start"
@@ -72,7 +90,8 @@
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
-      android:layout_marginBottom="12dp" />
+      android:layout_marginBottom="12dp"
+      android:visibility="gone" />
 
     <!-- Connection Statistics Section -->
     <TextView
