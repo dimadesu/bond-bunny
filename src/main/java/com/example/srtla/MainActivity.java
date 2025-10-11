@@ -574,7 +574,7 @@ public class MainActivity extends Activity {
         
         if (isRunning) {
             buttonNativeSrtla.setText("Stop Service");
-            buttonNativeSrtla.setBackgroundColor(0xFFFF5722); // Red color
+            buttonNativeSrtla.setBackgroundColor(0xFFD32F2F); // Proper red color
             // Log.i("MainActivity", "UI updated to STOP state");
             
             // Update connection window visualization with native data
