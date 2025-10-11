@@ -33,6 +33,39 @@ public class NativeSrtlaJni {
     // Optimized single-call stats method
     public static native String getAllStats();
     
+    // Per-connection bitrate methods for UI
+    public static native double[] getConnectionBitrates();
+    public static native String[] getConnectionTypes();
+    public static native String[] getConnectionIPs();
+    public static native int[] getConnectionLoadPercentages();
+    
+    // Helper method to get all connection bitrate data in one call
+    public static ConnectionBitrateData[] getAllConnectionBitrates() {
+        try {
+            double[] bitrates = getConnectionBitrates();
+            String[] types = getConnectionTypes();
+            String[] ips = getConnectionIPs();
+            int[] loads = getConnectionLoadPercentages();
+            
+            if (bitrates == null || types == null || ips == null || loads == null) {
+                return new ConnectionBitrateData[0];
+            }
+            
+            int count = Math.min(Math.min(bitrates.length, types.length), 
+                                Math.min(ips.length, loads.length));
+            
+            ConnectionBitrateData[] result = new ConnectionBitrateData[count];
+            for (int i = 0; i < count; i++) {
+                result[i] = new ConnectionBitrateData(bitrates[i], types[i], ips[i], loads[i]);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting connection bitrate data", e);
+            return new ConnectionBitrateData[0];
+        }
+    }
+    
     // Network change notification
     public static native void notifyNetworkChange();
     

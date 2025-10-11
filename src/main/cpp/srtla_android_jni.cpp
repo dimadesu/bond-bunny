@@ -32,6 +32,11 @@ extern "C" int srtla_get_connection_details(char* buffer, int buffer_size);
 extern "C" void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
                                         int network_type, int socket_fd);
 
+// Per-connection bitrate functions
+extern "C" int srtla_get_connection_bitrates(double* bitrates_mbps, char connection_types[][16], 
+                                            char connection_ips[][64], int* load_percentages,
+                                            int max_connections);
+
 static pthread_t srtla_thread;
 static bool srtla_running = false;
 
@@ -247,4 +252,99 @@ Java_com_example_srtla_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject
     } else {
         __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Attempted to close invalid socket FD: %d", sockfd);
     }
+}
+
+// Per-connection bitrate JNI functions
+extern "C" JNIEXPORT jdoubleArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionBitrates(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_bitrates(bitrates, connection_types, 
+                                                  connection_ips, load_percentages, 
+                                                  MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewDoubleArray(0);
+    }
+    
+    jdoubleArray result = env->NewDoubleArray(conn_count);
+    env->SetDoubleArrayRegion(result, 0, conn_count, bitrates);
+    return result;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionTypes(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_bitrates(bitrates, connection_types, 
+                                                  connection_ips, load_percentages, 
+                                                  MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewObjectArray(0, env->FindClass("java/lang/String"), nullptr);
+    }
+    
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray result = env->NewObjectArray(conn_count, stringClass, nullptr);
+    
+    for (int i = 0; i < conn_count; i++) {
+        env->SetObjectArrayElement(result, i, env->NewStringUTF(connection_types[i]));
+    }
+    
+    return result;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionIPs(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_bitrates(bitrates, connection_types, 
+                                                  connection_ips, load_percentages, 
+                                                  MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewObjectArray(0, env->FindClass("java/lang/String"), nullptr);
+    }
+    
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray result = env->NewObjectArray(conn_count, stringClass, nullptr);
+    
+    for (int i = 0; i < conn_count; i++) {
+        env->SetObjectArrayElement(result, i, env->NewStringUTF(connection_ips[i]));
+    }
+    
+    return result;
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionLoadPercentages(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_bitrates(bitrates, connection_types, 
+                                                  connection_ips, load_percentages, 
+                                                  MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewIntArray(0);
+    }
+    
+    jintArray result = env->NewIntArray(conn_count);
+    env->SetIntArrayRegion(result, 0, conn_count, load_percentages);
+    return result;
 }
