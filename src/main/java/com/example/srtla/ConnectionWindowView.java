@@ -223,9 +223,10 @@ public class ConnectionWindowView extends View {
         scorePaint.setColor(Color.parseColor("#6c757d"));
         String bitrateText = formatBitrate(conn.bitrateBps);
         String rttText = conn.rtt > 0 ? conn.rtt + "ms" : "N/A";
-        String scoreText = String.format("Score: %,d  •  RTT: %s  •  %s", 
-                                        conn.score, rttText, bitrateText);
-        canvas.drawText(scoreText, x + 20, barY + barHeight + 50, scorePaint);
+        String scoreText = conn.score > 0 ? String.valueOf(conn.score) : "N/A";
+        String displayText = String.format("Score: %s  •  RTT: %s  •  %s", 
+                                          scoreText, rttText, bitrateText);
+        canvas.drawText(displayText, x + 20, barY + barHeight + 50, scorePaint);
         
         // Window utilization percentage
         float utilization = conn.window > 0 ? (float) conn.inFlightPackets / conn.window * 100 : 0;

@@ -603,7 +603,7 @@ public class MainActivity extends Activity {
                     conn.connectionType,           // networkType (WIFI, CELLULAR, etc.)
                     conn.windowSize,               // window (actual native window size in packets)
                     conn.inFlightPackets,          // inFlightPackets (actual native in-flight count)
-                    conn.loadPercentage,           // score (using load percentage)
+                    0,                             // score (0 since we don't have real scoring data)
                     conn.bitrateMbps > 0.1,        // isActive (active if bitrate > 0.1 Mbps)
                     false,                         // isSelected (keep simple, always false)
                     0,                             // rtt (0 since we don't have real RTT data)
