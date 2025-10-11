@@ -1,5 +1,10 @@
 /*
- * srtla_android_jni.cpp - Minimal JNI wrapper for Android-patched SRTLA
+ * srtla_android_jni.cpp - Minimal JNextern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char connection_types[][16], 
+                                               char connection_ips[][64], int load_percentages[],
+                                               int window_sizes[], int inflight_packets[], 
+                                               int max_connections);
+
+apper for Android-patched SRTLA
  * 
  * This is the ONLY wrapper code needed. All SRTLA functionality comes
  * from the original srtla_send.c with minimal Android patches.
@@ -401,5 +406,38 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionInFlightPackets(JNIEnv *env, 
     
     jintArray result = env->NewIntArray(conn_count);
     env->SetIntArrayRegion(result, 0, conn_count, inflight_packets);
+    return result;
+}
+
+extern "C" JNIEXPORT jbooleanArray JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getConnectionActiveStatus(JNIEnv *env, jclass clazz) {
+    const int MAX_CONNECTIONS = 10;
+    double bitrates[MAX_CONNECTIONS];
+    char connection_types[MAX_CONNECTIONS][16];
+    char connection_ips[MAX_CONNECTIONS][64];
+    int load_percentages[MAX_CONNECTIONS];
+    int window_sizes[MAX_CONNECTIONS];
+    int inflight_packets[MAX_CONNECTIONS];
+    int active_status[MAX_CONNECTIONS];
+    
+    int conn_count = srtla_get_connection_window_data(bitrates, connection_types, 
+                                                     connection_ips, load_percentages,
+                                                     window_sizes, inflight_packets,
+                                                     MAX_CONNECTIONS);
+    
+    if (conn_count <= 0) {
+        return env->NewBooleanArray(0);
+    }
+    
+    // Determine active status based on available data
+    jbooleanArray result = env->NewBooleanArray(conn_count);
+    jboolean* statusArray = new jboolean[conn_count];
+    for (int i = 0; i < conn_count; i++) {
+        // Connection is active if it has bitrate > 0.1 Mbps OR in-flight packets > 0
+        bool isActive = (bitrates[i] > 0.1) || (inflight_packets[i] > 0);
+        statusArray[i] = isActive ? JNI_TRUE : JNI_FALSE;
+    }
+    env->SetBooleanArrayRegion(result, 0, conn_count, statusArray);
+    delete[] statusArray;
     return result;
 }

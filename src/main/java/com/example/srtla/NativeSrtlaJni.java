@@ -42,6 +42,7 @@ public class NativeSrtlaJni {
     // Per-connection window data methods for accurate visualization
     public static native int[] getConnectionWindowSizes();
     public static native int[] getConnectionInFlightPackets();
+    public static native boolean[] getConnectionActiveStatus();
     
     // Helper method to get all connection bitrate data in one call
     public static ConnectionBitrateData[] getAllConnectionBitrates() {
@@ -52,20 +53,21 @@ public class NativeSrtlaJni {
             int[] loads = getConnectionLoadPercentages();
             int[] windows = getConnectionWindowSizes();
             int[] inflight = getConnectionInFlightPackets();
+            boolean[] activeStatus = getConnectionActiveStatus();
             
             if (bitrates == null || types == null || ips == null || loads == null || 
-                windows == null || inflight == null) {
+                windows == null || inflight == null || activeStatus == null) {
                 return new ConnectionBitrateData[0];
             }
             
             int count = Math.min(Math.min(Math.min(bitrates.length, types.length), 
                                          Math.min(ips.length, loads.length)),
-                                Math.min(windows.length, inflight.length));
+                                Math.min(Math.min(windows.length, inflight.length), activeStatus.length));
             
             ConnectionBitrateData[] result = new ConnectionBitrateData[count];
             for (int i = 0; i < count; i++) {
                 result[i] = new ConnectionBitrateData(bitrates[i], types[i], ips[i], loads[i], 
-                                                     windows[i], inflight[i]);
+                                                     windows[i], inflight[i], activeStatus[i]);
             }
             
             return result;

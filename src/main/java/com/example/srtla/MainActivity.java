@@ -604,10 +604,10 @@ public class MainActivity extends Activity {
                     conn.windowSize,               // window (actual native window size in packets)
                     conn.inFlightPackets,          // inFlightPackets (actual native in-flight count)
                     0,                             // score (0 since we don't have real scoring data)
-                    conn.bitrateMbps > 0.1,        // isActive (active if bitrate > 0.1 Mbps)
+                    conn.isActive,                 // isActive (actual native connection status)
                     false,                         // isSelected (keep simple, always false)
                     0,                             // rtt (0 since we don't have real RTT data)
-                    "ACTIVE",                      // state (keep simple)
+                    conn.isActive ? "ACTIVE" : "INACTIVE",  // state (actual status)
                     conn.bitrateMbps * 1000000     // bitrateBps (convert Mbps to bps)
                 );
                 windowData.add(data);
