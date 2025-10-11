@@ -165,15 +165,7 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclas
     return count;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getTotalWindowSize(JNIEnv *env, jclass clazz) {
-    if (!srtla_running) {
-        return 0;
-    }
-    int size = srtla_get_total_window_size();
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getTotalWindowSize: %d", size);
-    return size;
-}
+
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
@@ -185,24 +177,23 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
     int inFlightPackets = srtla_get_total_in_flight_packets();
-    int totalWindow = srtla_get_total_window_size();
     
     // Get detailed per-connection stats
     char detailsBuffer[1024];
     int detailsLen = srtla_get_connection_details(detailsBuffer, sizeof(detailsBuffer));
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d, window=%d", 
-                       totalConnections, activeConnections, inFlightPackets, totalWindow);
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d", 
+                       totalConnections, activeConnections, inFlightPackets);
     
     // Format combined stats string
     char statsBuffer[1536];
     int len = snprintf(statsBuffer, sizeof(statsBuffer),
                        "📡 Native SRTLA Stats\n"
                        "Connections: %d total, %d active\n"
-                       "Total in-flight: %d, Total window: %d\n\n"
+                       "Total in-flight: %d\n\n"
                        "Per-Connection Details:\n%s",
                        totalConnections, activeConnections, 
-                       inFlightPackets, totalWindow,
+                       inFlightPackets,
                        (detailsLen > 0) ? detailsBuffer : "No connection details available");
     
     return env->NewStringUTF(statsBuffer);
