@@ -606,7 +606,7 @@ public class MainActivity extends Activity {
                     conn.loadPercentage,           // score (using load percentage)
                     conn.bitrateMbps > 0.1,        // isActive (active if bitrate > 0.1 Mbps)
                     false,                         // isSelected (keep simple, always false)
-                    50,                            // rtt (placeholder value in ms)
+                    0,                             // rtt (0 since we don't have real RTT data)
                     "ACTIVE",                      // state (keep simple)
                     conn.bitrateMbps * 1000000     // bitrateBps (convert Mbps to bps)
                 );
