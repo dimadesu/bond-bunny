@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private Button buttonStart;
     private Button buttonStop;
     private TextView textStatus;
+    private TextView textError;
     private TextView textNetworks;
     private TextView textConnectionStats;
     private ConnectionWindowView connectionWindowView;
@@ -52,6 +53,9 @@ public class MainActivity extends Activity {
     private Button buttonNativeSrtla;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
+    
+    // Error receiver for service errors
+    private BroadcastReceiver errorReceiver;
     
     // Network change receiver
     private BroadcastReceiver networkChangeReceiver = new BroadcastReceiver() {
@@ -102,6 +106,7 @@ public class MainActivity extends Activity {
         buttonStart = findViewById(R.id.button_start);
         buttonStop = findViewById(R.id.button_stop);
         textStatus = findViewById(R.id.text_status);
+        textError = findViewById(R.id.text_error);
         textConnectionStats = findViewById(R.id.text_connection_stats);
         connectionWindowView = findViewById(R.id.connection_window_view);
         buttonAbout = findViewById(R.id.button_about);
@@ -152,6 +157,10 @@ public class MainActivity extends Activity {
 
     private void startSrtlaService() {
         Log.i("MainActivity", "startSrtlaService() called");
+        
+        // Clear any previous error messages
+        clearError();
+        
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String srtlaReceiverHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
         String srtlaReceiverPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
@@ -372,6 +381,9 @@ public class MainActivity extends Activity {
             registerReceiver(networkChangeReceiver, networkFilter);
         }
         Log.i("MainActivity", "Registered network change receiver");
+        
+        // Register error receiver
+        setupErrorReceiver();
     }
     
     @Override
@@ -394,6 +406,16 @@ public class MainActivity extends Activity {
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Network change receiver was not registered");
         }
+        
+        // Unregister error receiver
+        try {
+            if (errorReceiver != null) {
+                unregisterReceiver(errorReceiver);
+                Log.i("MainActivity", "Unregistered error receiver");
+            }
+        } catch (IllegalArgumentException e) {
+            Log.w("MainActivity", "Error receiver was not registered");
+        }
     }
     
     private void loadPreferences() {
@@ -404,6 +426,41 @@ public class MainActivity extends Activity {
     private void savePreferences() {
         // Algorithm preferences are now managed in SettingsActivity
         // No longer saving preferences in MainActivity
+    }
+    
+    private void setupErrorReceiver() {
+        errorReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String errorMessage = intent.getStringExtra("error_message");
+                if (errorMessage != null) {
+                    showError(errorMessage);
+                }
+            }
+        };
+        
+        IntentFilter errorFilter = new IntentFilter("com.example.srtla.ERROR");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(errorReceiver, errorFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(errorReceiver, errorFilter);
+        }
+        Log.i("MainActivity", "Registered error receiver");
+    }
+    
+    private void showError(String errorMessage) {
+        runOnUiThread(() -> {
+            textError.setText(errorMessage);
+            textError.setVisibility(TextView.VISIBLE);
+            Log.e("MainActivity", "Showing error: " + errorMessage);
+        });
+    }
+    
+    private void clearError() {
+        runOnUiThread(() -> {
+            textError.setText("");
+            textError.setVisibility(TextView.GONE);
+        });
     }
 
     @Override
@@ -491,6 +548,9 @@ public class MainActivity extends Activity {
     }
     
     private void startNativeSrtla() {
+        // Clear any previous error messages
+        clearError();
+        
         textStatus.setText("Starting native SRTLA service...");
         
         try {
