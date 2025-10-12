@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
+import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
@@ -23,12 +24,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.net.Inet4Address;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -117,6 +113,13 @@ public class NativeSrtlaService extends Service {
     private void startNativeSrtla() {
         try {
             Log.i(TAG, "Starting native SRTLA process...");
+            
+            // Validate inputs before starting
+            String validationError = validateSrtlaConfig();
+            if (validationError != null) {
+                handleStartupError(validationError);
+                return;
+            }
             
             // Setup Application-Level Virtual IPs
             setupVirtualConnections();
@@ -597,6 +600,39 @@ public class NativeSrtlaService extends Service {
         NotificationManager notificationManager = 
             (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, createNotification(contentText));
+    }
+    
+    private void broadcastError(String errorMessage) {
+        Intent intent = new Intent("com.example.srtla.ERROR");
+        intent.putExtra("error_message", errorMessage);
+        sendBroadcast(intent);
+    }
+    
+    private String validateSrtlaConfig() {
+        if (srtlaHost == null || srtlaHost.trim().isEmpty()) {
+            return "Hostname is empty";
+        }
+        
+        try {
+            int port = Integer.parseInt(srtlaPort);
+            InetSocketAddress testAddress = new InetSocketAddress(srtlaHost, port);
+            if (testAddress.isUnresolved()) {
+                return "Cannot resolve hostname: " + srtlaHost;
+            }
+        } catch (NumberFormatException e) {
+            return "Invalid port number: " + srtlaPort;
+        } catch (Exception e) {
+            return "Invalid hostname or port: " + srtlaHost + ":" + srtlaPort;
+        }
+        
+        return null; // No error
+    }
+    
+    private void handleStartupError(String errorMessage) {
+        Log.e(TAG, "Cannot start native SRTLA: " + errorMessage);
+        broadcastError(errorMessage);
+        updateNotification("Native SRTLA error: " + errorMessage);
+        stopSelf();
     }
     
     // Static methods for external access

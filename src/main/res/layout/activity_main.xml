@@ -93,6 +93,18 @@
       android:layout_marginBottom="12dp"
       android:visibility="gone" />
 
+    <TextView
+      android:id="@+id/text_error"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text=""
+      android:textSize="14sp"
+      android:textColor="#D32F2F"
+      android:layout_marginBottom="12dp"
+      android:visibility="gone"
+      android:background="#FFEBEE"
+      android:padding="8dp" />
+
     <!-- Connection Statistics Section -->
     <TextView
       android:layout_width="wrap_content"
