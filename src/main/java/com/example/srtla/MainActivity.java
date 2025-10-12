@@ -167,7 +167,20 @@ public class MainActivity extends Activity {
         String srtListenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         
         if (srtlaReceiverHost.isEmpty() || srtlaReceiverPort.isEmpty() || srtListenPort.isEmpty()) {
-            Toast.makeText(this, "Please fill SRTLA receiver host, port, and SRT listen port", Toast.LENGTH_SHORT).show();
+            showError("Please fill SRTLA receiver host, port, and SRT listen port");
+            return;
+        }
+        
+        // Validate port numbers
+        try {
+            int receiverPort = Integer.parseInt(srtlaReceiverPort);
+            int listenPortNum = Integer.parseInt(srtListenPort);
+            if (receiverPort < 1 || receiverPort > 65535 || listenPortNum < 1 || listenPortNum > 65535) {
+                showError("Port numbers must be between 1 and 65535");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showError("Invalid port number format");
             return;
         }
         
@@ -561,7 +574,23 @@ public class MainActivity extends Activity {
             String listenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
             
             if (srtlaHost.isEmpty() || srtlaPort.isEmpty() || listenPort.isEmpty()) {
+                showError("Please configure SRTLA settings first");
                 textStatus.setText("❌ Please configure SRTLA settings first");
+                return;
+            }
+            
+            // Validate port numbers
+            try {
+                int srtlaPortNum = Integer.parseInt(srtlaPort);
+                int listenPortNum = Integer.parseInt(listenPort);
+                if (srtlaPortNum < 1 || srtlaPortNum > 65535 || listenPortNum < 1 || listenPortNum > 65535) {
+                    showError("Port numbers must be between 1 and 65535");
+                    textStatus.setText("❌ Invalid port number range");
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                showError("Invalid port number format");
+                textStatus.setText("❌ Invalid port number format");
                 return;
             }
             
