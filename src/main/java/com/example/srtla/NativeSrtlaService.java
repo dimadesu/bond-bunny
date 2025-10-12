@@ -254,6 +254,14 @@ public class NativeSrtlaService extends Service {
                                     NativeSrtlaJni.setNetworkSocket("10.0.2.1", realIP, 2, cellularSocket);
                                     Log.i(TAG, "Setup virtual Cellular connection: 10.0.2.1 -> " + realIP + " (socket: " + cellularSocket + ")");
                                 }
+                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                                // Setup Ethernet virtual connection
+                                int ethernetSocket = createNetworkSocket(network);
+                                if (ethernetSocket >= 0) {
+                                    virtualConnections.put("10.0.3.1", ethernetSocket);
+                                    NativeSrtlaJni.setNetworkSocket("10.0.3.1", realIP, 3, ethernetSocket);
+                                    Log.i(TAG, "Setup virtual Ethernet connection: 10.0.3.1 -> " + realIP + " (socket: " + ethernetSocket + ")");
+                                }
                             }
                         }
                     }
@@ -308,6 +316,8 @@ public class NativeSrtlaService extends Service {
                                 currentVirtualIPs.add("10.0.1.1");
                             } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                                 currentVirtualIPs.add("10.0.2.1");
+                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                                currentVirtualIPs.add("10.0.3.1");
                             }
                         }
                     }
@@ -359,14 +369,16 @@ public class NativeSrtlaService extends Service {
                         if (realIP != null) {
                             boolean isWiFiRequest = virtualIP.equals("10.0.1.1");
                             boolean isCellularRequest = virtualIP.equals("10.0.2.1");
+                            boolean isEthernetRequest = virtualIP.equals("10.0.3.1");
                             boolean isWiFiNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
                             boolean isCellularNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+                            boolean isEthernetNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET);
                             
-                            if ((isWiFiRequest && isWiFiNetwork) || (isCellularRequest && isCellularNetwork)) {
+                            if ((isWiFiRequest && isWiFiNetwork) || (isCellularRequest && isCellularNetwork) || (isEthernetRequest && isEthernetNetwork)) {
                                 int socket = createNetworkSocket(network);
                                 if (socket >= 0) {
                                     virtualConnections.put(virtualIP, socket);
-                                    int networkType = isWiFiNetwork ? 1 : 2;
+                                    int networkType = isWiFiNetwork ? 1 : (isCellularNetwork ? 2 : 3);
                                     NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkType, socket);
                                     Log.i(TAG, "Setup virtual connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
                                 }
@@ -524,6 +536,8 @@ public class NativeSrtlaService extends Service {
                                         networkType = "WiFi";
                                     } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                                         networkType = "Cellular";
+                                    } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                                        networkType = "Ethernet";
                                     }
                                     
                                     ips.add(ip);
