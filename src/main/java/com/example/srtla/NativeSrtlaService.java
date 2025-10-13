@@ -129,7 +129,7 @@ public class NativeSrtlaService extends Service {
             File ipsFile = createVirtualIpsFile();
             
             // Update notification
-            updateNotification("Starting native SRTLA...");
+            updateNotification("Starting service...");
             
             // Start native SRTLA
             int result = NativeSrtlaJni.startSrtlaNative(listenPort, srtlaHost, srtlaPort, ipsFile.getAbsolutePath());
@@ -139,21 +139,21 @@ public class NativeSrtlaService extends Service {
                 // Verify native state before marking as running
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     isServiceRunning = true;
-                    updateNotification("Native SRTLA running on port " + listenPort);
+                    updateNotification("Service is running on port " + listenPort);
                 } else {
                     Log.w(TAG, "Native SRTLA start returned 0 but process is not running");
-                    updateNotification("Native SRTLA failed to start");
+                    updateNotification("Service failed to start. Native code returned 0");
                     stopSelf();
                 }
             } else {
                 Log.e(TAG, "Native SRTLA failed to start with code: " + result);
-                updateNotification("Native SRTLA failed to start (code: " + result + ")");
+                updateNotification("Service failed to start (code: " + result + ")");
                 stopSelf();
             }
             
         } catch (Exception e) {
             Log.e(TAG, "Error starting native SRTLA", e);
-            updateNotification("Native SRTLA error: " + e.getMessage());
+            updateNotification("Error starting service: " + e.getMessage());
             stopSelf();
         }
     }
@@ -175,7 +175,7 @@ public class NativeSrtlaService extends Service {
                         if (!NativeSrtlaJni.isRunningSrtlaNative()) {
                             Log.i(TAG, "Native SRTLA process confirmed stopped");
                             // Post a dismissible notification when service stops
-                            postStoppedNotification("Native SRTLA stopped");
+                            postStoppedNotification("Service stopped");
                         } else {
                             Log.w(TAG, "Native SRTLA process still running after stop signal");
                         }
@@ -667,9 +667,9 @@ public class NativeSrtlaService extends Service {
     }
     
     private void handleStartupError(String errorMessage) {
-        Log.e(TAG, "Cannot start native SRTLA: " + errorMessage);
+        Log.e(TAG, "Cannot start native SRTLA. Settings validation error: " + errorMessage);
         broadcastError(errorMessage);
-        updateNotification("Native SRTLA error: " + errorMessage);
+        updateNotification("Settings validation error: " + errorMessage);
         stopSelf();
     }
     
