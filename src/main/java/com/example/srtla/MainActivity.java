@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
      */
     private void checkServiceState() {
         // Check if the service is running
-        serviceRunning = EnhancedSrtlaService.isServiceRunning();
+        serviceRunning = NativeSrtlaService.isServiceRunning();
         updateUI();
         
         if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         buttonNativeSrtla = findViewById(R.id.button_native_srtla);
         
         // Set initial logging level for performance
-        SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
+        // Native service handles logging internally
         
         // Add long-click listener to status text for changing log levels
         textStatus.setOnLongClickListener(v -> {
@@ -214,8 +214,8 @@ public class MainActivity extends Activity {
 
     // Starts the service without requesting permissions (assumes caller has handled permission logic)
     private void startServiceNow(String srtlaReceiverHost, String srtlaReceiverPort, String srtListenPort) {
-        Log.i("MainActivity", "startServiceNow() — starting EnhancedSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
+        Log.i("MainActivity", "startServiceNow() — starting NativeSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
+        Intent serviceIntent = new Intent(this, NativeSrtlaService.class);
         serviceIntent.putExtra("srtla_receiver_host", srtlaReceiverHost);
         serviceIntent.putExtra("srtla_receiver_port", Integer.parseInt(srtlaReceiverPort));
         serviceIntent.putExtra("srt_listen_address", "0.0.0.0");  // Always listen on all interfaces
@@ -227,11 +227,7 @@ public class MainActivity extends Activity {
 
         // Apply all current feature settings to the service from saved preferences
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        EnhancedSrtlaService.setStickinessEnabled(prefs.getBoolean("stickiness_enabled", false));
-        EnhancedSrtlaService.setQualityScoringEnabled(prefs.getBoolean("quality_scoring_enabled", true));
-        EnhancedSrtlaService.setNetworkPriorityEnabled(prefs.getBoolean("network_priority_enabled", true));
-        EnhancedSrtlaService.setExplorationEnabled(prefs.getBoolean("exploration_enabled", false));
-        EnhancedSrtlaService.setClassicMode(prefs.getBoolean("classic_mode", false));
+        // Native service configuration handled internally
 
         updateUI();
         startStatsUpdates();
@@ -242,7 +238,7 @@ public class MainActivity extends Activity {
     }
     
     private void stopSrtlaService() {
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
+        Intent serviceIntent = new Intent(this, NativeSrtlaService.class);
         stopService(serviceIntent);
         
         serviceRunning = false;
@@ -326,20 +322,6 @@ public class MainActivity extends Activity {
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
-        } else {
-            // Show Java SRTLA stats
-            String stats = EnhancedSrtlaService.getConnectionStatistics();
-            
-            // Add logging performance stats
-            String logStats = SrtlaLogger.getPerformanceStats();
-            String combinedStats = stats + "\n\n" + logStats;
-            
-            textConnectionStats.setText(combinedStats);
-            
-            // Update window visualization
-            List<ConnectionWindowView.ConnectionWindowData> windowData = 
-                EnhancedSrtlaService.getConnectionWindowData();
-            connectionWindowView.updateConnectionData(windowData);
         }
         
         // Periodically refresh native SRTLA UI state (handles crashes)
@@ -350,32 +332,9 @@ public class MainActivity extends Activity {
      * Cycle through logging levels on long press
      */
     private void cycleLogLevel() {
-        SrtlaLogger.LogLevel current = SrtlaLogger.getLogLevel();
-        SrtlaLogger.LogLevel next;
-        
-        switch (current) {
-            case PRODUCTION:
-                next = SrtlaLogger.LogLevel.DEVELOPMENT;
-                break;
-            case DEVELOPMENT:
-                next = SrtlaLogger.LogLevel.DEBUG;
-                break;
-            case DEBUG:
-                next = SrtlaLogger.LogLevel.TRACE;
-                break;
-            default:
-                next = SrtlaLogger.LogLevel.PRODUCTION;
-                break;
-        }
-        
-        SrtlaLogger.setLogLevel(next);
-        Toast.makeText(this, "Logging level: " + next + 
-                      (next == SrtlaLogger.LogLevel.PRODUCTION ? " (Best Performance)" : 
-                       next == SrtlaLogger.LogLevel.DEVELOPMENT ? " (Balanced)" : " (Verbose)"), 
+        // Native service handles logging internally
+        Toast.makeText(this, "Native SRTLA service handles logging internally", 
                       Toast.LENGTH_SHORT).show();
-        
-        // Reset stats when changing levels
-        SrtlaLogger.resetStats();
     }
     
     @Override
@@ -524,11 +483,11 @@ public class MainActivity extends Activity {
     // Post a small notification at app launch so the service can update it later using the same id.
     private void postStartupNotification() {
         try {
-            final String channelId = EnhancedSrtlaService.CHANNEL_ID;
+            final String channelId = NativeSrtlaService.CHANNEL_ID;
             final int notificationId = 1;
 
             // Ensure the shared notification channel exists. This is idempotent.
-            EnhancedSrtlaService.createNotificationChannel(this);
+            NativeSrtlaService.createNotificationChannel(this);
 
             Intent notificationIntent = new Intent(this, MainActivity.class);
             PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,

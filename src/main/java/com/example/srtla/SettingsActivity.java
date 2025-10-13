@@ -117,13 +117,10 @@ public class SettingsActivity extends Activity {
         updateAdvancedFeatureButtons();
         saveAlgorithmPreferences();
         
-        // Apply the setting to the service if it's running
-        if (EnhancedSrtlaService.isServiceRunning()) {
-            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
-            Toast.makeText(this, 
-                stickinessEnabled ? "Connection stickiness enabled" : "Connection stickiness disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
+        // Native service handles settings internally
+        Toast.makeText(this, 
+            stickinessEnabled ? "Connection stickiness enabled" : "Connection stickiness disabled", 
+            Toast.LENGTH_SHORT).show();
     }
     
     private void toggleQualityScoring() {
@@ -131,12 +128,10 @@ public class SettingsActivity extends Activity {
         updateAdvancedFeatureButtons();
         saveAlgorithmPreferences();
         
-        if (EnhancedSrtlaService.isServiceRunning()) {
-            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
-            Toast.makeText(this, 
-                qualityScoringEnabled ? "Quality-based scoring enabled" : "Quality-based scoring disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
+        // Native service handles settings internally
+        Toast.makeText(this, 
+            qualityScoringEnabled ? "Quality-based scoring enabled" : "Quality-based scoring disabled", 
+            Toast.LENGTH_SHORT).show();
     }
     
     private void toggleNetworkPriority() {
@@ -144,12 +139,10 @@ public class SettingsActivity extends Activity {
         updateAdvancedFeatureButtons();
         saveAlgorithmPreferences();
         
-        if (EnhancedSrtlaService.isServiceRunning()) {
-            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
-            Toast.makeText(this, 
-                networkPriorityEnabled ? "Network priority scaling enabled" : "Network priority scaling disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
+        // Native service handles settings internally
+        Toast.makeText(this, 
+            networkPriorityEnabled ? "Network priority scaling enabled" : "Network priority scaling disabled", 
+            Toast.LENGTH_SHORT).show();
     }
     
     private void toggleExploration() {
@@ -157,12 +150,10 @@ public class SettingsActivity extends Activity {
         updateAdvancedFeatureButtons();
         saveAlgorithmPreferences();
         
-        if (EnhancedSrtlaService.isServiceRunning()) {
-            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-            Toast.makeText(this, 
-                explorationEnabled ? "Connection exploration enabled" : "Connection exploration disabled", 
-                Toast.LENGTH_SHORT).show();
-        }
+        // Native service handles settings internally
+        Toast.makeText(this, 
+            explorationEnabled ? "Connection exploration enabled" : "Connection exploration disabled", 
+            Toast.LENGTH_SHORT).show();
     }
     
     private void toggleClassicMode() {
@@ -170,18 +161,11 @@ public class SettingsActivity extends Activity {
         updateAdvancedFeatureButtons();
         saveAlgorithmPreferences();
 
-        if (EnhancedSrtlaService.isServiceRunning()) {
-            EnhancedSrtlaService.setClassicMode(classicMode);
-            EnhancedSrtlaService.setQualityScoringEnabled(qualityScoringEnabled);
-            EnhancedSrtlaService.setNetworkPriorityEnabled(networkPriorityEnabled);
-            EnhancedSrtlaService.setExplorationEnabled(explorationEnabled);
-            EnhancedSrtlaService.setStickinessEnabled(stickinessEnabled);
-            
-            Toast.makeText(this, 
-                classicMode ? "Classic SRTLA algorithm enabled - all enhancements disabled" : 
-                           "Enhanced Android mode enabled - all features restored", 
-                Toast.LENGTH_LONG).show();
-        }
+        // Native service handles settings internally
+        Toast.makeText(this, 
+            classicMode ? "Classic SRTLA algorithm enabled - all enhancements disabled" : 
+                       "Enhanced Android mode enabled - all features restored", 
+            Toast.LENGTH_LONG).show();
     }
     
     private void updateAdvancedFeatureButtons() {
