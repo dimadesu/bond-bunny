@@ -237,7 +237,10 @@ public class NativeSrtlaService extends Service {
                     NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
                     if (capabilities != null && 
                         capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
                         
                         String realIP = getNetworkIP(network);
                         if (realIP != null) {
@@ -308,7 +311,10 @@ public class NativeSrtlaService extends Service {
                     NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
                     if (capabilities != null && 
                         capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
                         
                         String realIP = getNetworkIP(network);
                         if (realIP != null) {
@@ -365,7 +371,10 @@ public class NativeSrtlaService extends Service {
                     NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
                     if (capabilities != null && 
                         capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
                         
                         String realIP = getNetworkIP(network);
                         if (realIP != null) {
@@ -526,7 +535,10 @@ public class NativeSrtlaService extends Service {
                     NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
                     if (capabilities != null && 
                         capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
                         
                         // Get the network's interface
                         android.net.LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
