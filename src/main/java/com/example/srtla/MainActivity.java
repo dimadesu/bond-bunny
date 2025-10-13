@@ -35,6 +35,7 @@ import android.content.Context;
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
     private static final String PREFS_NAME = "SrtlaAppPrefs";
+    private static boolean hasPostedStartupNotification = false;
     private static final String PREF_SRTLA_HOST = "srtla_host";
     private static final String PREF_SRTLA_PORT = "srtla_port";
     private static final String PREF_LISTEN_PORT = "listen_port";
@@ -356,6 +357,12 @@ public class MainActivity extends Activity {
 
     // Post a small notification at app launch so the service can update it later using the same id.
     private void postStartupNotification() {
+        // Only post once per app launch
+        if (hasPostedStartupNotification) {
+            return;
+        }
+        hasPostedStartupNotification = true;
+        
         try {
             final String channelId = NativeSrtlaService.CHANNEL_ID;
             final int notificationId = 1;
