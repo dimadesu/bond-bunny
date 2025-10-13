@@ -138,9 +138,9 @@ public class MainActivity extends Activity {
     
     private void updateUI() {
         if (serviceRunning) {
-            textStatus.setText("Status: Running");
+            textStatus.setText("Status: running");
         } else {
-            textStatus.setText("Status: Stopped");
+            textStatus.setText("Status: stopped");
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
@@ -402,7 +402,7 @@ public class MainActivity extends Activity {
         // Clear any previous error messages
         clearError();
         
-        textStatus.setText("Starting native SRTLA service...");
+        textStatus.setText("Starting service...");
         
         try {
             // Get configuration from preferences (similar to regular SRTLA service)
@@ -435,7 +435,7 @@ public class MainActivity extends Activity {
             // Start the native SRTLA service
             NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             
-            textStatus.setText("⏳ Native SRTLA service starting...");
+            textStatus.setText("⏳ Service starting...");
             Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
             
             // Update UI after a short delay to allow service to start
@@ -444,23 +444,23 @@ public class MainActivity extends Activity {
                 updateNativeSrtlaUI();
                 if (NativeSrtlaService.isServiceRunning()) {
                     Log.i("MainActivity", "Native SRTLA is running, starting stats updates");
-                    textStatus.setText("✅ Native SRTLA service running");
+                    textStatus.setText("✅ Service is running");
                     // Start stats updates for native SRTLA
                     startStatsUpdates();
                 } else {
-                    Log.i("MainActivity", "Native SRTLA is not running");
-                    textStatus.setText("❌ Native SRTLA service failed to start");
+                    Log.i("MainActivity", "Service is not running");
+                    textStatus.setText("❌ Service failed to start");
                 }
             }, 2000); // Wait 2 seconds for service to start
             
         } catch (Exception e) {
-            textStatus.setText("❌ Error starting native SRTLA service: " + e.getMessage());
+            textStatus.setText("❌ Error starting service: " + e.getMessage());
             Log.e("MainActivity", "Native SRTLA service start error", e);
         }
     }
     
     private void stopNativeSrtla() {
-        textStatus.setText("⏳ Stopping native SRTLA service...");
+        textStatus.setText("⏳ Stopping service...");
         
         try {
             NativeSrtlaService.stopService(this);
@@ -470,16 +470,16 @@ public class MainActivity extends Activity {
             uiHandler.postDelayed(() -> {
                 updateNativeSrtlaUI();
                 if (!NativeSrtlaService.isServiceRunning()) {
-                    textStatus.setText("✅ Native SRTLA service stopped");
+                    textStatus.setText("✅ Service stopped");
                 } else {
-                    textStatus.setText("⏳ Native SRTLA service stopping...");
+                    textStatus.setText("⏳ Service stopping...");
                     // Try again after another delay
                     uiHandler.postDelayed(() -> {
                         updateNativeSrtlaUI();
                         if (!NativeSrtlaService.isServiceRunning()) {
-                            textStatus.setText("✅ Native SRTLA service stopped");
+                            textStatus.setText("✅ Service stopped");
                         } else {
-                            textStatus.setText("⚠️ Native SRTLA service may still be running");
+                            textStatus.setText("⚠️ Service may still be running");
                         }
                     }, 2000);
                 }
@@ -487,7 +487,7 @@ public class MainActivity extends Activity {
             
         } catch (Exception e) {
             updateNativeSrtlaUI();
-            textStatus.setText("❌ Error stopping native SRTLA service: " + e.getMessage());
+            textStatus.setText("❌ Error stopping service: " + e.getMessage());
             Log.e("MainActivity", "Native SRTLA service stop error", e);
         }
     }
