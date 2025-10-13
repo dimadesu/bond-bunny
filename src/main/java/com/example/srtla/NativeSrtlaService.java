@@ -445,18 +445,14 @@ public class NativeSrtlaService extends Service {
                 return socketFD;
                 
             } catch (Exception reflectionEx) {
-                Log.w(TAG, "Reflection approach failed, trying alternative", reflectionEx);
+                Log.w(TAG, "Reflection approach failed, cleaning up native socket", reflectionEx);
                 
-                // Alternative: Create a DatagramSocket and bind it to the network
-                java.net.DatagramSocket socket = new java.net.DatagramSocket();
-                network.bindSocket(socket);
+                // If reflection failed, we can't properly bind the native socket
+                // Close the native socket to prevent FD leaks
+                closeSocketNative(socketFD);
                 
-                // The socket is now bound to the network, but we return our native FD
-                // Note: This means the native socket may not be bound, but the network is selected
-                socket.close();
-                
-                Log.i(TAG, "Used DatagramSocket binding approach for socket FD " + socketFD);
-                return socketFD;
+                Log.e(TAG, "Failed to bind native socket to network - socket closed");
+                return -1;
             }
             
         } catch (Exception e) {
