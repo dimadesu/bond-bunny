@@ -329,8 +329,10 @@ public class NativeSrtlaService extends Service {
             while (iterator.hasNext()) {
                 java.util.Map.Entry<String, Integer> entry = iterator.next();
                 if (!currentVirtualIPs.contains(entry.getKey())) {
-                    Log.i(TAG, "Removing virtual connection for " + entry.getKey());
-                    closeSocketNative(entry.getValue());
+                    Log.i(TAG, "Removing virtual connection for " + entry.getKey() + 
+                          " (FD: " + entry.getValue() + ") - ownership transferred to native code");
+                    // Don't close the socket here - it was transferred to native code ownership
+                    // Closing it from Java would cause fdsan crashes. Native code will clean it up.
                     iterator.remove();
                 }
             }
