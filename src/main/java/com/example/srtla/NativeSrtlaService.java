@@ -161,7 +161,6 @@ public class NativeSrtlaService extends Service {
     private void stopNativeSrtla() {
         try {
             Log.i(TAG, "Stopping native SRTLA process...");
-            updateNotification("Stopping native SRTLA...");
             
             int result = NativeSrtlaJni.stopSrtlaNative();
             if (result == 0) {
@@ -175,10 +174,10 @@ public class NativeSrtlaService extends Service {
                         // Check if native process actually stopped
                         if (!NativeSrtlaJni.isRunningSrtlaNative()) {
                             Log.i(TAG, "Native SRTLA process confirmed stopped");
-                            updateNotification("Native SRTLA stopped");
+                            // Post a dismissible notification when service stops
+                            postStoppedNotification("Native SRTLA stopped");
                         } else {
                             Log.w(TAG, "Native SRTLA process still running after stop signal");
-                            updateNotification("Native SRTLA stopping...");
                         }
                     } catch (InterruptedException e) {
                         Log.w(TAG, "Stop monitoring interrupted", e);
@@ -593,7 +592,23 @@ public class NativeSrtlaService extends Service {
     
 
     
+    /**
+     * Create a notification with default settings for running service
+     * (non-dismissible, does not auto-cancel)
+     * @return A non-dismissible Notification configured for running service (ongoing=true, autoCancel=false)
+     */
     private Notification createNotification(String contentText) {
+        return createNotification(contentText, true, false);
+    }
+    
+    /**
+     * Create a notification with customizable dismissibility
+     * @param contentText The text to display in the notification
+     * @param ongoing If true, notification cannot be dismissed by user (for running service)
+     * @param autoCancel If true, notification dismisses when tapped (for stopped service)
+     * @return The configured Notification object
+     */
+    private Notification createNotification(String contentText, boolean ongoing, boolean autoCancel) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent, 
@@ -605,8 +620,8 @@ public class NativeSrtlaService extends Service {
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            .setOngoing(ongoing)
+            .setAutoCancel(autoCancel)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
     }
@@ -615,6 +630,14 @@ public class NativeSrtlaService extends Service {
         NotificationManager notificationManager = 
             (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, createNotification(contentText));
+    }
+    
+    private void postStoppedNotification(String contentText) {
+        // Create a dismissible notification when service stops
+        // Using same notification ID updates the existing notification in place
+        NotificationManager notificationManager = 
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.notify(NOTIFICATION_ID, createNotification(contentText, false, true));
     }
     
     private void broadcastError(String errorMessage) {
@@ -809,8 +832,8 @@ public class NativeSrtlaService extends Service {
             
             Log.i(TAG, "Completed network change handling");
             
-            // Update notification to show network change
-            updateNotification("Network changed - updating connections...");
+            // Don't update notification text during network changes while service is running
+            // This keeps the notification stable and less confusing for users
             
             // Broadcast network change to update UI immediately
             Intent networkChangeIntent = new Intent("com.example.srtla.NETWORK_CHANGED");
