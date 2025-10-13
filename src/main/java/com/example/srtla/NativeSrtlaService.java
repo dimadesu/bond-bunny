@@ -36,6 +36,7 @@ import java.util.List;
 public class NativeSrtlaService extends Service {
     private static final String TAG = "NativeSrtlaService";
     private static final int NOTIFICATION_ID = 1; // Same as startup notification - will update it
+    public static final String CHANNEL_ID = "SRTLA_SERVICE_CHANNEL";
     
     // Native method for creating UDP socket
     private native int createUdpSocketNative();
@@ -62,8 +63,8 @@ public class NativeSrtlaService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "NativeSrtlaService created");
-        // Use the same notification channel as EnhancedSrtlaService
-        EnhancedSrtlaService.createNotificationChannel(this);
+        // Create notification channel
+        createNotificationChannel(this);
         
         // Initialize network monitoring
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -599,7 +600,7 @@ public class NativeSrtlaService extends Service {
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
         
-        return new NotificationCompat.Builder(this, EnhancedSrtlaService.CHANNEL_ID)
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Bond Bunny")
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
@@ -818,6 +819,22 @@ public class NativeSrtlaService extends Service {
             
         } catch (Exception e) {
             Log.e(TAG, "Error handling network change", e);
+        }
+    }
+    
+    /**
+     * Create notification channel (API 26+)
+     */
+    public static void createNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "SRTLA Service";
+            String description = "Notifications for SRTLA service status";
+            int importance = NotificationManager.IMPORTANCE_LOW;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            
+            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
         }
     }
 }

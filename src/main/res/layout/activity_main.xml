@@ -60,38 +60,13 @@
 
     </LinearLayout>
 
-    <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:layout_marginBottom="8dp"
-      android:visibility="gone">
-
-      <Button
-        android:id="@+id/button_start"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Start Service" />
-
-      <Button
-        android:id="@+id/button_stop"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Stop Service"
-        android:enabled="false" />
-
-    </LinearLayout>
-
     <TextView
       android:id="@+id/text_status"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
-      android:layout_marginBottom="12dp"
-      android:visibility="gone" />
+      android:layout_marginBottom="12dp" />
 
     <TextView
       android:id="@+id/text_error"

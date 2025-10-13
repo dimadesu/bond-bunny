@@ -40,8 +40,6 @@ public class MainActivity extends Activity {
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
     
-    private Button buttonStart;
-    private Button buttonStop;
     private TextView textStatus;
     private TextView textError;
     private TextView textNetworks;
@@ -79,9 +77,6 @@ public class MainActivity extends Activity {
         // Request notification permission at app start (Android 13+) so Start button doesn't trigger it
         checkAndRequestNotificationPermissionOnLaunch();
         
-        buttonStart.setOnClickListener(v -> startSrtlaService());
-        buttonStop.setOnClickListener(v -> stopSrtlaService());
-        
         // Restore service state if activity was recreated
         checkServiceState();
     }
@@ -91,7 +86,7 @@ public class MainActivity extends Activity {
      */
     private void checkServiceState() {
         // Check if the service is running
-        serviceRunning = EnhancedSrtlaService.isServiceRunning();
+        serviceRunning = NativeSrtlaService.isServiceRunning();
         updateUI();
         
         if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
@@ -103,8 +98,6 @@ public class MainActivity extends Activity {
     }
     
     private void initViews() {
-        buttonStart = findViewById(R.id.button_start);
-        buttonStop = findViewById(R.id.button_stop);
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
         textConnectionStats = findViewById(R.id.text_connection_stats);
@@ -113,15 +106,6 @@ public class MainActivity extends Activity {
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
         buttonNativeSrtla = findViewById(R.id.button_native_srtla);
-        
-        // Set initial logging level for performance
-        SrtlaLogger.setLogLevel(SrtlaLogger.LogLevel.PRODUCTION);
-        
-        // Add long-click listener to status text for changing log levels
-        textStatus.setOnLongClickListener(v -> {
-            cycleLogLevel();
-            return true;
-        });
         
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
@@ -149,117 +133,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
-        // Restore form values
-        if (savedInstanceState != null) {
-            // Service state will be checked in onResume()
-        }
-    }
-
-    private void startSrtlaService() {
-        Log.i("MainActivity", "startSrtlaService() called");
-        
-        // Clear any previous error messages
-        clearError();
-        
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String srtlaReceiverHost = prefs.getString(PREF_SRTLA_HOST, "au.srt.belabox.net").trim();
-        String srtlaReceiverPort = prefs.getString(PREF_SRTLA_PORT, "5000").trim();
-        String srtListenPort = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
-        
-        if (srtlaReceiverHost.isEmpty() || srtlaReceiverPort.isEmpty() || srtListenPort.isEmpty()) {
-            showError("Please fill SRTLA receiver host, port, and SRT listen port");
-            return;
-        }
-        
-        // Validate port numbers
-        try {
-            int receiverPort = Integer.parseInt(srtlaReceiverPort);
-            int listenPortNum = Integer.parseInt(srtListenPort);
-            if (receiverPort < 1 || receiverPort > 65535 || listenPortNum < 1 || listenPortNum > 65535) {
-                showError("Port numbers must be between 1 and 65535");
-                return;
-            }
-        } catch (NumberFormatException e) {
-            showError("Invalid port number format");
-            return;
-        }
-        
-        // Save preferences when starting service
-        savePreferences();
-        
-        // On Android 13+ we must request POST_NOTIFICATIONS permission before showing notifications
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Ensure notification permission is available; the app requests it at launch.
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                // Do not request here; direct the user to app notification settings instead
-                Toast.makeText(this, "Notifications are disabled for this app. Please enable them in App Settings.", Toast.LENGTH_LONG).show();
-                try {
-                    Intent intent = new Intent();
-                    intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                    intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                }
-                return;
-            }
-        }
-
-        // Permission already granted or not required - start the service now
-        startServiceNow(srtlaReceiverHost, srtlaReceiverPort, srtListenPort);
-    }
-
-    // Starts the service without requesting permissions (assumes caller has handled permission logic)
-    private void startServiceNow(String srtlaReceiverHost, String srtlaReceiverPort, String srtListenPort) {
-        Log.i("MainActivity", "startServiceNow() — starting EnhancedSrtlaService with " + srtlaReceiverHost + ":" + srtlaReceiverPort + " listening:" + srtListenPort);
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
-        serviceIntent.putExtra("srtla_receiver_host", srtlaReceiverHost);
-        serviceIntent.putExtra("srtla_receiver_port", Integer.parseInt(srtlaReceiverPort));
-        serviceIntent.putExtra("srt_listen_address", "0.0.0.0");  // Always listen on all interfaces
-        serviceIntent.putExtra("srt_listen_port", Integer.parseInt(srtListenPort));
-
-        startForegroundService(serviceIntent);
-
-        serviceRunning = true;
-
-        // Apply all current feature settings to the service from saved preferences
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        EnhancedSrtlaService.setStickinessEnabled(prefs.getBoolean("stickiness_enabled", false));
-        EnhancedSrtlaService.setQualityScoringEnabled(prefs.getBoolean("quality_scoring_enabled", true));
-        EnhancedSrtlaService.setNetworkPriorityEnabled(prefs.getBoolean("network_priority_enabled", true));
-        EnhancedSrtlaService.setExplorationEnabled(prefs.getBoolean("exploration_enabled", false));
-        EnhancedSrtlaService.setClassicMode(prefs.getBoolean("classic_mode", false));
-
-        updateUI();
-        startStatsUpdates();
-
-        Toast.makeText(this,
-            "Port: " + srtListenPort + ". " + srtlaReceiverHost + ":" + srtlaReceiverPort,
-            Toast.LENGTH_LONG).show();
-    }
-    
-    private void stopSrtlaService() {
-        Intent serviceIntent = new Intent(this, EnhancedSrtlaService.class);
-        stopService(serviceIntent);
-        
-        serviceRunning = false;
-        updateUI();
-        stopStatsUpdates();
-        Toast.makeText(this, "Service Stopped", Toast.LENGTH_SHORT).show();
     }
     
     private void updateUI() {
         if (serviceRunning) {
             textStatus.setText("Status: Running");
-            buttonStart.setEnabled(false);
-            buttonStop.setEnabled(true);
         } else {
             textStatus.setText("Status: Stopped");
-            buttonStart.setEnabled(true);
-            buttonStop.setEnabled(false);
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
@@ -321,61 +201,14 @@ public class MainActivity extends Activity {
             // Log.i("MainActivity", "Native stats: " + nativeStats);
             textConnectionStats.setText(nativeStats);
             
-            // Also update the status to show we're getting stats (for visibility test)
-            textStatus.setText("✅ Native SRTLA running - Stats updating at " + (currentTime % 100000));
+            textStatus.setText("✅ Native SRTLA running");
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
-        } else {
-            // Show Java SRTLA stats
-            String stats = EnhancedSrtlaService.getConnectionStatistics();
-            
-            // Add logging performance stats
-            String logStats = SrtlaLogger.getPerformanceStats();
-            String combinedStats = stats + "\n\n" + logStats;
-            
-            textConnectionStats.setText(combinedStats);
-            
-            // Update window visualization
-            List<ConnectionWindowView.ConnectionWindowData> windowData = 
-                EnhancedSrtlaService.getConnectionWindowData();
-            connectionWindowView.updateConnectionData(windowData);
         }
         
         // Periodically refresh native SRTLA UI state (handles crashes)
         updateNativeSrtlaUI();
-    }
-    
-    /**
-     * Cycle through logging levels on long press
-     */
-    private void cycleLogLevel() {
-        SrtlaLogger.LogLevel current = SrtlaLogger.getLogLevel();
-        SrtlaLogger.LogLevel next;
-        
-        switch (current) {
-            case PRODUCTION:
-                next = SrtlaLogger.LogLevel.DEVELOPMENT;
-                break;
-            case DEVELOPMENT:
-                next = SrtlaLogger.LogLevel.DEBUG;
-                break;
-            case DEBUG:
-                next = SrtlaLogger.LogLevel.TRACE;
-                break;
-            default:
-                next = SrtlaLogger.LogLevel.PRODUCTION;
-                break;
-        }
-        
-        SrtlaLogger.setLogLevel(next);
-        Toast.makeText(this, "Logging level: " + next + 
-                      (next == SrtlaLogger.LogLevel.PRODUCTION ? " (Best Performance)" : 
-                       next == SrtlaLogger.LogLevel.DEVELOPMENT ? " (Balanced)" : " (Verbose)"), 
-                      Toast.LENGTH_SHORT).show();
-        
-        // Reset stats when changing levels
-        SrtlaLogger.resetStats();
     }
     
     @Override
@@ -524,11 +357,11 @@ public class MainActivity extends Activity {
     // Post a small notification at app launch so the service can update it later using the same id.
     private void postStartupNotification() {
         try {
-            final String channelId = EnhancedSrtlaService.CHANNEL_ID;
+            final String channelId = NativeSrtlaService.CHANNEL_ID;
             final int notificationId = 1;
 
             // Ensure the shared notification channel exists. This is idempotent.
-            EnhancedSrtlaService.createNotificationChannel(this);
+            NativeSrtlaService.createNotificationChannel(this);
 
             Intent notificationIntent = new Intent(this, MainActivity.class);
             PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
@@ -549,8 +382,6 @@ public class MainActivity extends Activity {
             Log.w("MainActivity", "Failed to post startup notification", e);
         }
     }
-    
-    // Native SRTLA is now handled by NativeSrtlaService using NativeSrtlaJni
     
     private void toggleNativeSrtla() {
         if (NativeSrtlaService.isServiceRunning()) {
@@ -711,8 +542,4 @@ public class MainActivity extends Activity {
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
         }
     }
-    
-    // Network IP detection is now handled by NativeSrtlaService
-    
-    // Algorithm toggle methods moved to SettingsActivity
 }
