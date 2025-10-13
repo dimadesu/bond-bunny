@@ -278,23 +278,20 @@ public class NativeSrtlaService extends Service {
     }
     
     private void cleanupVirtualConnections() {
-        Log.i(TAG, "Cleaning up old virtual connections...");
+        Log.i(TAG, "Cleaning up virtual connections...");
         
         for (java.util.Map.Entry<String, Integer> entry : virtualConnections.entrySet()) {
             int socketFD = entry.getValue();
-            try {
-                // Close the socket file descriptor using native close
-                if (socketFD >= 0) {
-                    closeSocketNative(socketFD);
-                    Log.i(TAG, "Closed socket FD " + socketFD + " for virtual IP " + entry.getKey());
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Error closing socket FD " + socketFD, e);
+            if (socketFD >= 0) {
+                // Note: We don't close these sockets here because they were transferred
+                // to native code ownership. The native code is responsible for closing them.
+                // Attempting to close them here would cause fdsan crashes.
+                Log.i(TAG, "Virtual connection " + entry.getKey() + " (FD: " + socketFD + ") - ownership transferred to native code");
             }
         }
         
         virtualConnections.clear();
-        Log.i(TAG, "Virtual connections cleanup complete");
+        Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
     
     private void updateVirtualConnections() {
@@ -441,7 +438,19 @@ public class NativeSrtlaService extends Service {
                 // Now bind the FileDescriptor to the network
                 network.bindSocket(fd);
                 
-                Log.i(TAG, "Successfully bound native socket FD " + socketFD + " to network " + network);
+                // Detach the FileDescriptor from fdsan tracking since we're transferring ownership
+                // to native code. This prevents fdsan crashes when native code closes the socket.
+                try {
+                    // Use reflection to call FileDescriptor.setInt$(-1) to detach from fdsan
+                    java.lang.reflect.Method setIntMethod = java.io.FileDescriptor.class.getDeclaredMethod("setInt$", int.class);
+                    setIntMethod.setAccessible(true);
+                    setIntMethod.invoke(fd, -1);
+                    Log.i(TAG, "Detached FD " + socketFD + " from fdsan tracking for native ownership");
+                } catch (Exception fdDetachEx) {
+                    Log.w(TAG, "Could not detach FD from fdsan (may cause crashes): " + fdDetachEx.getMessage());
+                }
+                
+                Log.i(TAG, "Successfully bound and transferred socket FD " + socketFD + " to native code");
                 return socketFD;
                 
             } catch (Exception reflectionEx) {
