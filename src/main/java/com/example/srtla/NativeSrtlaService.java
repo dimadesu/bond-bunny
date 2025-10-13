@@ -593,6 +593,10 @@ public class NativeSrtlaService extends Service {
 
     
     private Notification createNotification(String contentText) {
+        return createNotification(contentText, true, false);
+    }
+    
+    private Notification createNotification(String contentText, boolean ongoing, boolean autoCancel) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this, 0, notificationIntent, 
@@ -604,8 +608,8 @@ public class NativeSrtlaService extends Service {
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            .setOngoing(ongoing)
+            .setAutoCancel(autoCancel)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
     }
@@ -618,25 +622,10 @@ public class NativeSrtlaService extends Service {
     
     private void postStoppedNotification(String contentText) {
         // Create a dismissible notification when service stops
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-            this, 0, notificationIntent, 
-            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-        );
-        
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Bond Bunny")
-            .setContentText(contentText)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentIntent(pendingIntent)
-            .setOngoing(false)  // Make it dismissible
-            .setAutoCancel(true)  // Dismiss when tapped
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build();
-        
+        // Using same notification ID updates the existing notification in place
         NotificationManager notificationManager = 
             (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.notify(NOTIFICATION_ID, notification);
+        notificationManager.notify(NOTIFICATION_ID, createNotification(contentText, false, true));
     }
     
     private void broadcastError(String errorMessage) {
