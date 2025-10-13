@@ -201,7 +201,7 @@ public class MainActivity extends Activity {
             // Log.i("MainActivity", "Native stats: " + nativeStats);
             textConnectionStats.setText(nativeStats);
             
-            textStatus.setText("✅ Native SRTLA running");
+            textStatus.setText("✅ Service is running");
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
