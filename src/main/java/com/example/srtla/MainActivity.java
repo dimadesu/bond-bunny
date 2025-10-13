@@ -114,15 +114,6 @@ public class MainActivity extends Activity {
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
         buttonNativeSrtla = findViewById(R.id.button_native_srtla);
         
-        // Set initial logging level for performance
-        // Native service handles logging internally
-        
-        // Add long-click listener to status text for changing log levels
-        textStatus.setOnLongClickListener(v -> {
-            cycleLogLevel();
-            return true;
-        });
-        
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
@@ -326,15 +317,6 @@ public class MainActivity extends Activity {
         
         // Periodically refresh native SRTLA UI state (handles crashes)
         updateNativeSrtlaUI();
-    }
-    
-    /**
-     * Cycle through logging levels on long press
-     */
-    private void cycleLogLevel() {
-        // Native service handles logging internally
-        Toast.makeText(this, "Native SRTLA service handles logging internally", 
-                      Toast.LENGTH_SHORT).show();
     }
     
     @Override
