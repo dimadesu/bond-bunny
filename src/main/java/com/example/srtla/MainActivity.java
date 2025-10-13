@@ -201,8 +201,7 @@ public class MainActivity extends Activity {
             // Log.i("MainActivity", "Native stats: " + nativeStats);
             textConnectionStats.setText(nativeStats);
             
-            // Also update the status to show we're getting stats (for visibility test)
-            textStatus.setText("✅ Native SRTLA running - Stats updating at " + (currentTime % 100000));
+            textStatus.setText("✅ Native SRTLA running");
             
             // Clear the connection window view for native SRTLA (simplified UI)
             connectionWindowView.updateConnectionData(new java.util.ArrayList<>());

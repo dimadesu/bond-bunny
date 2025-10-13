@@ -66,8 +66,7 @@
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
-      android:layout_marginBottom="12dp"
-      android:visibility="gone" />
+      android:layout_marginBottom="12dp" />
 
     <TextView
       android:id="@+id/text_error"
