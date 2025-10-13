@@ -592,10 +592,21 @@ public class NativeSrtlaService extends Service {
     
 
     
+    /**
+     * Create a notification with default settings for running service
+     * (non-dismissible, does not auto-cancel)
+     */
     private Notification createNotification(String contentText) {
         return createNotification(contentText, true, false);
     }
     
+    /**
+     * Create a notification with customizable dismissibility
+     * @param contentText The text to display in the notification
+     * @param ongoing If true, notification cannot be dismissed by user (for running service)
+     * @param autoCancel If true, notification dismisses when tapped (for stopped service)
+     * @return The configured Notification object
+     */
     private Notification createNotification(String contentText, boolean ongoing, boolean autoCancel) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
