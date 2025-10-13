@@ -595,7 +595,7 @@ public class NativeSrtlaService extends Service {
     /**
      * Create a notification with default settings for running service
      * (non-dismissible, does not auto-cancel)
-     * @return The configured Notification object for running service
+     * @return A non-dismissible Notification configured for running service (ongoing=true, autoCancel=false)
      */
     private Notification createNotification(String contentText) {
         return createNotification(contentText, true, false);
