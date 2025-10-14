@@ -13,9 +13,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.ParcelFileDescriptor;
 import android.util.Log;
-import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
@@ -25,10 +23,8 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Android foreground service for native SRTLA implementation
@@ -52,10 +48,17 @@ public class NativeSrtlaService extends Service {
     
     // Network monitoring
     private ConnectivityManager connectivityManager;
-    private NetworkCallback networkCallback;
+    
+    // Dedicated network callbacks for each transport type
+    private ConnectivityManager.NetworkCallback cellularCallback;
+    private ConnectivityManager.NetworkCallback wifiCallback;
+    private ConnectivityManager.NetworkCallback ethernetCallback;
     
     // Virtual connection tracking
     private java.util.Map<String, Integer> virtualConnections = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    // Synchronization for waiting for first network connection
+    private CountDownLatch firstConnectionLatch = new CountDownLatch(1);
     
     // Native methods are accessed through NativeSrtlaJni wrapper
     
@@ -68,7 +71,7 @@ public class NativeSrtlaService extends Service {
         
         // Initialize network monitoring
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        setupNetworkMonitoring();
+        setupDedicatedNetworkCallbacks();
     }
     
     @Override
@@ -101,7 +104,7 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "NativeSrtlaService onDestroy");
         stopNativeSrtla();
         cleanupVirtualConnections();
-        teardownNetworkMonitoring();
+        teardownDedicatedNetworkCallbacks();
         isServiceRunning = false;
         super.onDestroy();
     }
@@ -122,10 +125,11 @@ public class NativeSrtlaService extends Service {
                 return;
             }
             
-            // Setup Application-Level Virtual IPs
-            setupVirtualConnections();
+            // Wait for at least one network to be detected by dedicated callbacks
+            updateNotification("Waiting for network connections...");
+            waitForNetworkConnections();
             
-            // Create IPs file with virtual IPs instead of real IPs
+            // Create IPs file with virtual IPs from detected networks
             File ipsFile = createVirtualIpsFile();
             
             // Update notification
@@ -195,89 +199,24 @@ public class NativeSrtlaService extends Service {
         }
     }
     
-    private File createNetworkIpsFile() throws IOException {
-        File ipsFile = new File(getFilesDir(), "native_srtla_ips.txt");
-        
-        // Delete existing file
-        if (ipsFile.exists()) {
-            ipsFile.delete();
-            Log.i(TAG, "Deleted existing IPs file");
-        }
-        
-        List<String> networkIps = getRealNetworkIPs();
-        if (networkIps.isEmpty()) {
-            throw new RuntimeException("No network interfaces found - device may not be connected to any networks");
-        }
-        
-        try (FileWriter writer = new FileWriter(ipsFile, false)) {
-            for (String ip : networkIps) {
-                writer.write(ip + "\n");
-                Log.i(TAG, "Writing IP to file: " + ip);
-            }
-            writer.flush();
-        }
-        
-        Log.i(TAG, "Created IPs file: " + ipsFile.getAbsolutePath() + 
-              " (size: " + ipsFile.length() + " bytes)");
-        
-        return ipsFile;
-    }
-    
-    private void setupVirtualConnections() {
-        Log.i(TAG, "Setting up Application-Level Virtual IP connections...");
+    /**
+     * Wait for network connections to be detected by dedicated callbacks
+     * This ensures we have at least one network before starting native SRTLA
+     * Simple polling loop until at least 1 connection available
+     */
+    private void waitForNetworkConnections() {
+        Log.i(TAG, "Waiting for connections before starting");
         
         try {
-            // Clean up old virtual connections
-            cleanupVirtualConnections();
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Network[] networks = connectivityManager.getAllNetworks();
-                
-                for (Network network : networks) {
-                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
-                    if (capabilities != null && 
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                        
-                        String realIP = getNetworkIP(network);
-                        if (realIP != null) {
-                            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                                // Setup WiFi virtual connection
-                                int wifiSocket = createNetworkSocket(network);
-                                if (wifiSocket >= 0) {
-                                    virtualConnections.put("10.0.1.1", wifiSocket);
-                                    NativeSrtlaJni.setNetworkSocket("10.0.1.1", realIP, 1, wifiSocket);
-                                    Log.i(TAG, "Setup virtual WiFi connection: 10.0.1.1 -> " + realIP + " (socket: " + wifiSocket + ")");
-                                }
-                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                                // Setup Cellular virtual connection
-                                int cellularSocket = createNetworkSocket(network);
-                                if (cellularSocket >= 0) {
-                                    virtualConnections.put("10.0.2.1", cellularSocket);
-                                    NativeSrtlaJni.setNetworkSocket("10.0.2.1", realIP, 2, cellularSocket);
-                                    Log.i(TAG, "Setup virtual Cellular connection: 10.0.2.1 -> " + realIP + " (socket: " + cellularSocket + ")");
-                                }
-                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                                // Setup Ethernet virtual connection
-                                int ethernetSocket = createNetworkSocket(network);
-                                if (ethernetSocket >= 0) {
-                                    virtualConnections.put("10.0.3.1", ethernetSocket);
-                                    NativeSrtlaJni.setNetworkSocket("10.0.3.1", realIP, 3, ethernetSocket);
-                                    Log.i(TAG, "Setup virtual Ethernet connection: 10.0.3.1 -> " + realIP + " (socket: " + ethernetSocket + ")");
-                                }
-                            }
-                        }
-                    }
-                }
+            // Wait up to 2 seconds for first connection
+            if (firstConnectionLatch.await(2, TimeUnit.SECONDS)) {
+                Log.i(TAG, "Ready to start. " + virtualConnections.size() + " connections available");
+            } else {
+                Log.w(TAG, "Timeout waiting for connections, starting anyway with " + virtualConnections.size() + " connections");
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error setting up virtual connections", e);
+        } catch (InterruptedException e) {
+            Log.w(TAG, "Network wait interrupted", e);
         }
-        
-        Log.i(TAG, "Virtual connections setup complete. Active connections: " + virtualConnections.size());
     }
     
     private void cleanupVirtualConnections() {
@@ -295,113 +234,6 @@ public class NativeSrtlaService extends Service {
         
         virtualConnections.clear();
         Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
-    }
-    
-    private void updateVirtualConnections() {
-        Log.i(TAG, "Updating virtual connections (keeping existing where possible)...");
-        
-        try {
-            // Get current network state
-            java.util.Set<String> currentVirtualIPs = new java.util.HashSet<>();
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Network[] networks = connectivityManager.getAllNetworks();
-                
-                for (Network network : networks) {
-                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
-                    if (capabilities != null && 
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                        
-                        String realIP = getNetworkIP(network);
-                        if (realIP != null) {
-                            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                                currentVirtualIPs.add("10.0.1.1");
-                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                                currentVirtualIPs.add("10.0.2.1");
-                            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                                currentVirtualIPs.add("10.0.3.1");
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Remove virtual connections that are no longer valid
-            java.util.Iterator<java.util.Map.Entry<String, Integer>> iterator = virtualConnections.entrySet().iterator();
-            while (iterator.hasNext()) {
-                java.util.Map.Entry<String, Integer> entry = iterator.next();
-                if (!currentVirtualIPs.contains(entry.getKey())) {
-                    Log.i(TAG, String.format("Removing virtual connection for %s (FD: %d) - ownership transferred to native code", 
-                            entry.getKey(), entry.getValue()));
-                    // Don't close the socket here - it was transferred to native code ownership
-                    // Closing it from Java would cause fdsan crashes. Native code will clean it up.
-                    iterator.remove();
-                }
-            }
-            
-            // Add new virtual connections for networks we don't have yet
-            for (String virtualIP : currentVirtualIPs) {
-                if (!virtualConnections.containsKey(virtualIP)) {
-                    Log.i(TAG, "Adding new virtual connection for " + virtualIP);
-                    // Re-setup this specific virtual connection
-                    setupSpecificVirtualConnection(virtualIP);
-                }
-            }
-            
-            // Update the virtual IPs file
-            createVirtualIpsFile();
-            
-            Log.i(TAG, "Virtual connections update complete. Active: " + virtualConnections.size());
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating virtual connections", e);
-        }
-    }
-    
-    private void setupSpecificVirtualConnection(String virtualIP) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Network[] networks = connectivityManager.getAllNetworks();
-                
-                for (Network network : networks) {
-                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
-                    if (capabilities != null && 
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                        
-                        String realIP = getNetworkIP(network);
-                        if (realIP != null) {
-                            boolean isWiFiRequest = virtualIP.equals("10.0.1.1");
-                            boolean isCellularRequest = virtualIP.equals("10.0.2.1");
-                            boolean isEthernetRequest = virtualIP.equals("10.0.3.1");
-                            boolean isWiFiNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-                            boolean isCellularNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
-                            boolean isEthernetNetwork = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET);
-                            
-                            if ((isWiFiRequest && isWiFiNetwork) || (isCellularRequest && isCellularNetwork) || (isEthernetRequest && isEthernetNetwork)) {
-                                int socket = createNetworkSocket(network);
-                                if (socket >= 0) {
-                                    virtualConnections.put(virtualIP, socket);
-                                    int networkType = isWiFiNetwork ? 1 : (isCellularNetwork ? 2 : 3);
-                                    NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkType, socket);
-                                    Log.i(TAG, "Setup virtual connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error setting up virtual connection for " + virtualIP, e);
-        }
     }
     
     private File createVirtualIpsFile() throws IOException {
@@ -481,31 +313,6 @@ public class NativeSrtlaService extends Service {
         }
     }
     
-
-    
-    private java.net.InetAddress getNetworkLocalAddress(Network network) {
-        try {
-            LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
-            if (linkProperties != null) {
-                for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
-                    java.net.InetAddress address = linkAddress.getAddress();
-                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
-                        return address;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting network local address", e);
-        }
-        return null;
-    }
-    
-    private void storeNetworkSocket(Network network, int socketFD) {
-        // Store the network-socket mapping for potential future use
-        // For now, just log it - the socket FD will be passed to native code
-        Log.i(TAG, "Stored mapping: Network " + network + " -> Socket FD " + socketFD);
-    }
-    
     private String getNetworkIP(Network network) {
         try {
             LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
@@ -522,95 +329,7 @@ public class NativeSrtlaService extends Service {
         }
         return null;
     }
-    
-    private List<String> getRealNetworkIPs() {
-        List<String> ips = new ArrayList<>();
-        
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Use ConnectivityManager to get only actually connected networks
-                Network[] networks = connectivityManager.getAllNetworks();
-                
-                for (Network network : networks) {
-                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
-                    if (capabilities != null && 
-                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                         capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                        
-                        // Get the network's interface
-                        android.net.LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
-                        if (linkProperties != null) {
-                            for (android.net.LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
-                                java.net.InetAddress address = linkAddress.getAddress();
-                                if (address instanceof Inet4Address && 
-                                    !address.isLoopbackAddress() && 
-                                    !address.isLinkLocalAddress()) {
-                                    
-                                    String ip = address.getHostAddress();
-                                    String interfaceName = linkProperties.getInterfaceName();
-                                    
-                                    // Determine network type
-                                    String networkType = "unknown";
-                                    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                                        networkType = "WiFi";
-                                    } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                                        networkType = "Cellular";
-                                    } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                                        networkType = "Ethernet";
-                                    }
-                                    
-                                    ips.add(ip);
-                                    Log.i(TAG, "Found active network IP: " + ip + 
-                                          " on interface: " + interfaceName + 
-                                          " type: " + networkType);
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Fallback for older Android versions
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                
-                while (interfaces.hasMoreElements()) {
-                    NetworkInterface networkInterface = interfaces.nextElement();
-                    
-                    // Skip loopback and inactive interfaces
-                    if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                        continue;
-                    }
-                    
-                    Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
-                    
-                    while (addresses.hasMoreElements()) {
-                        InetAddress address = addresses.nextElement();
-                        
-                        // Only IPv4, not loopback, not link-local
-                        if (address instanceof Inet4Address && 
-                            !address.isLoopbackAddress() && 
-                            !address.isLinkLocalAddress()) {
-                            
-                            String ip = address.getHostAddress();
-                            ips.add(ip);
-                            Log.i(TAG, "Found network IP (fallback): " + ip + 
-                                  " on interface: " + networkInterface.getName());
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting network IPs", e);
-        }
-        
-        Log.i(TAG, "Total active network IPs found: " + ips.size());
-        return ips;
-    }
-    
 
-    
     /**
      * Create a notification with default settings for running service
      * (non-dismissible, does not auto-cancel)
@@ -767,100 +486,186 @@ public class NativeSrtlaService extends Service {
     }
     
     /**
-     * Set up network monitoring to detect WiFi/cellular changes
+     * Set up dedicated network callbacks for each transport type
+     * This ensures we detect all networks even on Samsung devices where getAllNetworks() might miss some
      */
-    private void setupNetworkMonitoring() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            networkCallback = new NetworkCallback();
-            
-            // Monitor all networks (WiFi, cellular, etc.)
-            NetworkRequest.Builder builder = new NetworkRequest.Builder();
-            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-            
-            connectivityManager.registerNetworkCallback(builder.build(), networkCallback);
-            Log.i(TAG, "Network monitoring enabled");
-        } else {
-            Log.w(TAG, "Network monitoring not available on this Android version");
-        }
-    }
-    
-    /**
-     * Clean up network monitoring
-     */
-    private void teardownNetworkMonitoring() {
-        if (networkCallback != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            try {
-                connectivityManager.unregisterNetworkCallback(networkCallback);
-                Log.i(TAG, "Network monitoring disabled");
-            } catch (Exception e) {
-                Log.w(TAG, "Error unregistering network callback", e);
-            }
-            networkCallback = null;
-        }
-    }
-    
-    /**
-     * Network callback to detect connectivity changes
-     */
-    private class NetworkCallback extends ConnectivityManager.NetworkCallback {
-        @Override
-        public void onAvailable(Network network) {
-            Log.i(TAG, "Network available: " + network);
-            if (isServiceRunning) {
-                handleNetworkChange("Network available");
-            }
+    private void setupDedicatedNetworkCallbacks() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            Log.w(TAG, "Dedicated network callbacks not available on this Android version");
+            return;
         }
         
-        @Override
-        public void onLost(Network network) {
-            Log.i(TAG, "Network lost: " + network);
-            if (isServiceRunning) {
-                handleNetworkChange("Network lost");
-            }
-        }
+        Log.i(TAG, "Setting up dedicated network callbacks...");
         
-        @Override
-        public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
-            Log.i(TAG, "Network capabilities changed: " + network);
-            if (isServiceRunning) {
-                handleNetworkChange("Network capabilities changed");
-            }
-        }
+        // Create and register callbacks for each network type
+        cellularCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_CELLULAR, "CELLULAR");
+        wifiCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_WIFI, "WIFI");
+        ethernetCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_ETHERNET, "ETHERNET");
+        
+        Log.i(TAG, "Dedicated network callbacks setup complete");
     }
     
     /**
-     * Handle network changes by updating SRTLA connections
+     * Create and register a network callback for a specific transport type
      */
-    private void handleNetworkChange(String reason) {
-        Log.i(TAG, "Handling network change: " + reason);
+    private ConnectivityManager.NetworkCallback registerNetworkCallback(int transportType, String networkTypeName) {
+        ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                try {
+                    Log.i(TAG, "DEDICATED: Got " + networkTypeName.toLowerCase() + " network available: " + network);
+                    handleDedicatedNetworkAvailable(network, networkTypeName, "");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in dedicated " + networkTypeName.toLowerCase() + " callback", e);
+                }
+            }
+            
+            @Override
+            public void onLost(Network network) {
+                Log.i(TAG, "DEDICATED: Lost " + networkTypeName.toLowerCase() + " network: " + network);
+                handleDedicatedNetworkLost(network, networkTypeName);
+            }
+        };
         
         try {
-            // Check if SRTLA is actively running before disrupting connections
-            boolean srtlaRunning = isServiceRunning && NativeSrtlaJni.isRunningSrtlaNative();
+            NetworkRequest request = new NetworkRequest.Builder()
+                .addTransportType(transportType)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build();
+            connectivityManager.requestNetwork(request, callback);
+            Log.i(TAG, "Registered dedicated " + networkTypeName + " network callback");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to register " + networkTypeName.toLowerCase() + " callback", e);
+        }
+        
+        return callback;
+    }
+    
+    /**
+     * Get virtual IP for a given network type
+     */
+    private String getVirtualIPForNetworkType(String networkType) {
+        switch (networkType) {
+            case "WIFI":
+                return "10.0.1.1";
+            case "CELLULAR":
+                return "10.0.2.1";
+            case "ETHERNET":
+                return "10.0.3.1";
+            default:
+                return null;
+        }
+    }
+    
+    /**
+     * Get network type ID for a given network type
+     */
+    private int getNetworkTypeId(String networkType) {
+        switch (networkType) {
+            case "WIFI":
+                return 1;
+            case "CELLULAR":
+                return 2;
+            case "ETHERNET":
+                return 3;
+            default:
+                return 0;
+        }
+    }
+    
+    /**
+     * Handle when a dedicated network callback detects an available network
+     */
+    private synchronized void handleDedicatedNetworkAvailable(Network network, String networkType, String operatorName) {
+        try {
+            String realIP = getNetworkIP(network);
+            if (realIP != null) {
+                String virtualIP = getVirtualIPForNetworkType(networkType);
+                int networkTypeId = getNetworkTypeId(networkType);
+                
+                if (virtualIP != null && !virtualConnections.containsKey(virtualIP)) {
+                    Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
+                    int socket = createNetworkSocket(network);
+                    if (socket >= 0) {
+                        virtualConnections.put(virtualIP, socket);
+                        NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
+                        Log.i(TAG, "DEDICATED: Successfully setup " + networkType + " connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
+                        
+                        // Signal that we have our first connection
+                        firstConnectionLatch.countDown();
+                        
+                        // Update virtual IPs file if service is running
+                        if (isServiceRunning) {
+                            try {
+                                createVirtualIpsFile();
+                                NativeSrtlaJni.notifyNetworkChange();
+                                Log.i(TAG, "DEDICATED: Updated virtual IPs file and notified native code of " + networkType + " network change");
+                            } catch (Exception e) {
+                                Log.w(TAG, "Error updating virtual IPs file after dedicated network change", e);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling dedicated " + networkType + " network available", e);
+        }
+    }
+    
+    /**
+     * Handle when a dedicated network callback detects a lost network
+     */
+    private void handleDedicatedNetworkLost(Network network, String networkType) {
+        try {
+            String virtualIP = getVirtualIPForNetworkType(networkType);
             
-            if (srtlaRunning) {
-                // For running SRTLA, use conservative update approach
-                Log.i(TAG, "SRTLA is running - using conservative virtual connection update");
-                updateVirtualConnections();
-                NativeSrtlaJni.notifyNetworkChange();
-            } else {
-                // SRTLA not running - safe to recreate virtual connections from scratch
-                Log.i(TAG, "SRTLA not running - recreating virtual connections from scratch");
-                setupVirtualConnections();
+            if (virtualIP != null && virtualConnections.containsKey(virtualIP)) {
+                Log.i(TAG, "DEDICATED: Removing " + networkType + " connection: " + virtualIP);
+                // Note: Don't close socket here - native code owns it
+                virtualConnections.remove(virtualIP);
+                
+                // Update virtual IPs file if service is running
+                if (isServiceRunning) {
+                    try {
+                        createVirtualIpsFile();
+                        NativeSrtlaJni.notifyNetworkChange();
+                        Log.i(TAG, "DEDICATED: Updated virtual IPs file and notified native code of " + networkType + " network loss");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error updating virtual IPs file after dedicated network loss", e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error handling dedicated " + networkType + " network lost", e);
+        }
+    }
+    
+    /**
+     * Clean up dedicated network callbacks
+     */
+    private void teardownDedicatedNetworkCallbacks() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                if (cellularCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(cellularCallback);
+                    Log.i(TAG, "Unregistered dedicated cellular callback");
+                }
+                if (wifiCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(wifiCallback);
+                    Log.i(TAG, "Unregistered dedicated WiFi callback");
+                }
+                if (ethernetCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(ethernetCallback);
+                    Log.i(TAG, "Unregistered dedicated ethernet callback");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error unregistering dedicated network callbacks", e);
             }
             
-            Log.i(TAG, "Completed network change handling");
-            
-            // Don't update notification text during network changes while service is running
-            // This keeps the notification stable and less confusing for users
-            
-            // Broadcast network change to update UI immediately
-            Intent networkChangeIntent = new Intent("com.example.srtla.NETWORK_CHANGED");
-            networkChangeIntent.putExtra("reason", reason);
-            sendBroadcast(networkChangeIntent);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling network change", e);
+            cellularCallback = null;
+            wifiCallback = null;
+            ethernetCallback = null;
         }
     }
     
