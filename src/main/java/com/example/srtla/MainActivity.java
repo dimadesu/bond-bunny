@@ -438,25 +438,51 @@ public class MainActivity extends Activity {
             textStatus.setText("⏳ Service starting...");
             Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
             
-            // Update UI after a short delay to allow service to start
-            uiHandler.postDelayed(() -> {
-                Log.i("MainActivity", "Delayed callback: checking native SRTLA status");
-                updateNativeSrtlaUI();
-                if (NativeSrtlaService.isServiceRunning()) {
-                    Log.i("MainActivity", "Native SRTLA is running, starting stats updates");
-                    textStatus.setText("✅ Service is running");
-                    // Start stats updates for native SRTLA
-                    startStatsUpdates();
-                } else {
-                    Log.i("MainActivity", "Service is not running");
-                    textStatus.setText("❌ Service failed to start");
-                }
-            }, 2000); // Wait 2 seconds for service to start
+            // Poll service status intelligently instead of fixed delay
+            pollServiceStartup(0);
             
         } catch (Exception e) {
             textStatus.setText("❌ Error starting service: " + e.getMessage());
             Log.e("MainActivity", "Native SRTLA service start error", e);
         }
+    }
+    
+    /**
+     * Poll service startup status with 500ms intervals
+     * Times out after 3 seconds (6 attempts)
+     */
+    private void pollServiceStartup(int attemptCount) {
+        final int maxAttempts = 6; // Maximum attempts (3 seconds total)
+        
+        if (attemptCount >= maxAttempts) {
+            Log.i("MainActivity", "Service startup polling timed out after 3 seconds");
+            textStatus.setText("❌ Service startup timed out");
+            return;
+        }
+        
+        // Check if service started successfully
+        if (NativeSrtlaService.isServiceRunning()) {
+            Log.i("MainActivity", "Service started successfully after " + attemptCount + " polling attempts");
+            textStatus.setText("✅ Service is running");
+            updateNativeSrtlaUI();
+            startStatsUpdates();
+            return;
+        }
+        
+        // Check if service failed (error receiver would have been triggered)
+        if (!textError.getText().toString().isEmpty()) {
+            Log.i("MainActivity", "Service startup failed with error after " + attemptCount + " attempts");
+            textStatus.setText("❌ Service failed to start");
+            return;
+        }
+        
+        // Continue polling - use 500ms intervals for 3 second timeout
+        int delay = 500; // 500ms intervals (6 attempts = 3 seconds)
+        
+        uiHandler.postDelayed(() -> {
+            Log.i("MainActivity", "Polling service startup - attempt " + (attemptCount + 1));
+            pollServiceStartup(attemptCount + 1);
+        }, delay);
     }
     
     private void stopNativeSrtla() {
