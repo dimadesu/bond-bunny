@@ -96,6 +96,7 @@
       android:text="No active connections"
       android:textSize="14sp"
       android:fontFamily="monospace"
+      android:textColor="#212529"
       android:padding="12dp"
       android:background="#e8f5e8"
       android:layout_marginBottom="16dp" />
