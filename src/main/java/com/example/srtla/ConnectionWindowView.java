@@ -112,21 +112,6 @@ public class ConnectionWindowView extends View {
         int padding = 40;
         int connectionHeight = (height - padding * 2) / Math.max(connectionData.size(), 1);
         
-        // Calculate total bitrate
-        double totalBitrate = 0;
-        for (ConnectionWindowData conn : connectionData) {
-            if (conn.isActive) {
-                totalBitrate += conn.bitrateBps;
-            }
-        }
-        
-        // Draw total bitrate at the top
-        textPaint.setTextSize(40);
-        textPaint.setColor(Color.parseColor("#28a745"));
-        String totalBitrateText = "📊 Total: " + formatBitrate(totalBitrate);
-        float totalBitrateWidth = textPaint.measureText(totalBitrateText);
-        canvas.drawText(totalBitrateText, width - padding - totalBitrateWidth, padding - 10, textPaint);
-        
         for (int i = 0; i < connectionData.size(); i++) {
             ConnectionWindowData conn = connectionData.get(i);
             int y = padding + i * connectionHeight;
