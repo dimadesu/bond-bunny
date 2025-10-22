@@ -170,11 +170,11 @@ public class ConnectionWindowView extends View {
         textPaint.setColor(Color.parseColor("#212529"));
         String networkIcon = getNetworkIcon(conn.networkType);
         String title = networkIcon + " " + conn.networkType + " (" + conn.state + ")";
-        canvas.drawText(title, x + 20, y + 40, textPaint);
+        canvas.drawText(title, x + 20, y + 45, textPaint);
         
         // Window visualization
-        int barY = y + 65;
-        int barHeight = 28;
+        int barY = y + 75;
+        int barHeight = 32;
         int barWidth = width - 40;
         
         // Window capacity bar
@@ -197,7 +197,7 @@ public class ConnectionWindowView extends View {
         textPaint.setTextSize(36);
         textPaint.setColor(Color.parseColor("#495057"));
         String windowStats = String.format("Window: %,d / %,d", conn.window, MAX_WINDOW_SIZE);
-        canvas.drawText(windowStats, x + 20, barY + barHeight + 30, textPaint);
+        canvas.drawText(windowStats, x + 20, barY + barHeight + 35, textPaint);
     }
     
     private String getNetworkIcon(String networkType) {
