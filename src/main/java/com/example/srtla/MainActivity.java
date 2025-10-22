@@ -492,6 +492,9 @@ public class MainActivity extends Activity {
             NativeSrtlaService.stopService(this);
             Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
             
+            // Stop stats updates and clear display immediately
+            stopStatsUpdates();
+            
             // Update UI after a short delay to allow service to stop
             uiHandler.postDelayed(() -> {
                 updateNativeSrtlaUI();
