@@ -11,6 +11,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -64,6 +65,9 @@ public class NativeSrtlaService extends Service {
     // Wakelock to keep CPU awake during network operations
     private PowerManager.WakeLock wakeLock;
     
+    // Wi-Fi lock to maintain high-performance Wi-Fi
+    private WifiManager.WifiLock wifiLock;
+    
     // Native methods are accessed through NativeSrtlaJni wrapper
     
     @Override
@@ -82,6 +86,12 @@ public class NativeSrtlaService extends Service {
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SRTLA::NetworkWakeLock");
         wakeLock.acquire();
         Log.i(TAG, "WakeLock acquired");
+        
+        // Acquire Wi-Fi lock to maintain high-performance Wi-Fi
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "SRTLA::WifiLock");
+        wifiLock.acquire();
+        Log.i(TAG, "Wi-Fi lock acquired");
     }
     
     @Override
@@ -120,6 +130,12 @@ public class NativeSrtlaService extends Service {
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
             Log.i(TAG, "WakeLock released");
+        }
+        
+        // Release Wi-Fi lock
+        if (wifiLock != null && wifiLock.isHeld()) {
+            wifiLock.release();
+            Log.i(TAG, "Wi-Fi lock released");
         }
         
         isServiceRunning = false;
