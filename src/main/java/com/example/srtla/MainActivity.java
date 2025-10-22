@@ -180,15 +180,11 @@ public class MainActivity extends Activity {
         Log.i("MainActivity", "stopStatsUpdates called - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
         if (statsUpdateRunnable != null) {
             uiHandler.removeCallbacks(statsUpdateRunnable);
-            // Only clear stats if no services are running
-            if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
-                Log.i("MainActivity", "Clearing stats display - no services running");
-                textConnectionStats.setText("No active connections");
-                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
-            } else {
-                Log.i("MainActivity", "Not clearing stats - service still running");
-            }
         }
+        // Always clear stats when explicitly stopping updates
+        Log.i("MainActivity", "Clearing stats display");
+        textConnectionStats.setText("No active connections");
+        connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
     }
     
     private void updateConnectionStats() {
@@ -491,6 +487,9 @@ public class MainActivity extends Activity {
         try {
             NativeSrtlaService.stopService(this);
             Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
+            
+            // Stop stats updates and clear display immediately
+            stopStatsUpdates();
             
             // Update UI after a short delay to allow service to stop
             uiHandler.postDelayed(() -> {
