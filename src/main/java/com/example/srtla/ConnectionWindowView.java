@@ -76,7 +76,7 @@ public class ConnectionWindowView extends View {
         
         textPaint = new Paint();
         textPaint.setColor(Color.parseColor("#495057"));
-        textPaint.setTextSize(32);
+        textPaint.setTextSize(36);
         textPaint.setAntiAlias(true);
         
         windowBarPaint = new Paint();
@@ -89,7 +89,7 @@ public class ConnectionWindowView extends View {
         
         scorePaint = new Paint();
         scorePaint.setColor(Color.parseColor("#6c757d"));
-        scorePaint.setTextSize(28);
+        scorePaint.setTextSize(32);
         scorePaint.setAntiAlias(true);
     }
     
@@ -121,7 +121,7 @@ public class ConnectionWindowView extends View {
         }
         
         // Draw total bitrate at the top
-        textPaint.setTextSize(32);
+        textPaint.setTextSize(40);
         textPaint.setColor(Color.parseColor("#28a745"));
         String totalBitrateText = "📊 Total: " + formatBitrate(totalBitrate);
         float totalBitrateWidth = textPaint.measureText(totalBitrateText);
@@ -138,7 +138,7 @@ public class ConnectionWindowView extends View {
         int centerX = getWidth() / 2;
         int centerY = getHeight() / 2;
         
-        textPaint.setTextSize(32);
+        textPaint.setTextSize(36);
         textPaint.setColor(Color.parseColor("#6c757d"));
         String text = "No active connections";
         float textWidth = textPaint.measureText(text);
@@ -166,15 +166,15 @@ public class ConnectionWindowView extends View {
         canvas.drawRoundRect(bgRect, 8, 8, borderPaint);
         
         // Network type and status
-        textPaint.setTextSize(32);
+        textPaint.setTextSize(40);
         textPaint.setColor(Color.parseColor("#212529"));
         String networkIcon = getNetworkIcon(conn.networkType);
         String title = networkIcon + " " + conn.networkType + " (" + conn.state + ")";
-        canvas.drawText(title, x + 20, y + 35, textPaint);
+        canvas.drawText(title, x + 20, y + 40, textPaint);
         
         // Window visualization
-        int barY = y + 50;
-        int barHeight = 25;
+        int barY = y + 65;
+        int barHeight = 28;
         int barWidth = width - 40;
         
         // Window capacity bar
@@ -193,45 +193,11 @@ public class ConnectionWindowView extends View {
         RectF windowRect = new RectF(x + 20, barY, x + 20 + windowBarWidth, barY + barHeight);
         canvas.drawRoundRect(windowRect, 4, 4, windowBarPaint);
         
-        // In-flight packets overlay
-        if (conn.inFlightPackets > 0) {
-            float inFlightRatio = Math.min((float) conn.inFlightPackets / conn.window, 1.0f);
-            int inFlightBarWidth = (int) (windowBarWidth * inFlightRatio);
-            
-            inFlightBarPaint.setColor(Color.parseColor("#17a2b8")); // Cyan for in-flight
-            inFlightBarPaint.setAlpha(150); // Semi-transparent
-            
-            RectF inFlightRect = new RectF(x + 20, barY, x + 20 + inFlightBarWidth, barY + barHeight);
-            canvas.drawRoundRect(inFlightRect, 4, 4, inFlightBarPaint);
-        }
-        
         // Window statistics text
-        textPaint.setTextSize(28);
+        textPaint.setTextSize(36);
         textPaint.setColor(Color.parseColor("#495057"));
-        String windowStats = String.format("Window: %,d / %,d  •  In-flight: %,d", 
-                                          conn.window, MAX_WINDOW_SIZE, conn.inFlightPackets);
-        canvas.drawText(windowStats, x + 20, barY + barHeight + 25, textPaint);
-        
-        // Score, RTT, and Bitrate
-        scorePaint.setTextSize(26);
-        scorePaint.setColor(Color.parseColor("#6c757d"));
-        String bitrateText = formatBitrate(conn.bitrateBps);
-        String rttText = conn.rtt > 0 ? conn.rtt + "ms" : "N/A";
-        String scoreText = conn.score > 0 ? String.valueOf(conn.score) : "N/A";
-        String displayText = String.format("Score: %s  •  RTT: %s  •  %s", 
-                                          scoreText, rttText, bitrateText);
-        canvas.drawText(displayText, x + 20, barY + barHeight + 50, scorePaint);
-        
-        // Window utilization percentage
-        float utilization = conn.window > 0 ? (float) conn.inFlightPackets / conn.window * 100 : 0;
-        String utilizationText = String.format("Utilization: %.1f%%", utilization);
-        
-        scorePaint.setColor(utilization > 80 ? Color.parseColor("#dc3545") : 
-                           utilization > 60 ? Color.parseColor("#ffc107") : 
-                           Color.parseColor("#28a745"));
-        
-        float utilizationWidth = scorePaint.measureText(utilizationText);
-        canvas.drawText(utilizationText, x + width - 20 - utilizationWidth, barY + barHeight + 50, scorePaint);
+        String windowStats = String.format("Window: %,d / %,d", conn.window, MAX_WINDOW_SIZE);
+        canvas.drawText(windowStats, x + 20, barY + barHeight + 30, textPaint);
     }
     
     private String getNetworkIcon(String networkType) {
@@ -258,7 +224,7 @@ public class ConnectionWindowView extends View {
     
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int desiredHeight = Math.max(connectionData.size() * 150 + 120, 200);
+        int desiredHeight = Math.max(connectionData.size() * 160 + 120, 200);
         int height = resolveSize(desiredHeight, heightMeasureSpec);
         int width = MeasureSpec.getSize(widthMeasureSpec);
         setMeasuredDimension(width, height);
