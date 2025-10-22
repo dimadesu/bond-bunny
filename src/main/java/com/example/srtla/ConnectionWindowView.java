@@ -120,13 +120,7 @@ public class ConnectionWindowView extends View {
             }
         }
         
-        // Draw title with total bitrate
-        textPaint.setTextSize(36);
-        textPaint.setColor(Color.parseColor("#212529"));
-        String title = "🔗 Connection Windows";
-        canvas.drawText(title, padding, padding - 10, textPaint);
-        
-        // Draw total bitrate on the right side of the title
+        // Draw total bitrate at the top
         textPaint.setTextSize(32);
         textPaint.setColor(Color.parseColor("#28a745"));
         String totalBitrateText = "📊 Total: " + formatBitrate(totalBitrate);
