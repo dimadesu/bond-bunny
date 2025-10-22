@@ -113,7 +113,7 @@
     <com.example.srtla.ConnectionWindowView
       android:id="@+id/connection_window_view"
       android:layout_width="match_parent"
-      android:layout_height="200dp"
+      android:layout_height="wrap_content"
       android:layout_marginBottom="16dp"
       android:background="#ffffff"
       android:elevation="2dp" />
