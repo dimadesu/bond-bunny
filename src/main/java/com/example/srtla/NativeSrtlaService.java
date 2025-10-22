@@ -13,6 +13,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import android.net.LinkAddress;
@@ -60,6 +61,9 @@ public class NativeSrtlaService extends Service {
     // Synchronization for waiting for first network connection
     private CountDownLatch firstConnectionLatch = new CountDownLatch(1);
     
+    // Wakelock to keep CPU awake during network operations
+    private PowerManager.WakeLock wakeLock;
+    
     // Native methods are accessed through NativeSrtlaJni wrapper
     
     @Override
@@ -72,6 +76,12 @@ public class NativeSrtlaService extends Service {
         // Initialize network monitoring
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         setupDedicatedNetworkCallbacks();
+        
+        // Acquire wakelock to keep CPU awake during network operations
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SRTLA::NetworkWakeLock");
+        wakeLock.acquire();
+        Log.i(TAG, "WakeLock acquired");
     }
     
     @Override
@@ -105,6 +115,13 @@ public class NativeSrtlaService extends Service {
         stopNativeSrtla();
         cleanupVirtualConnections();
         teardownDedicatedNetworkCallbacks();
+        
+        // Release wakelock
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            Log.i(TAG, "WakeLock released");
+        }
+        
         isServiceRunning = false;
         super.onDestroy();
     }
