@@ -109,13 +109,14 @@ public class ConnectionWindowView extends View {
         
         int width = getWidth();
         int height = getHeight();
-        int padding = 40;
-        int connectionHeight = (height - padding * 2) / Math.max(connectionData.size(), 1);
+        int outerPadding = 20;
+        int connectionSpacing = 20;
+        int connectionHeight = (height - outerPadding * 2 - connectionSpacing * (connectionData.size() - 1)) / Math.max(connectionData.size(), 1);
         
         for (int i = 0; i < connectionData.size(); i++) {
             ConnectionWindowData conn = connectionData.get(i);
-            int y = padding + i * connectionHeight;
-            drawConnection(canvas, conn, padding, y, width - padding * 2, connectionHeight - 20);
+            int y = outerPadding + i * (connectionHeight + connectionSpacing);
+            drawConnection(canvas, conn, outerPadding, y, width - outerPadding * 2, connectionHeight);
         }
     }
     
@@ -150,17 +151,20 @@ public class ConnectionWindowView extends View {
         canvas.drawRoundRect(bgRect, 8, 8, backgroundPaint);
         canvas.drawRoundRect(bgRect, 8, 8, borderPaint);
         
+        // Consistent internal padding
+        int internalPadding = 20;
+        
         // Network type and status
         textPaint.setTextSize(40);
         textPaint.setColor(Color.parseColor("#212529"));
         String networkIcon = getNetworkIcon(conn.networkType);
         String title = networkIcon + " " + conn.networkType + " (" + conn.state + ")";
-        canvas.drawText(title, x + 20, y + 45, textPaint);
+        canvas.drawText(title, x + internalPadding, y + internalPadding + 35, textPaint);
         
         // Window visualization
-        int barY = y + 75;
+        int barY = y + internalPadding + 55;
         int barHeight = 32;
-        int barWidth = width - 40;
+        int barWidth = width - (internalPadding * 2);
         
         // Window capacity bar
         float windowRatio = Math.min((float) conn.window / MAX_WINDOW_SIZE, 1.0f);
@@ -175,14 +179,14 @@ public class ConnectionWindowView extends View {
             windowBarPaint.setColor(Color.parseColor("#dc3545")); // Red - low window
         }
         
-        RectF windowRect = new RectF(x + 20, barY, x + 20 + windowBarWidth, barY + barHeight);
+        RectF windowRect = new RectF(x + internalPadding, barY, x + internalPadding + windowBarWidth, barY + barHeight);
         canvas.drawRoundRect(windowRect, 4, 4, windowBarPaint);
         
         // Window statistics text
         textPaint.setTextSize(36);
         textPaint.setColor(Color.parseColor("#495057"));
         String windowStats = String.format("Window: %,d / %,d", conn.window, MAX_WINDOW_SIZE);
-        canvas.drawText(windowStats, x + 20, barY + barHeight + 35, textPaint);
+        canvas.drawText(windowStats, x + internalPadding, barY + barHeight + 35, textPaint);
     }
     
     private String getNetworkIcon(String networkType) {
