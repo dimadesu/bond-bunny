@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical"
+  android:padding="12dp"
+  android:background="#e8f5e8"
+  android:layout_marginBottom="4dp">
+
+  <!-- Connection header with network type and status -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="8dp">
+
+    <TextView
+      android:id="@+id/connection_network_type"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="📶 WIFI"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:textColor="#212529" />
+
+    <TextView
+      android:id="@+id/connection_status"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="ACTIVE"
+      android:textSize="14sp"
+      android:textStyle="bold"
+      android:textColor="#28a745"
+      android:layout_marginStart="8dp" />
+  </LinearLayout>
+
+  <!-- Window bar visualization -->
+  <com.example.srtla.WindowBarView
+    android:id="@+id/window_bar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp" />
+
+  <!-- Stats text -->
+  <TextView
+    android:id="@+id/connection_stats_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Window: 15,000 / 60,000\nRTT: 25ms • Load: 45%"
+    android:textSize="13sp"
+    android:fontFamily="monospace"
+    android:textColor="#495057" />
+
+</LinearLayout>

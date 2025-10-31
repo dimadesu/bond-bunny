@@ -80,43 +80,36 @@
       android:background="#FFEBEE"
       android:padding="8dp" />
 
-    <!-- Connection Statistics Section -->
+    <!-- Connections Section (combined stats + visualization) -->
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="📊 Connection Statistics:"
+      android:text="📊 Active Connections:"
       android:textSize="16sp"
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
 
-    <TextView
-      android:id="@+id/text_connection_stats"
+    <!-- Container for dynamically added connection items -->
+    <LinearLayout
+      android:id="@+id/connections_container"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="No active connections"
-      android:textSize="14sp"
-      android:fontFamily="monospace"
-      android:textColor="#212529"
-      android:padding="12dp"
-      android:background="#e8f5e8"
-      android:layout_marginBottom="16dp" />
+      android:orientation="vertical"
+      android:layout_marginBottom="16dp">
 
-    <!-- Connection Windows Visualization -->
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="📈 Connection Windows:"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:layout_marginBottom="8dp" />
-
-    <com.example.srtla.ConnectionWindowView
-      android:id="@+id/connection_window_view"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginBottom="16dp"
-      android:background="#ffffff"
-      android:elevation="2dp" />
+      <!-- Default "no connections" message -->
+      <TextView
+        android:id="@+id/text_no_connections"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No active connections"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:textColor="#6c757d"
+        android:padding="12dp"
+        android:background="#e8f5e8"
+        android:gravity="center" />
+    </LinearLayout>
 
   </LinearLayout>
 
