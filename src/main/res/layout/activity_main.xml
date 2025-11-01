@@ -66,6 +66,7 @@
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
+      android:textColor="#495057"
       android:layout_marginBottom="12dp" />
 
     <TextView
@@ -80,43 +81,50 @@
       android:background="#FFEBEE"
       android:padding="8dp" />
 
-    <!-- Connection Statistics Section -->
+    <!-- Connections Section (combined stats + visualization) -->
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="📊 Connection Statistics:"
+      android:text="Connection Stats:"
       android:textSize="16sp"
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
 
+    <!-- Total Bitrate Display -->
     <TextView
-      android:id="@+id/text_connection_stats"
+      android:id="@+id/text_total_bitrate"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="No active connections"
-      android:textSize="14sp"
-      android:fontFamily="monospace"
-      android:textColor="#212529"
-      android:padding="12dp"
-      android:background="#e8f5e8"
-      android:layout_marginBottom="16dp" />
-
-    <!-- Connection Windows Visualization -->
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="📈 Connection Windows:"
+      android:text="Total: 0.0 Mbps"
       android:textSize="16sp"
-      android:textStyle="bold"
-      android:layout_marginBottom="8dp" />
+      android:textColor="#495057"
+      android:paddingTop="8dp"
+      android:paddingLeft="12dp"
+      android:paddingRight="12dp"
+      android:paddingBottom="8dp"
+      android:background="#F0F0F0"
+      android:layout_marginBottom="4dp" />
 
-    <com.example.srtla.ConnectionWindowView
-      android:id="@+id/connection_window_view"
+    <!-- Container for dynamically added connection items -->
+    <LinearLayout
+      android:id="@+id/connections_container"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:layout_marginBottom="16dp"
-      android:background="#ffffff"
-      android:elevation="2dp" />
+      android:orientation="vertical"
+      android:layout_marginBottom="16dp">
+
+      <!-- Default "no connections" message -->
+      <TextView
+        android:id="@+id/text_no_connections"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No active connections"
+        android:textSize="16sp"
+        android:textColor="#495057"
+        android:padding="12dp"
+        android:background="#F0F0F0"
+        android:gravity="center" />
+    </LinearLayout>
 
   </LinearLayout>
 

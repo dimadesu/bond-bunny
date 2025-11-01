@@ -15,6 +15,7 @@ import android.text.Editable;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,9 +44,9 @@ public class MainActivity extends Activity {
     
     private TextView textStatus;
     private TextView textError;
-    private TextView textNetworks;
-    private TextView textConnectionStats;
-    private ConnectionWindowView connectionWindowView;
+    private TextView textTotalBitrate;
+    private LinearLayout connectionsContainer;
+    private TextView textNoConnections;
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
@@ -101,8 +102,9 @@ public class MainActivity extends Activity {
     private void initViews() {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
-        textConnectionStats = findViewById(R.id.text_connection_stats);
-        connectionWindowView = findViewById(R.id.connection_window_view);
+        textTotalBitrate = findViewById(R.id.text_total_bitrate);
+        connectionsContainer = findViewById(R.id.connections_container);
+        textNoConnections = findViewById(R.id.text_no_connections);
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
@@ -144,14 +146,24 @@ public class MainActivity extends Activity {
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
-                textConnectionStats.setText("No active connections");
-                connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+                clearConnectionsDisplay();
             } else {
                 Log.i("MainActivity", "updateUI: Not clearing connection stats - native SRTLA still running");
             }
         }
     }
     
+    private void clearConnectionsDisplay() {
+        // Remove all dynamically added connection views
+        connectionsContainer.removeAllViews();
+        
+        // Hide total bitrate when no connections
+        textTotalBitrate.setVisibility(android.view.View.GONE);
+        
+        // Show the "no connections" message
+        textNoConnections.setVisibility(android.view.View.VISIBLE);
+        connectionsContainer.addView(textNoConnections);
+    }
     
     private void startStatsUpdates() {
         Log.i("MainActivity", "Starting stats updates");
@@ -183,29 +195,133 @@ public class MainActivity extends Activity {
         }
         // Always clear stats when explicitly stopping updates
         Log.i("MainActivity", "Clearing stats display");
-        textConnectionStats.setText("No active connections");
-        connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+        clearConnectionsDisplay();
     }
     
     private void updateConnectionStats() {
         long currentTime = System.currentTimeMillis();
-        // Log.i("MainActivity", "updateConnectionStats called at " + currentTime);
         
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaService.isServiceRunning()) {
-            // Log.i("MainActivity", "Native SRTLA service is running, getting native stats");
             String nativeStats = NativeSrtlaService.getNativeStats();
-            // Log.i("MainActivity", "Native stats: " + nativeStats);
-            textConnectionStats.setText(nativeStats);
+            
+            // Parse and display connection items
+            parseAndDisplayConnections(nativeStats);
             
             textStatus.setText("✅ Service is running");
-            
-            // Clear the connection window view for native SRTLA (simplified UI)
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
         }
         
         // Periodically refresh native SRTLA UI state (handles crashes)
         updateNativeSrtlaUI();
+    }
+    
+    private void parseAndDisplayConnections(String statsText) {
+        if (statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
+            clearConnectionsDisplay();
+            return;
+        }
+        
+        // Clear existing views
+        connectionsContainer.removeAllViews();
+        textNoConnections.setVisibility(android.view.View.GONE);
+        
+        // Parse the stats text to extract connection information
+        // Format: "Total bitrate: X.X Mbps\n\nWIFI\n  Bitrate: ... \n  Window: ...\n  Packets in-flight: ...\n\n..."
+        String[] sections = statsText.split("\n\n");
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
+        
+        // Extract and display total bitrate from first section
+        if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
+            textTotalBitrate.setText(sections[0]);
+            textTotalBitrate.setVisibility(android.view.View.VISIBLE);
+        }
+        
+        for (String section : sections) {
+            if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {
+                continue; // Skip empty sections and total bitrate line
+            }
+            
+            // Parse connection section
+            try {
+                String[] lines = section.trim().split("\n");
+                if (lines.length < 4) continue; // Need at least 4 lines: type, bitrate, window, in-flight
+                
+                // First line is network type
+                String networkType = lines[0].trim();
+                
+                // Parse bitrate line: "  Bitrate: 45.2 Mbps 45%"
+                String bitrateLine = lines[1].trim();
+                String bitrate = "N/A";
+                String load = "N/A";
+                if (bitrateLine.startsWith("Bitrate:")) {
+                    String bitrateData = bitrateLine.substring(8).trim(); // Remove "Bitrate:"
+                    String[] bitrateParts = bitrateData.split(" ");
+                    if (bitrateParts.length >= 2) {
+                        bitrate = bitrateParts[0] + " " + bitrateParts[1]; // e.g., "45.2 Mbps"
+                    }
+                    if (bitrateParts.length >= 3) {
+                        load = bitrateParts[2]; // e.g., "45%"
+                    }
+                }
+                
+                // Parse window line: "  Window: 15234"
+                String windowLine = lines[2].trim();
+                int windowSize = 0;
+                if (windowLine.startsWith("Window:")) {
+                    windowSize = Integer.parseInt(windowLine.substring(7).trim());
+                }
+                
+                // Parse in-flight line: "  Packets in-flight: 125"
+                String inFlightLine = lines[3].trim();
+                int inFlight = 0;
+                if (inFlightLine.startsWith("Packets in-flight:")) {
+                    inFlight = Integer.parseInt(inFlightLine.substring(18).trim());
+                }
+                
+                // Determine if connection is active (has bitrate > 0 or in-flight packets)
+                boolean isActive = inFlight > 0 || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
+                
+                // Create connection item view
+                android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
+                
+                // Set network type
+                TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
+                networkTypeView.setText(networkType);
+                
+                // Set status
+                TextView statusView = connectionView.findViewById(R.id.connection_status);
+                if (isActive) {
+                    statusView.setText("ACTIVE");
+                    statusView.setTextColor(android.graphics.Color.parseColor("#28a745"));
+                } else {
+                    statusView.setText("INACTIVE");
+                    statusView.setTextColor(android.graphics.Color.parseColor("#dc3545"));
+                }
+                
+                // Set window bar
+                WindowBarView windowBar = connectionView.findViewById(R.id.window_bar);
+                windowBar.setWindowData(windowSize, isActive);
+                
+                // Set stats text
+                TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
+                String statsDisplay = String.format(
+                    "Bitrate: %s  %s\nPackets in-flight: %,d\nWindow: %,d / 60,000",
+                    bitrate, load, inFlight, windowSize
+                );
+                statsTextView.setText(statsDisplay);
+                
+                // Add view to container
+                connectionsContainer.addView(connectionView);
+                
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error parsing connection section: " + section, e);
+            }
+        }
+        
+        // If no connections were added, show the "no connections" message
+        if (connectionsContainer.getChildCount() == 0) {
+            clearConnectionsDisplay();
+        }
     }
     
     @Override
@@ -530,48 +646,13 @@ public class MainActivity extends Activity {
             // Log.i("MainActivity", "UI updated to STOP state");
             
             // Update connection window visualization with native data
-            updateNativeConnectionWindows();
         } else {
             buttonNativeSrtla.setText("Start Service");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
-            // Log.i("MainActivity", "UI updated to START state");
             
-            // Clear connection windows when not running
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
-        }
-    }
-    
-    private void updateNativeConnectionWindows() {
-        try {
-            // Get native connection data
-            ConnectionBitrateData[] nativeConnections = NativeSrtlaJni.getAllConnectionBitrates();
-            
-            // Convert to ConnectionWindowData format (keeping it simple)
-            List<ConnectionWindowView.ConnectionWindowData> windowData = new ArrayList<>();
-            
-            for (ConnectionBitrateData conn : nativeConnections) {
-                // Use actual native data for accurate visualization
-                ConnectionWindowView.ConnectionWindowData data = new ConnectionWindowView.ConnectionWindowData(
-                    conn.connectionType,           // networkType (WIFI, CELLULAR, etc.)
-                    conn.windowSize,               // window (actual native window size in packets)
-                    conn.inFlightPackets,          // inFlightPackets (actual native in-flight count)
-                    0,                             // score (0 since we don't have real scoring data)
-                    conn.isActive,                 // isActive (actual native connection status)
-                    false,                         // isSelected (keep simple, always false)
-                    0,                             // rtt (0 since we don't have real RTT data)
-                    conn.isActive ? "ACTIVE" : "INACTIVE",  // state (actual status)
-                    conn.bitrateMbps * 1000000     // bitrateBps (convert Mbps to bps)
-                );
-                windowData.add(data);
-            }
-            
-            // Update the connection window view
-            connectionWindowView.updateConnectionData(windowData);
-            
-        } catch (Exception e) {
-            Log.e("MainActivity", "Error updating native connection windows", e);
-            // Fallback to empty data on error
-            connectionWindowView.updateConnectionData(new java.util.ArrayList<>());
+            // Clear connections display when not running
+            clearConnectionsDisplay();
         }
     }
 }
+

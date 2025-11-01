@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical"
+  android:paddingTop="10dp"
+  android:paddingLeft="12dp"
+  android:paddingRight="12dp"
+  android:paddingBottom="16dp"
+  android:background="#F0F0F0"
+  android:layout_marginBottom="4dp">
+
+  <!-- Connection header with network type and status -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal" >
+
+    <TextView
+      android:id="@+id/connection_network_type"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="NETWORK NAME"
+      android:textSize="16sp"
+      android:textStyle="bold"
+      android:textColor="#212529" />
+
+    <TextView
+      android:id="@+id/connection_status"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="INACTIVE"
+      android:textSize="16sp"
+      android:textColor="#dc3545"
+      android:layout_marginStart="8dp" />
+  </LinearLayout>
+
+  <!-- Stats text -->
+  <TextView
+    android:id="@+id/connection_stats_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Bitrate: 0.00 Mbps  100%\nPackets in-flight: 0\nWindow: 20,000 / 60,000"
+    android:textSize="16sp"
+    android:textColor="#495057"
+    android:layout_marginBottom="6dp" />
+
+  <!-- Window bar visualization -->
+  <com.example.srtla.WindowBarView
+    android:id="@+id/window_bar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />
+
+</LinearLayout>
