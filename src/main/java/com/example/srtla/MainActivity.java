@@ -296,8 +296,8 @@ public class MainActivity extends Activity {
                 // Set stats text
                 TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
                 String statsDisplay = String.format(
-                    "Window: %,d / 60,000 • In-flight: %,d\nBitrate: %s • Load: %s",
-                    windowSize, inFlight, bitrate, load
+                    "Bitrate: %s  %s\nPackets in-flight: %,d\nWindow: %,d / 60,000",
+                    bitrate, load, inFlight, windowSize
                 );
                 statsTextView.setText(statsDisplay);
                 

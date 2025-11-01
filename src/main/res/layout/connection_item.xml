@@ -4,7 +4,7 @@
   android:layout_height="wrap_content"
   android:orientation="vertical"
   android:padding="12dp"
-  android:background="#e8f5e8"
+  android:background="#F0F0F0"
   android:layout_marginBottom="4dp">
 
   <!-- Connection header with network type and status -->
@@ -29,27 +29,25 @@
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:text="ACTIVE"
-      android:textSize="14sp"
-      android:textStyle="bold"
+      android:textSize="16sp"
       android:textColor="#28a745"
       android:layout_marginStart="8dp" />
   </LinearLayout>
-
-  <!-- Window bar visualization -->
-  <com.example.srtla.WindowBarView
-    android:id="@+id/window_bar"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp" />
 
   <!-- Stats text -->
   <TextView
     android:id="@+id/connection_stats_text"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:text="Window: 15,000 / 60,000\nRTT: 25ms • Load: 45%"
-    android:textSize="13sp"
-    android:fontFamily="monospace"
+    android:text="Bitrate: 0.00 Mbps 45%\nPackets in-flight: 0\nWindow: 15,000 / 60,000"
+    android:textSize="16sp"
     android:textColor="#495057" />
+
+  <!-- Window bar visualization -->
+  <com.example.srtla.WindowBarView
+    android:id="@+id/window_bar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp" />
 
 </LinearLayout>
