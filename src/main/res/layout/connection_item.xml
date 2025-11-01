@@ -3,7 +3,10 @@
   android:layout_width="match_parent"
   android:layout_height="wrap_content"
   android:orientation="vertical"
-  android:padding="12dp"
+  android:paddingTop="10dp"
+  android:paddingLeft="12dp"
+  android:paddingRight="12dp"
+  android:paddingBottom="14dp"
   android:background="#F0F0F0"
   android:layout_marginBottom="4dp">
 
@@ -12,7 +15,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:layout_marginBottom="8dp">
+    android:layout_marginBottom="4dp" >
 
     <TextView
       android:id="@+id/connection_network_type"
@@ -41,13 +44,13 @@
     android:layout_height="wrap_content"
     android:text="Bitrate: 0.00 Mbps 45%\nPackets in-flight: 0\nWindow: 15,000 / 60,000"
     android:textSize="16sp"
-    android:textColor="#495057" />
+    android:textColor="#495057"
+    android:layout_marginBottom="6dp" />
 
   <!-- Window bar visualization -->
   <com.example.srtla.WindowBarView
     android:id="@+id/window_bar"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="8dp" />
+    android:layout_height="wrap_content" />
 
 </LinearLayout>
