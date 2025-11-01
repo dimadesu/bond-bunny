@@ -216,7 +216,7 @@ public class MainActivity extends Activity {
     }
     
     private void parseAndDisplayConnections(String statsText) {
-        if (statsText == null || statsText.isEmpty() || statsText.equals("No active connections")) {
+        if (statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
             clearConnectionsDisplay();
             return;
         }
