@@ -118,11 +118,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="No active connections"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:textColor="#6c757d"
+        android:textSize="16sp"
+        android:textColor="#495057"
         android:padding="12dp"
-        android:background="#e8f5e8"
+        android:background="#F0F0F0"
         android:gravity="center" />
     </LinearLayout>
 
