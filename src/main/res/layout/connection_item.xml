@@ -21,7 +21,7 @@
       android:layout_width="0dp"
       android:layout_height="wrap_content"
       android:layout_weight="1"
-      android:text="📶 WIFI"
+      android:text="NETWORK NAME"
       android:textSize="16sp"
       android:textStyle="bold"
       android:textColor="#212529" />
@@ -30,9 +30,9 @@
       android:id="@+id/connection_status"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="ACTIVE"
+      android:text="INACTIVE"
       android:textSize="16sp"
-      android:textColor="#28a745"
+      android:textColor="#dc3545"
       android:layout_marginStart="8dp" />
   </LinearLayout>
 
@@ -41,7 +41,7 @@
     android:id="@+id/connection_stats_text"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:text="Bitrate: 0.00 Mbps 100%\nPackets in-flight: 0\nWindow: 20,000 / 60,000"
+    android:text="Bitrate: 0.00 Mbps  100%\nPackets in-flight: 0\nWindow: 20,000 / 60,000"
     android:textSize="16sp"
     android:textColor="#495057"
     android:layout_marginBottom="6dp" />
