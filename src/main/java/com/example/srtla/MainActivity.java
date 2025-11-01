@@ -230,13 +230,11 @@ public class MainActivity extends Activity {
         String[] sections = statsText.split("\n\n");
         android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
         
-        // Extract total bitrate from first section
-        String totalBitrate = "0.0 Mbps";
+        // Extract and display total bitrate from first section
         if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
-            totalBitrate = sections[0].substring(14).trim(); // Remove "Total bitrate:"
+            textTotalBitrate.setText(sections[0]);
+            textTotalBitrate.setVisibility(android.view.View.VISIBLE);
         }
-        textTotalBitrate.setText("Total bitrate: " + totalBitrate);
-        textTotalBitrate.setVisibility(android.view.View.VISIBLE);
         
         for (String section : sections) {
             if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {
