@@ -284,10 +284,9 @@ public class MainActivity extends Activity {
                 // Create connection item view
                 android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
                 
-                // Set network type with icon
+                // Set network type
                 TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
-                String icon = getNetworkIcon(networkType);
-                networkTypeView.setText(icon + " " + networkType);
+                networkTypeView.setText(networkType);
                 
                 // Set status
                 TextView statusView = connectionView.findViewById(R.id.connection_status);
@@ -322,14 +321,6 @@ public class MainActivity extends Activity {
         // If no connections were added, show the "no connections" message
         if (connectionsContainer.getChildCount() == 0) {
             clearConnectionsDisplay();
-        }
-    }
-    
-    private String getNetworkIcon(String networkType) {
-        switch (networkType.toUpperCase()) {
-            case "WIFI": return "🛜";
-            case "CELLULAR": return "📶";
-            default: return "🌐";
         }
     }
     
