@@ -327,10 +327,8 @@ public class MainActivity extends Activity {
     
     private String getNetworkIcon(String networkType) {
         switch (networkType.toUpperCase()) {
-            case "WIFI": return "📶";
-            case "CELLULAR": return "📱";
-            case "ETHERNET": return "🔗";
-            case "VPN": return "🔒";
+            case "WIFI": return "🛜";
+            case "CELLULAR": return "📶";
             default: return "🌐";
         }
     }
