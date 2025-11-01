@@ -66,6 +66,7 @@
       android:layout_height="wrap_content"
       android:text="Status: Stopped"
       android:textSize="16sp"
+      android:textColor="#495057"
       android:layout_marginBottom="12dp" />
 
     <TextView
