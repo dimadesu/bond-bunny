@@ -157,8 +157,8 @@ public class MainActivity extends Activity {
         // Remove all dynamically added connection views
         connectionsContainer.removeAllViews();
         
-        // Reset total bitrate
-        textTotalBitrate.setText("Total bitrate: 0.0 Mbps");
+        // Hide total bitrate when no connections
+        textTotalBitrate.setVisibility(android.view.View.GONE);
         
         // Show the "no connections" message
         textNoConnections.setVisibility(android.view.View.VISIBLE);
@@ -236,6 +236,7 @@ public class MainActivity extends Activity {
             totalBitrate = sections[0].substring(14).trim(); // Remove "Total bitrate:"
         }
         textTotalBitrate.setText("Total bitrate: " + totalBitrate);
+        textTotalBitrate.setVisibility(android.view.View.VISIBLE);
         
         for (String section : sections) {
             if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {
