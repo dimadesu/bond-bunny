@@ -21,7 +21,7 @@ public class WindowBarView extends View {
     private static final int MAX_WINDOW_SIZE = 60000;
     private static final int WINDOW_STABLE_MIN = 10000;
     private static final int WINDOW_STABLE_MAX = 20000;
-    private static final int BAR_HEIGHT_DP = 24; // Fixed height in dp
+    private static final int BAR_HEIGHT_DP = 18; // Fixed height in dp
     
     private int windowSize = 0;
     private boolean isActive = false;
