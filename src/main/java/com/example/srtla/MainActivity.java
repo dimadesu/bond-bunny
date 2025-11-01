@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     
     private TextView textStatus;
     private TextView textError;
-    private TextView textNetworks;
+    private TextView textTotalBitrate;
     private LinearLayout connectionsContainer;
     private TextView textNoConnections;
     private Button buttonAbout;
@@ -102,6 +102,7 @@ public class MainActivity extends Activity {
     private void initViews() {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
+        textTotalBitrate = findViewById(R.id.text_total_bitrate);
         connectionsContainer = findViewById(R.id.connections_container);
         textNoConnections = findViewById(R.id.text_no_connections);
         buttonAbout = findViewById(R.id.button_about);
@@ -155,6 +156,9 @@ public class MainActivity extends Activity {
     private void clearConnectionsDisplay() {
         // Remove all dynamically added connection views
         connectionsContainer.removeAllViews();
+        
+        // Reset total bitrate
+        textTotalBitrate.setText("Total bitrate: 0.0 Mbps");
         
         // Show the "no connections" message
         textNoConnections.setVisibility(android.view.View.VISIBLE);
@@ -225,6 +229,13 @@ public class MainActivity extends Activity {
         // Format: "Total bitrate: X.X Mbps\n\nWIFI\n  Bitrate: ... \n  Window: ...\n  Packets in-flight: ...\n\n..."
         String[] sections = statsText.split("\n\n");
         android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
+        
+        // Extract total bitrate from first section
+        String totalBitrate = "0.0 Mbps";
+        if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
+            totalBitrate = sections[0].substring(14).trim(); // Remove "Total bitrate:"
+        }
+        textTotalBitrate.setText("Total bitrate: " + totalBitrate);
         
         for (String section : sections) {
             if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {

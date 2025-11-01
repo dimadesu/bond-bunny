@@ -84,10 +84,25 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Connections:"
+      android:text="Connection Stats:"
       android:textSize="16sp"
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
+
+    <!-- Total Bitrate Display -->
+    <TextView
+      android:id="@+id/text_total_bitrate"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Total: 0.0 Mbps"
+      android:textSize="16sp"
+      android:textColor="#495057"
+      android:paddingTop="8dp"
+      android:paddingLeft="12dp"
+      android:paddingRight="12dp"
+      android:paddingBottom="8dp"
+      android:background="#F0F0F0"
+      android:layout_marginBottom="4dp" />
 
     <!-- Container for dynamically added connection items -->
     <LinearLayout
