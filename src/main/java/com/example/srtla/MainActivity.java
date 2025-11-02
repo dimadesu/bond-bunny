@@ -284,9 +284,10 @@ public class MainActivity extends Activity {
                 // Create connection item view
                 android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
                 
-                // Set network type
+                // Set network type with display formatting
                 TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
-                networkTypeView.setText(networkType);
+                String displayName = networkType.equals("WIFI") ? "WI-FI" : networkType;
+                networkTypeView.setText(displayName);
                 
                 // Set status
                 TextView statusView = connectionView.findViewById(R.id.connection_status);
