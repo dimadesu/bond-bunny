@@ -74,9 +74,9 @@ public class WindowBarView extends View {
         float windowRatio = Math.min((float) windowSize / MAX_WINDOW_SIZE, 1.0f);
         int barWidth = (int) (width * windowRatio);
         
-        // Set muted blue color for all bars
-        barPaint.setColor(Color.parseColor("#6c8ebf")); // Muted blue
-        borderPaint.setColor(Color.parseColor("#6c8ebf"));
+        // Set blue color for all bars
+        barPaint.setColor(Color.parseColor("#5b9bd5")); // Medium blue
+        borderPaint.setColor(Color.parseColor("#5b9bd5"));
         
         // Draw bar
         if (barWidth > 0) {
