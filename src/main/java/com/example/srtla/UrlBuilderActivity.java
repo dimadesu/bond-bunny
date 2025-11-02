@@ -123,7 +123,7 @@ public class UrlBuilderActivity extends Activity {
                             String ipAddress = address.getHostAddress();
                             networkInfo.append("• ").append(ipAddress);
                             if (interfaceName.toLowerCase().contains("wlan") || interfaceName.toLowerCase().contains("wifi")) {
-                                networkInfo.append(" (WiFi)");
+                                networkInfo.append(" (Wi-Fi)");
                             } else if (interfaceName.toLowerCase().contains("rmnet") || interfaceName.toLowerCase().contains("mobile") || interfaceName.toLowerCase().contains("cellular")) {
                                 networkInfo.append(" (Cellular)");
                             } else if (interfaceName.toLowerCase().contains("eth")) {
@@ -152,7 +152,7 @@ public class UrlBuilderActivity extends Activity {
             if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
                 availableNetworks++;
                 if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    networkInfo.append("• WiFi Network (Internet)\n");
+                    networkInfo.append("• Wi-Fi Network (Internet)\n");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                     networkInfo.append("• Cellular Network (Internet)\n");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
