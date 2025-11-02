@@ -10,7 +10,6 @@ import android.view.View;
 
 /**
  * Simple fixed-height view that displays a window capacity bar
- * Shows congestion window size with color coding
  */
 public class WindowBarView extends View {
     
@@ -19,12 +18,9 @@ public class WindowBarView extends View {
     private Paint borderPaint;
     
     private static final int MAX_WINDOW_SIZE = 60000;
-    private static final int WINDOW_STABLE_MIN = 10000;
-    private static final int WINDOW_STABLE_MAX = 20000;
     private static final int BAR_HEIGHT_DP = 12; // Fixed height in dp
     
     private int windowSize = 0;
-    private boolean isActive = false;
     
     public WindowBarView(Context context) {
         super(context);
@@ -53,7 +49,6 @@ public class WindowBarView extends View {
     
     public void setWindowData(int windowSize, boolean isActive) {
         this.windowSize = windowSize;
-        this.isActive = isActive;
         invalidate();
     }
     
@@ -79,20 +74,9 @@ public class WindowBarView extends View {
         float windowRatio = Math.min((float) windowSize / MAX_WINDOW_SIZE, 1.0f);
         int barWidth = (int) (width * windowRatio);
         
-        // Set color based on window size and active state
-        if (!isActive) {
-            barPaint.setColor(Color.parseColor("#dc3545")); // Red for inactive
-            borderPaint.setColor(Color.parseColor("#dc3545"));
-        } else if (windowSize >= WINDOW_STABLE_MAX) {
-            barPaint.setColor(Color.parseColor("#28a745")); // Green - high window
-            borderPaint.setColor(Color.parseColor("#28a745"));
-        } else if (windowSize >= WINDOW_STABLE_MIN) {
-            barPaint.setColor(Color.parseColor("#ffc107")); // Yellow - medium window
-            borderPaint.setColor(Color.parseColor("#ffc107"));
-        } else {
-            barPaint.setColor(Color.parseColor("#fd7e14")); // Orange - low window
-            borderPaint.setColor(Color.parseColor("#fd7e14"));
-        }
+        // Set muted blue color for all bars
+        barPaint.setColor(Color.parseColor("#6c8ebf")); // Muted blue
+        borderPaint.setColor(Color.parseColor("#6c8ebf"));
         
         // Draw bar
         if (barWidth > 0) {
