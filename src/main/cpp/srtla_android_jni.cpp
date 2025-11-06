@@ -1,10 +1,5 @@
 /*
- * srtla_android_jni.cpp - Minimal JNextern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char connection_types[][16], 
-                                               char connection_ips[][64], int load_percentages[],
-                                               int window_sizes[], int inflight_packets[], 
-                                               int max_connections);
-
-apper for Android-patched SRTLA
+ * srtla_android_jni.cpp - Minimal JNI wrapper for Android-patched SRTLA
  * 
  * This is the ONLY wrapper code needed. All SRTLA functionality comes
  * from the original srtla_send.c with minimal Android patches.
@@ -19,6 +14,7 @@ apper for Android-patched SRTLA
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <atomic>
 
 // Forward declare the Android SRTLA functions from patched srtla_send.c
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
@@ -49,7 +45,10 @@ extern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char conn
                                                int max_connections);
 
 static pthread_t srtla_thread;
-static bool srtla_running = false;
+static std::atomic<bool> srtla_running(false);
+static std::atomic<bool> srtla_should_stop(false);
+static std::atomic<bool> srtla_retry_enabled(false);
+static std::atomic<int> srtla_retry_count(0);
 
 struct SrtlaParams {
     char listen_port[16];
@@ -58,20 +57,45 @@ struct SrtlaParams {
     char ips_file[512];
 };
 
-// Thread function to run SRTLA
+// Thread function to run SRTLA with retry logic
 static void* srtla_thread_func(void* args) {
     SrtlaParams* params = (SrtlaParams*)args;
+    const int MAX_RETRIES = -1;  // Infinite retries
+    const int RETRY_DELAY_MS = 3000;  // 3 seconds between retries
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA with original code...");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA with retry support...");
     
-    // Call the Android-patched SRTLA function - this is 99% original SRTLA!
-    int result = srtla_start_android(params->listen_port, params->srtla_host,
-                                   params->srtla_port, params->ips_file);
+    while (!srtla_should_stop.load() && (MAX_RETRIES < 0 || srtla_retry_count.load() < MAX_RETRIES)) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA attempt %d", srtla_retry_count.load() + 1);
+        
+        // Call the Android-patched SRTLA function
+        int result = srtla_start_android(params->listen_port, params->srtla_host,
+                                       params->srtla_port, params->ips_file);
+        
+        if (srtla_should_stop.load()) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stopped by user");
+            break;
+        }
+        
+        if (result == 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally");
+            break;
+        } else {
+            __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", 
+                "SRTLA failed with code %d, will retry in %dms...", result, RETRY_DELAY_MS);
+            
+            srtla_retry_count.fetch_add(1);
+            
+            // Sleep with interruption check
+            for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
+                usleep(100 * 1000);  // Sleep 100ms at a time
+            }
+        }
+    }
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA finished with result: %d", result);
-    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA thread exiting");
     delete params;
-    srtla_running = false;
+    srtla_running.store(false);
     return nullptr;
 }
 
@@ -79,7 +103,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz,
                                                      jstring listen_port, jstring srtla_host,
                                                      jstring srtla_port, jstring ips_file) {
-    if (srtla_running) {
+    if (srtla_running.load()) {
         return -1; // Already running
     }
     
@@ -102,10 +126,14 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
     env->ReleaseStringUTFChars(srtla_port, c_srtla_port);
     env->ReleaseStringUTFChars(ips_file, c_ips_file);
     
-    // Start SRTLA in background thread
-    srtla_running = true;
+    // Reset state
+    srtla_should_stop.store(false);
+    srtla_retry_count.store(0);
+    srtla_running.store(true);
+    
+    // Start SRTLA in background thread with retry logic
     if (pthread_create(&srtla_thread, nullptr, srtla_thread_func, params) != 0) {
-        srtla_running = false;
+        srtla_running.store(false);
         delete params;
         return -1;
     }
@@ -115,17 +143,18 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz) {
-    if (!srtla_running) {
+    if (!srtla_running.load()) {
         return 0;
     }
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Stopping SRTLA process...");
     
-    // Signal the SRTLA process to stop gracefully
+    // Signal the SRTLA process to stop
+    srtla_should_stop.store(true);
     srtla_stop_android();
     
     // Mark as not running immediately - the thread will finish cleanup
-    srtla_running = false;
+    srtla_running.store(false);
     
     // Detach the thread so it can clean up itself without blocking the UI
     pthread_detach(srtla_thread);
@@ -137,7 +166,13 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass clazz) {
-    return srtla_running;
+    return srtla_running.load();
+}
+
+// New function to get retry status
+extern "C" JNIEXPORT jint JNICALL
+Java_com_example_srtla_NativeSrtlaJni_getRetryCount(JNIEnv *env, jclass clazz) {
+    return srtla_retry_count.load();
 }
 
 extern "C" JNIEXPORT void JNICALL

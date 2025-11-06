@@ -25,6 +25,9 @@ public class NativeSrtlaJni {
     public static native int stopSrtlaNative();
     public static native boolean isRunningSrtlaNative();
     
+    // New retry status method
+    public static native int getRetryCount();
+    
     // Stats methods for minimal UI integration
     public static native int getConnectionCount();
     public static native int getActiveConnectionCount();

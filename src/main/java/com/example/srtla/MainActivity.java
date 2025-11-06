@@ -68,6 +68,19 @@ public class MainActivity extends Activity {
             updateConnectionStats();
         }
     };
+    
+    // Add retry status receiver
+    private BroadcastReceiver retryStatusReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int retryCount = NativeSrtlaJni.getRetryCount();
+            if (retryCount > 0) {
+                String message = String.format("⚠️ Connection failed. Retrying... (attempt %d)", retryCount);
+                textStatus.setText(message);
+            }
+        }
+    };
+    
     private Runnable statsUpdateRunnable;
 
     @Override
@@ -217,6 +230,14 @@ public class MainActivity extends Activity {
     
     private void parseAndDisplayConnections(String statsText) {
         if (statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
+            // Check if we're in retry mode
+            int retryCount = NativeSrtlaJni.getRetryCount();
+            if (retryCount > 0) {
+                // Show retry status instead of clearing display
+                textTotalBitrate.setText(String.format("Reconnecting... (attempt %d)", retryCount));
+                textTotalBitrate.setVisibility(android.view.View.VISIBLE);
+                return;
+            }
             clearConnectionsDisplay();
             return;
         }
