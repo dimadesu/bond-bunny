@@ -330,10 +330,12 @@ public class MainActivity extends Activity {
     }
     
     private void parseAndDisplayConnections(String statsText) {
+        TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
+        TextView textStatus = findViewById(R.id.text_status);
+        
         // Handle empty or no-connection state
         if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
             // Don't clear if we're showing a retry/connecting status
-            TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             if (textTotalBitrate != null && textTotalBitrate.getVisibility() == View.VISIBLE) {
                 String text = textTotalBitrate.getText().toString();
                 if (text.contains("Connecting") || text.contains("Reconnecting")) {
@@ -348,8 +350,8 @@ public class MainActivity extends Activity {
             return;
         }
         
-        // Reset text color when connection is established
-        textTotalBitrate.setTextColor(getResources().getColor(android.R.color.primary_text_dark));
+        // Reset text color when connection is established - use black for better visibility
+        textTotalBitrate.setTextColor(getResources().getColor(android.R.color.black));
         textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
         
         // Clear existing views

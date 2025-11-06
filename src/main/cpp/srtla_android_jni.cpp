@@ -308,8 +308,18 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
         totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
     
-    // If we're retrying, return empty to trigger retry UI
-    if (retryCount > 0) {
+    // We have valid stats - mark as connected if not already
+    if (!isConnected && activeConnections > 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections");
+        srtla_connected.store(true);
+        srtla_has_ever_connected.store(true);
+        srtla_retry_count.store(0);
+        isConnected = true;  // Update local variable
+        retryCount = 0;      // Update local variable
+    }
+    
+    // If we're retrying AND not connected, return empty to trigger retry UI
+    if (retryCount > 0 && !isConnected) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
         return env->NewStringUTF("");
     }
@@ -342,31 +352,15 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     }
     
     // Check if stats show actual data
-    bool hasZeroBitrate = (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL);
-    bool hasMinimalData = (strlen(detailsBuffer) < 50);
+    bool hasZeroBitrate = (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL || 
+                           strstr(detailsBuffer, "Total bitrate: 0.00 Mbps") != NULL);
+    bool hasMinimalData = (strlen(detailsBuffer) < 50);  // Just the header line
     
-    if (hasZeroBitrate && hasMinimalData && totalConnections == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No active data (zero bitrate, no connections)");
-        // Check elapsed time to trigger retry if needed
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - srtla_start_time).count();
-        
-        if (elapsed > 10 && !hasEverConnected) {
-            // Been trying for more than 10 seconds with no successful connection
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection failed after 10s, triggering retry");
-            srtla_retry_count.store(1);
-            return env->NewStringUTF("");
-        }
-        
+    // If we only have "Total bitrate: 0.0 Mbps" with no connections, return empty
+    if (hasZeroBitrate && (totalConnections == 0 || activeConnections == 0)) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Only zero bitrate, no real data (total=%d, active=%d)", 
+                          totalConnections, activeConnections);
         return env->NewStringUTF("");
-    }
-    
-    // We have valid stats - mark as connected if not already
-    if (!isConnected && activeConnections > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections");
-        srtla_connected.store(true);
-        srtla_has_ever_connected.store(true);
-        srtla_retry_count.store(0);
     }
     
     return env->NewStringUTF(detailsBuffer);
