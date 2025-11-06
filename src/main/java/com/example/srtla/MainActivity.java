@@ -72,46 +72,36 @@ public class MainActivity extends Activity {
     };
     
     // Add retry status receiver
-    private BroadcastReceiver retryStatusReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver retryReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             int retryCount = intent.getIntExtra("retry_count", 0);
             boolean isRetrying = intent.getBooleanExtra("is_retrying", false);
-            boolean isInitial = intent.getBooleanExtra("is_initial", false);
             boolean isConnected = intent.getBooleanExtra("is_connected", false);
+            boolean isInitial = intent.getBooleanExtra("is_initial", false);
             
-            if (isConnected) {
-                // Connection established - clear retry status
-                textStatus.setText("✅ Service is running");
-                textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-                return;
-            }
-            
-            if (isRetrying) {
-                String message;
-                if (isInitial) {
-                    message = "🔄 Connecting to SRTLA server...";
-                } else if (retryCount > 0) {
-                    message = String.format("⚠️ Connection failed. Retrying... (attempt %d)", retryCount);
-                } else {
-                    message = "🔄 Connecting...";
+            runOnUiThread(() -> {
+                TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
+                
+                if (isConnected) {
+                    // Connected - hide retry status
+                    textTotalBitrate.setVisibility(View.GONE);
+                } else if (isRetrying) {
+                    // Retrying
+                    String message = String.format("Reconnecting... (attempt %d)", retryCount);
+                    textTotalBitrate.setText(message);
+                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                    textTotalBitrate.setVisibility(View.VISIBLE);
+                } else if (isInitial) {
+                    // Initial connection attempt
+                    textTotalBitrate.setText("Connecting to SRTLA server...");
+                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                    textTotalBitrate.setVisibility(View.VISIBLE);
                 }
-                textStatus.setText(message);
-                textStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                
-                // Also show in the bitrate area
-                textTotalBitrate.setText(isInitial ? "Connecting..." : 
-                                         String.format("Reconnecting... (attempt %d)", retryCount));
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                // Clear connections display but keep the retry message visible
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-            }
+            });
         }
     };
-    
+
     private Runnable statsUpdateRunnable;
 
     @Override
@@ -262,29 +252,16 @@ public class MainActivity extends Activity {
     private void parseAndDisplayConnections(String statsText) {
         // Handle empty or no-connection state
         if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
-            // Check if we're showing retry status
-            View retryView = findViewById(R.id.text_total_bitrate);
-            if (retryView != null && retryView.getVisibility() == View.VISIBLE) {
+            // Don't clear if we're showing a retry/connecting status
+            TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
+            if (textTotalBitrate != null && textTotalBitrate.getVisibility() == View.VISIBLE) {
                 String text = textTotalBitrate.getText().toString();
                 if (text.contains("Connecting") || text.contains("Reconnecting")) {
-                    // Keep the retry status visible, just clear the connections
+                    // Keep the status message, just clear the connection list
                     connectionsContainer.removeAllViews();
                     textNoConnections.setVisibility(View.GONE);
                     return;
                 }
-            }
-            
-            // If native SRTLA is running but we have no stats, show connecting status
-            if (NativeSrtlaService.isServiceRunning()) {
-                // Show connecting status
-                textTotalBitrate.setText("Connecting to SRTLA server...");
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                // Clear connections display but keep the retry message visible
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                return;
             }
             
             clearConnectionsDisplay();
@@ -409,7 +386,7 @@ public class MainActivity extends Activity {
         LocalBroadcastManager.getInstance(this).registerReceiver(networkChangeReceiver, 
             new IntentFilter("network-changed"));
         // Register retry status receiver
-        LocalBroadcastManager.getInstance(this).registerReceiver(retryStatusReceiver,
+        LocalBroadcastManager.getInstance(this).registerReceiver(retryReceiver,
             new IntentFilter("srtla-retry-status"));
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
@@ -450,7 +427,7 @@ public class MainActivity extends Activity {
         }
         
         // Unregister retry status receiver
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(retryStatusReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(retryReceiver);
     }
     
     private void loadPreferences() {

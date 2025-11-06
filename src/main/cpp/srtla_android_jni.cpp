@@ -254,36 +254,41 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         return env->NewStringUTF("No native SRTLA connections");
     }
     
-    // Check if we're retrying
-    if (srtla_retry_count.load() > 0 && !srtla_connected.load()) {
-        return env->NewStringUTF("");  // Return empty during retry
-    }
-    
-    // Check if initial connection hasn't been established yet
-    if (!srtla_has_ever_connected.load() && !srtla_connected.load()) {
-        return env->NewStringUTF("");  // Return empty during initial connection
-    }
-    
-    // Get summary stats
+    // Get connection counts to determine if we're connected
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
-    int inFlightPackets = srtla_get_total_in_flight_packets();
+    
+    // If we're retrying, return empty
+    if (srtla_retry_count.load() > 0) {
+        return env->NewStringUTF("");
+    }
+    
+    // If we have no active connections and never connected, return empty
+    if (activeConnections == 0 && !srtla_has_ever_connected.load()) {
+        return env->NewStringUTF("");
+    }
     
     // Get detailed per-connection stats
     char detailsBuffer[1024];
     int detailsLen = srtla_get_connection_details(detailsBuffer, sizeof(detailsBuffer));
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d", 
-                       totalConnections, activeConnections, inFlightPackets);
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, details_len=%d", 
+                       totalConnections, activeConnections, detailsLen);
     
     // Check if we actually have connection details to show
     if (detailsLen <= 0 || activeConnections == 0) {
-        // No active connections, we might be disconnected
+        // No active connections
         if (srtla_has_ever_connected.load()) {
-            // We had a connection but lost it
+            // We had a connection but lost it, mark as disconnected
             srtla_connected.store(false);
         }
         return env->NewStringUTF("");
+    }
+    
+    // We have active connections and data
+    if (!srtla_connected.load()) {
+        srtla_connected.store(true);
+        srtla_has_ever_connected.store(true);
     }
     
     // Format combined stats string
