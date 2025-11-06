@@ -77,11 +77,37 @@ public class MainActivity extends Activity {
         public void onReceive(Context context, Intent intent) {
             int retryCount = intent.getIntExtra("retry_count", 0);
             boolean isRetrying = intent.getBooleanExtra("is_retrying", false);
+            boolean isInitial = intent.getBooleanExtra("is_initial", false);
+            boolean isConnected = intent.getBooleanExtra("is_connected", false);
             
-            if (isRetrying && retryCount > 0) {
-                String message = String.format("⚠️ Connection failed. Retrying... (attempt %d)", retryCount);
+            if (isConnected) {
+                // Connection established - clear retry status
+                textStatus.setText("✅ Service is running");
+                textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+                return;
+            }
+            
+            if (isRetrying) {
+                String message;
+                if (isInitial) {
+                    message = "🔄 Connecting to SRTLA server...";
+                } else if (retryCount > 0) {
+                    message = String.format("⚠️ Connection failed. Retrying... (attempt %d)", retryCount);
+                } else {
+                    message = "🔄 Connecting...";
+                }
                 textStatus.setText(message);
                 textStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                
+                // Also show in the bitrate area
+                textTotalBitrate.setText(isInitial ? "Connecting..." : 
+                                         String.format("Reconnecting... (attempt %d)", retryCount));
+                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                // Clear connections display but keep the retry message visible
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
             }
         }
     };
@@ -234,25 +260,27 @@ public class MainActivity extends Activity {
     }
     
     private void parseAndDisplayConnections(String statsText) {
-        if (statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
-            // Check if we're in retry mode via the service
-            if (NativeSrtlaService.isServiceRunning()) {
-                int retryCount = NativeSrtlaService.getRetryCount();
-                if (retryCount > 0) {
-                    // Show retry status in the bitrate area
-                    textTotalBitrate.setText(String.format("Reconnecting... (attempt %d)", retryCount));
-                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                    textTotalBitrate.setVisibility(View.VISIBLE);
-                    clearConnectionsDisplay();
+        // Handle empty or no-connection state
+        if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
+            // Don't clear display if we're showing retry status
+            View retryView = findViewById(R.id.text_total_bitrate);
+            if (retryView != null && retryView.getVisibility() == View.VISIBLE) {
+                String text = textTotalBitrate.getText().toString();
+                if (text.contains("Connecting") || text.contains("Reconnecting")) {
+                    // Keep the retry status visible, just clear the connections
+                    connectionsContainer.removeAllViews();
+                    textNoConnections.setVisibility(View.GONE);
                     return;
                 }
             }
+            
             clearConnectionsDisplay();
             return;
         }
         
         // Reset text color when connection is established
         textTotalBitrate.setTextColor(getResources().getColor(android.R.color.primary_text_dark));
+        textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
         
         // Clear existing views
         connectionsContainer.removeAllViews();
