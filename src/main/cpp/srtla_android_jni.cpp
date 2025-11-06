@@ -290,34 +290,35 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         return env->NewStringUTF("");
     }
     
-    // Get connection counts and state
+    // Get connection counts
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
-    bool isConnecting = srtla_is_connecting();
-    bool hasFailed = srtla_connections_failed();
     int retryCount = srtla_retry_count.load();
+    bool isConnected = srtla_connected.load();
+    bool hasEverConnected = srtla_has_ever_connected.load();
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-        "getAllStats: total=%d, active=%d, connecting=%d, failed=%d, retry_count=%d, connected=%d, ever_connected=%d", 
-        totalConnections, activeConnections, isConnecting, hasFailed,
-        retryCount, srtla_connected.load(), srtla_has_ever_connected.load());
+        "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
+        totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
     
-    // If we're retrying after a failure (not initial connection)
-    if (retryCount > 0 && srtla_has_ever_connected.load()) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Retry in progress (attempt %d)", retryCount);
+    // Check various retry/connection states
+    
+    // 1. If we're retrying after a previous successful connection
+    if (retryCount > 0 && hasEverConnected && !isConnected) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnecting after disconnection (attempt %d)", retryCount);
         return env->NewStringUTF("");  // Return empty to trigger retry UI
     }
     
-    // If we're in initial connection phase
-    if (isConnecting && !srtla_has_ever_connected.load() && retryCount == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt in progress");
-        return env->NewStringUTF("");  // Return empty to trigger "Connecting..." UI
+    // 2. If we're retrying the initial connection
+    if (retryCount > 0 && !hasEverConnected) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection retry (attempt %d)", retryCount);
+        return env->NewStringUTF("");  // Return empty to trigger retry UI
     }
     
-    // If all connections have failed but we're not actively retrying yet
-    if (hasFailed && !isConnecting && retryCount == 0 && srtla_has_ever_connected.load()) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "All connections failed, retry pending");
-        return env->NewStringUTF("");
+    // 3. If we're in the initial connection attempt (no retries yet)
+    if (!isConnected && !hasEverConnected && retryCount == 0 && totalConnections == 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection in progress");
+        return env->NewStringUTF("");  // Return empty to trigger "Connecting..." UI
     }
     
     // Get detailed per-connection stats
@@ -326,25 +327,31 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     
     // If we have no stats data yet
     if (detailsLen <= 0 || strlen(detailsBuffer) == 0) {
-        if (isConnecting || retryCount > 0) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats yet, still connecting/retrying");
+        if (retryCount > 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats yet, retry in progress");
+            return env->NewStringUTF("");
+        }
+        if (totalConnections == 0 && !isConnected) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats yet, still connecting");
             return env->NewStringUTF("");
         }
         return env->NewStringUTF("");
     }
     
     // Check if stats show actual data (not just "Total bitrate: 0.0 Mbps")
-    if (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL && 
-        strlen(detailsBuffer) < 50) {  // Just the header, no connections
-        if (isConnecting || totalConnections == 0 || retryCount > 0) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No active data yet");
+    bool hasZeroBitrate = (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL);
+    bool hasMinimalData = (strlen(detailsBuffer) < 50);  // Just the header, no connections
+    
+    if (hasZeroBitrate && hasMinimalData) {
+        if (retryCount > 0 || totalConnections == 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No active data yet (zero bitrate)");
             return env->NewStringUTF("");
         }
     }
     
     // We have valid stats - mark as connected if not already
-    if (!srtla_connected.load() && activeConnections > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections");
+    if (!isConnected && activeConnections > 0 && !hasZeroBitrate) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections and bitrate");
         srtla_connected.store(true);
         srtla_has_ever_connected.store(true);
         srtla_retry_count.store(0);
@@ -353,16 +360,27 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     return env->NewStringUTF(detailsBuffer);
 }
 
-// Add a new JNI method to check if connected
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz) {
-    return srtla_connected.load();
-}
-
-// Add a new JNI method to check if retrying
+// Update isRetrying to be more comprehensive
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
-    return srtla_retry_count.load() > 0;
+    if (!srtla_running.load()) {
+        return JNI_FALSE;
+    }
+    
+    int retryCount = srtla_retry_count.load();
+    bool isConnected = srtla_connected.load();
+    
+    // We're retrying if:
+    // 1. Retry count is greater than 0
+    // 2. AND we're not currently connected
+    bool isRetrying = (retryCount > 0) && !isConnected;
+    
+    if (isRetrying) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "isRetrying: true (retry_count=%d, connected=%d)", 
+                          retryCount, isConnected);
+    }
+    
+    return isRetrying ? JNI_TRUE : JNI_FALSE;
 }
 
 // Virtual IP JNI function
@@ -377,6 +395,12 @@ Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz
     
     env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
     env->ReleaseStringUTFChars(real_ip, real_ip_str);
+}
+
+// Add a new JNI method to check if connected
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_srtla_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz) {
+    return srtla_connected.load();
 }
 
 // Native UDP socket creation for NativeSrtlaService

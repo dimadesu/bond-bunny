@@ -37,6 +37,11 @@ public class NativeSrtlaService extends Service {
     private static final int NOTIFICATION_ID = 1; // Same as startup notification - will update it
     public static final String CHANNEL_ID = "SRTLA_SERVICE_CHANNEL";
     
+    // Load the native library
+    static {
+        System.loadLibrary("srtla_android");
+    }
+    
     // Native method for creating UDP socket
     private native int createUdpSocketNative();
     
