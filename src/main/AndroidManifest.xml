@@ -42,12 +42,6 @@
       android:label="URL Builder" />
 
     <service
-      android:name=".EnhancedSrtlaService"
-      android:enabled="true"
-      android:exported="false"
-      android:foregroundServiceType="connectedDevice" />
-
-    <service
       android:name=".NativeSrtlaService"
       android:enabled="true"
       android:exported="false"
