@@ -241,58 +241,29 @@ public class MainActivity extends Activity {
             boolean isConnected = NativeSrtlaJni.isConnected();
             boolean isRetrying = NativeSrtlaJni.isRetrying();
             int retryCount = NativeSrtlaJni.getRetryCount();
-            boolean isConnecting = NativeSrtlaJni.isConnecting();
-            boolean hasFailed = NativeSrtlaJni.hasConnectionsFailed();
             
             // Log the current state for debugging
-            Log.i("MainActivity", String.format("updateConnectionStats: connected=%b, retrying=%b, retryCount=%d, connecting=%b, failed=%b", 
-                  isConnected, isRetrying, retryCount, isConnecting, hasFailed));
+            Log.i("MainActivity", String.format("updateConnectionStats: connected=%b, retrying=%b, retryCount=%d", 
+                  isConnected, isRetrying, retryCount));
             
             // Get stats - this might return empty string if retrying/connecting
             String nativeStats = NativeSrtlaService.getNativeStats();
             boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
             
-            // Determine the actual state
-            boolean showRetryUI = false;
-            boolean showConnectingUI = false;
-            String statusMessage = "";
-            
-            // Check if connections have failed (wrong host/port)
-            if (hasFailed && !isConnected && retryCount == 0) {
-                // Connection attempt failed, trigger retry
-                showRetryUI = true;
-                statusMessage = "Connection failed, retrying...";
-                Log.i("MainActivity", "Connection failed, showing retry UI");
-            } else if (isRetrying || retryCount > 0) {
-                // We're in retry mode
-                showRetryUI = true;
-                statusMessage = String.format("Reconnecting... (attempt %d)", retryCount);
-                Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (isConnecting && !isConnected && !hasStats) {
-                // We're connecting for the first time
-                showConnectingUI = true;
-                statusMessage = "Connecting to SRTLA receiver...";
-                Log.i("MainActivity", "Showing connecting UI: " + statusMessage);
-            } else if (!isConnected && !hasStats && !hasFailed) {
-                // Still waiting for initial connection
-                showConnectingUI = true;
-                statusMessage = "Establishing connection...";
-                Log.i("MainActivity", "Still establishing connection");
-            }
-            
             // Broadcast the connection state
             Intent intent = new Intent("srtla-retry-status");
             intent.putExtra("is_connected", isConnected);
-            intent.putExtra("is_retrying", showRetryUI);
+            intent.putExtra("is_retrying", isRetrying || retryCount > 0);
             intent.putExtra("retry_count", retryCount);
-            intent.putExtra("is_initial", showConnectingUI);
             LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
             
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
             
-            if (showRetryUI) {
+            // Always check retry state first
+            if (!isConnected && (isRetrying || retryCount > 0)) {
                 // Show retry status
+                String statusMessage = String.format("Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                 textTotalBitrate.setVisibility(View.VISIBLE);
@@ -303,8 +274,11 @@ public class MainActivity extends Activity {
                 
                 textStatus.setText("⏳ Retrying connection...");
                 textStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-            } else if (showConnectingUI) {
+                
+                Log.i("MainActivity", "Showing retry UI: " + statusMessage);
+            } else if (!isConnected && !hasStats) {
                 // Show initial connecting status
+                String statusMessage = "Connecting to SRTLA receiver...";
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 textTotalBitrate.setVisibility(View.VISIBLE);
@@ -315,6 +289,8 @@ public class MainActivity extends Activity {
                 
                 textStatus.setText("⏳ Connecting...");
                 textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                
+                Log.i("MainActivity", "Showing connecting UI");
             } else if (hasStats) {
                 // We have actual stats to display
                 parseAndDisplayConnections(nativeStats);
@@ -328,7 +304,7 @@ public class MainActivity extends Activity {
                     textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 }
             } else {
-                // No stats and no specific state - likely starting up
+                // No stats and no specific state - might be starting up
                 textTotalBitrate.setText("Starting SRTLA service...");
                 textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 textTotalBitrate.setVisibility(View.VISIBLE);
@@ -339,6 +315,14 @@ public class MainActivity extends Activity {
                 textStatus.setText("⏳ Service starting...");
                 textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
             }
+        } else {
+            // Service not running - clear display
+            connectionsContainer.removeAllViews();
+            textNoConnections.setVisibility(View.VISIBLE);
+            textNoConnections.setText("Service not running");
+            
+            TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
+            textTotalBitrate.setVisibility(View.GONE);
         }
         
         // Periodically refresh native SRTLA UI state (handles crashes)

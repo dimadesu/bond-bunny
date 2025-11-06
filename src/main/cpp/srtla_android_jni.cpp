@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <atomic>
+#include <chrono>  // Add this include for std::chrono
 
 // Forward declare the Android SRTLA functions from patched srtla_send.c
 extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
@@ -74,6 +75,9 @@ static std::atomic<bool> srtla_retry_enabled(false);
 static std::atomic<int> srtla_retry_count(0);
 static std::atomic<bool> srtla_connected(false);
 static std::atomic<bool> srtla_has_ever_connected(false);
+
+// Add this global variable to track when SRTLA started
+static std::chrono::steady_clock::time_point srtla_start_time;
 
 struct SrtlaParams {
     char listen_port[16];
@@ -189,6 +193,9 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
     srtla_retry_count.store(0);
     srtla_running.store(true);
     
+    // Record start time for timeout detection
+    srtla_start_time = std::chrono::steady_clock::now();
+    
     // Start SRTLA in background thread with retry logic
     if (pthread_create(&srtla_thread, nullptr, srtla_thread_func, params) != 0) {
         srtla_running.store(false);
@@ -301,33 +308,26 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
         totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
     
-    // Check if we're in a connecting or failed state
-    int isConnecting = srtla_is_connecting();
-    int connectionsFailed = srtla_connections_failed();
-    
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-        "getAllStats: is_connecting=%d, connections_failed=%d", 
-        isConnecting, connectionsFailed);
-    
-    // If we're connecting and haven't established connection yet, return empty
-    if (isConnecting && !hasEverConnected && totalConnections == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still connecting, no connections yet");
-        return env->NewStringUTF("");
-    }
-    
-    // If connections have failed, trigger retry
-    if (connectionsFailed && !isConnected) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connections failed, entering retry mode");
-        if (!hasEverConnected) {
-            // Initial connection failed, start retry
-            srtla_retry_count.store(1);
-        }
-        return env->NewStringUTF("");
-    }
-    
-    // If we're retrying
+    // If we're retrying, return empty to trigger retry UI
     if (retryCount > 0) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
+        return env->NewStringUTF("");
+    }
+    
+    // If not connected and no connections, we might be in initial connection or failed state
+    if (!isConnected && totalConnections == 0) {
+        // Check how long we've been trying to connect
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - srtla_start_time).count();
+        
+        if (elapsed > 5) {
+            // Been trying for more than 5 seconds with no connections - trigger retry
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection timeout, triggering retry mode");
+            srtla_retry_count.store(1);
+            return env->NewStringUTF("");
+        }
+        
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still attempting initial connection");
         return env->NewStringUTF("");
     }
     
@@ -337,10 +337,7 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     
     // If we have no stats data yet
     if (detailsLen <= 0 || strlen(detailsBuffer) == 0) {
-        if (totalConnections == 0 && !isConnected) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats yet, no connections");
-            return env->NewStringUTF("");
-        }
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats data available");
         return env->NewStringUTF("");
     }
     
@@ -350,6 +347,17 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     
     if (hasZeroBitrate && hasMinimalData && totalConnections == 0) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No active data (zero bitrate, no connections)");
+        // Check elapsed time to trigger retry if needed
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - srtla_start_time).count();
+        
+        if (elapsed > 10 && !hasEverConnected) {
+            // Been trying for more than 10 seconds with no successful connection
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection failed after 10s, triggering retry");
+            srtla_retry_count.store(1);
+            return env->NewStringUTF("");
+        }
+        
         return env->NewStringUTF("");
     }
     
