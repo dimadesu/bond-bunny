@@ -477,6 +477,15 @@ public class MainActivity extends Activity {
         hasPostedStartupNotification = true;
         
         try {
+            // Check for notification permission on Android 13+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                        != PackageManager.PERMISSION_GRANTED) {
+                    Log.d("MainActivity", "POST_NOTIFICATIONS permission not granted, skipping startup notification");
+                    return;
+                }
+            }
+            
             final String channelId = NativeSrtlaService.CHANNEL_ID;
             final int notificationId = 1;
 
