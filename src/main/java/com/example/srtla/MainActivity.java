@@ -237,6 +237,19 @@ public class MainActivity extends Activity {
         
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaService.isServiceRunning()) {
+            // First check connection status and broadcast retry state
+            boolean isConnected = NativeSrtlaJni.isConnected();
+            boolean isRetrying = NativeSrtlaJni.isRetrying();
+            int retryCount = NativeSrtlaJni.getRetryCount();
+            
+            // Broadcast the current connection state
+            Intent intent = new Intent("srtla-retry-status");
+            intent.putExtra("is_connected", isConnected);
+            intent.putExtra("is_retrying", isRetrying);
+            intent.putExtra("retry_count", retryCount);
+            intent.putExtra("is_initial", !isConnected && !isRetrying && retryCount == 0);
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+            
             String nativeStats = NativeSrtlaService.getNativeStats();
             
             // Parse and display connection items
