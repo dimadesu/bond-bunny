@@ -80,23 +80,29 @@ public class MainActivity extends Activity {
             boolean isConnected = intent.getBooleanExtra("is_connected", false);
             boolean isInitial = intent.getBooleanExtra("is_initial", false);
             
+            Log.i("MainActivity", String.format("retryReceiver: retrying=%b, count=%d, connected=%b, initial=%b", 
+                  isRetrying, retryCount, isConnected, isInitial));
+            
             runOnUiThread(() -> {
                 TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
                 
                 if (isConnected) {
                     // Connected - hide retry status
                     textTotalBitrate.setVisibility(View.GONE);
+                    Log.i("MainActivity", "retryReceiver: Hiding bitrate text (connected)");
                 } else if (isRetrying) {
                     // Retrying
-                    String message = String.format("Reconnecting... (attempt %d)", retryCount);
+                    String message = String.format("🔄 Reconnecting... (attempt %d)", retryCount);
                     textTotalBitrate.setText(message);
                     textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                     textTotalBitrate.setVisibility(View.VISIBLE);
+                    Log.i("MainActivity", "retryReceiver: Set retry message: " + message);
                 } else if (isInitial) {
                     // Initial connection attempt
                     textTotalBitrate.setText("Connecting to SRTLA server...");
                     textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                     textTotalBitrate.setVisibility(View.VISIBLE);
+                    Log.i("MainActivity", "retryReceiver: Set connecting message");
                 }
             });
         }
