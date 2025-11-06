@@ -44,6 +44,29 @@ extern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char conn
                                                int* window_sizes, int* inflight_packets,
                                                int max_connections);
 
+// Add forward declarations for new functions
+extern "C" int srtla_is_connecting(void);
+extern "C" int srtla_connections_failed(void);
+
+// Forward declarations for all SRTLA C functions we call
+extern "C" {
+    int srtla_start_android(const char* listen_port, const char* srtla_host, 
+                           const char* srtla_port, const char* ips_file);
+    void srtla_stop_android();
+    void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
+                                 int network_type, int socket_fd);
+    int srtla_get_connection_count();
+    int srtla_get_active_connection_count();
+    int srtla_get_total_in_flight_packets();
+    int srtla_get_total_window_size();
+    int srtla_has_established_connections();
+    int srtla_is_connecting();  // ADD THIS
+    int srtla_connections_failed();  // ADD THIS
+    int srtla_get_connection_details(char* buffer, int buffer_size);
+    void srtla_on_connection_established();
+    void srtla_notify_network_change();
+}
+
 static pthread_t srtla_thread;
 static std::atomic<bool> srtla_running(false);
 static std::atomic<bool> srtla_should_stop(false);
@@ -250,20 +273,36 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclas
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
-    if (!srtla_running) {
-        return env->NewStringUTF("No native SRTLA connections");
+    if (!srtla_running.load()) {
+        return env->NewStringUTF("");
     }
     
-    // Get connection counts to determine if we're connected
+    // Get connection counts and state
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
+    bool isConnecting = srtla_is_connecting();  // UPDATED TO USE NEW FUNCTION
+    bool hasFailed = srtla_connections_failed();  // UPDATED TO USE NEW FUNCTION
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
-                       totalConnections, activeConnections, srtla_retry_count.load(), 
-                       srtla_connected.load(), srtla_has_ever_connected.load());
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+        "getAllStats: total=%d, active=%d, connecting=%d, failed=%d, retry_count=%d, connected=%d, ever_connected=%d", 
+        totalConnections, activeConnections, isConnecting, hasFailed,
+        srtla_retry_count.load(), srtla_connected.load(), srtla_has_ever_connected.load());
     
-    // If we're retrying and haven't ever connected, return empty
-    if (srtla_retry_count.load() > 0 && !srtla_has_ever_connected.load()) {
+    // If we're in initial connection phase
+    if (isConnecting && !srtla_has_ever_connected.load()) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt in progress");
+        return env->NewStringUTF("");  // Return empty to trigger "Connecting..." UI
+    }
+    
+    // If we're retrying after a failure
+    if (srtla_retry_count.load() > 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Retry in progress");
+        return env->NewStringUTF("");  // Return empty to trigger retry UI
+    }
+    
+    // If all connections have failed
+    if (hasFailed && !isConnecting) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "All connections failed");
         return env->NewStringUTF("");
     }
     
@@ -271,28 +310,27 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     char detailsBuffer[1024];
     int detailsLen = srtla_get_connection_details(detailsBuffer, sizeof(detailsBuffer));
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: details_len=%d, details=%s", 
-                       detailsLen, detailsBuffer);
-    
-    // Check if we actually have connection details to show
+    // If we have no stats data yet
     if (detailsLen <= 0 || strlen(detailsBuffer) == 0) {
-        // No active connections
-        if (srtla_has_ever_connected.load()) {
-            // We had a connection but lost it
-            srtla_connected.store(false);
+        if (isConnecting) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats yet, still connecting");
             return env->NewStringUTF("");
-        } else if (totalConnections > 0) {
-            // We have connections but no data yet - still connecting
-            return env->NewStringUTF("");
-        } else {
-            // No connections at all
+        }
+        return env->NewStringUTF("");
+    }
+    
+    // Check if stats show actual data (not just "Total bitrate: 0.0 Mbps")
+    if (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL && 
+        strlen(detailsBuffer) < 50) {  // Just the header, no connections
+        if (isConnecting || totalConnections == 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No active data yet");
             return env->NewStringUTF("");
         }
     }
     
-    // We have active connections and data
-    if (!srtla_connected.load()) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on stats data");
+    // We have valid stats - mark as connected if not already
+    if (!srtla_connected.load() && activeConnections > 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections");
         srtla_connected.store(true);
         srtla_has_ever_connected.store(true);
         srtla_retry_count.store(0);
