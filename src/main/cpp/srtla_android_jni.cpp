@@ -301,22 +301,37 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
         totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
     
+    // Check if we're in a connecting or failed state
+    int isConnecting = srtla_is_connecting();
+    int connectionsFailed = srtla_connections_failed();
+    
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+        "getAllStats: is_connecting=%d, connections_failed=%d", 
+        isConnecting, connectionsFailed);
+    
     // Check various retry/connection states
     
-    // 1. If we're retrying after a previous successful connection
+    // 1. If connections have failed and we're not retrying yet, trigger retry
+    if (connectionsFailed && retryCount == 0 && !isConnected) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connections failed, should start retrying");
+        // The retry will be triggered by the thread loop
+        return env->NewStringUTF("");  // Return empty to show appropriate UI
+    }
+    
+    // 2. If we're retrying after a previous successful connection
     if (retryCount > 0 && hasEverConnected && !isConnected) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnecting after disconnection (attempt %d)", retryCount);
         return env->NewStringUTF("");  // Return empty to trigger retry UI
     }
     
-    // 2. If we're retrying the initial connection
+    // 3. If we're retrying the initial connection
     if (retryCount > 0 && !hasEverConnected) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection retry (attempt %d)", retryCount);
         return env->NewStringUTF("");  // Return empty to trigger retry UI
     }
     
-    // 3. If we're in the initial connection attempt (no retries yet)
-    if (!isConnected && !hasEverConnected && retryCount == 0 && totalConnections == 0) {
+    // 4. If we're in the initial connection attempt (no retries yet)
+    if (!isConnected && !hasEverConnected && retryCount == 0 && totalConnections == 0 && isConnecting) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection in progress");
         return env->NewStringUTF("");  // Return empty to trigger "Connecting..." UI
     }

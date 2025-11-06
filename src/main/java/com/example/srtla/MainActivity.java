@@ -248,13 +248,17 @@ public class MainActivity extends Activity {
             
             // Get stats - this might return empty string if retrying/connecting
             String nativeStats = NativeSrtlaService.getNativeStats();
-            boolean hasStats = nativeStats != null && !nativeStats.isEmpty();
+            boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
             
             // Determine the actual state
             boolean showRetryUI = false;
             boolean showConnectingUI = false;
             String statusMessage = "";
             
+            // We're in retry mode if:
+            // 1. isRetrying flag is true OR
+            // 2. retryCount > 0 OR  
+            // 3. We have no stats and enough time has passed since service start
             if (isRetrying || retryCount > 0) {
                 // We're in retry mode
                 showRetryUI = true;
@@ -315,16 +319,32 @@ public class MainActivity extends Activity {
                     textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 }
             } else {
-                // No stats and no retry - might be starting up
-                textTotalBitrate.setText("Starting SRTLA service...");
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                textStatus.setText("⏳ Service starting...");
-                textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                // No stats and no retry - might be starting up or connection failed
+                // Check how long we've been in this state
+                if (!hasStats && !isConnected) {
+                    // If we've been waiting too long without stats, assume connection failed
+                    // The native code should be entering retry mode soon
+                    textTotalBitrate.setText("Waiting for connection...");
+                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                    textTotalBitrate.setVisibility(View.VISIBLE);
+                    
+                    connectionsContainer.removeAllViews();
+                    textNoConnections.setVisibility(View.GONE);
+                    
+                    textStatus.setText("⏳ Attempting connection...");
+                    textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                } else {
+                    // Starting up
+                    textTotalBitrate.setText("Starting SRTLA service...");
+                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                    textTotalBitrate.setVisibility(View.VISIBLE);
+                    
+                    connectionsContainer.removeAllViews();
+                    textNoConnections.setVisibility(View.GONE);
+                    
+                    textStatus.setText("⏳ Service starting...");
+                    textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                }
             }
         }
         
