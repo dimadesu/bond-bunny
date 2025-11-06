@@ -392,23 +392,6 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     return env->NewStringUTF(detailsBuffer);
 }
 
-// Add these helper functions that were referenced but missing
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_isConnecting(JNIEnv *env, jclass clazz) {
-    if (!srtla_running.load()) {
-        return JNI_FALSE;
-    }
-    return srtla_is_connecting() ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_hasConnectionsFailed(JNIEnv *env, jclass clazz) {
-    if (!srtla_running.load()) {
-        return JNI_FALSE;
-    }
-    return srtla_connections_failed() ? JNI_TRUE : JNI_FALSE;
-}
-
 // Update isRetrying to be more comprehensive
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {

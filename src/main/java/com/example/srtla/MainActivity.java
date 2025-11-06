@@ -225,7 +225,7 @@ public class MainActivity extends Activity {
             // Always check retry state first
             if (!isConnected && (isRetrying || retryCount > 0)) {
                 // Show retry status
-                String statusMessage = String.format("Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
+                String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                 textTotalBitrate.setVisibility(View.VISIBLE);
