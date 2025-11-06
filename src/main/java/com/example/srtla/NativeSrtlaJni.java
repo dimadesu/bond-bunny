@@ -50,6 +50,8 @@ public class NativeSrtlaJni {
     // Add new connection status methods
     public static native boolean isConnected();
     public static native boolean isRetrying();
+    public static native boolean isConnecting();
+    public static native boolean hasConnectionsFailed();
     
     // Helper method to get all connection bitrate data in one call
     public static ConnectionBitrateData[] getAllConnectionBitrates() {
