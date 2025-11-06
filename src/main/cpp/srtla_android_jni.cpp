@@ -45,10 +45,6 @@ extern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char conn
                                                int* window_sizes, int* inflight_packets,
                                                int max_connections);
 
-// Add forward declarations for new functions
-extern "C" int srtla_is_connecting(void);
-extern "C" int srtla_connections_failed(void);
-
 // Forward declarations for all SRTLA C functions we call
 extern "C" {
     int srtla_start_android(const char* listen_port, const char* srtla_host, 
@@ -60,9 +56,6 @@ extern "C" {
     int srtla_get_active_connection_count();
     int srtla_get_total_in_flight_packets();
     int srtla_get_total_window_size();
-    int srtla_has_established_connections();
-    int srtla_is_connecting();  // ADD THIS
-    int srtla_connections_failed();  // ADD THIS
     int srtla_get_connection_details(char* buffer, int buffer_size);
     void srtla_on_connection_established();
     void srtla_notify_network_change();
