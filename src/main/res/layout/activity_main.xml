@@ -126,6 +126,32 @@
         android:gravity="center" />
     </LinearLayout>
 
+    <!-- Add retry indicator after status text -->
+    <LinearLayout
+      android:id="@+id/retry_indicator"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center"
+      android:padding="8dp"
+      android:visibility="gone"
+      android:background="@drawable/retry_background">
+
+      <ProgressBar
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:indeterminate="true"
+        android:layout_marginEnd="8dp" />
+
+      <TextView
+        android:id="@+id/text_retry_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reconnecting..."
+        android:textColor="@android:color/holo_orange_dark"
+        android:textSize="14sp" />
+    </LinearLayout>
+
   </LinearLayout>
 
 </ScrollView>

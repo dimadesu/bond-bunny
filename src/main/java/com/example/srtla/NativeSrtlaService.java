@@ -17,6 +17,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
 import java.io.File;
@@ -69,6 +70,8 @@ public class NativeSrtlaService extends Service {
     private WifiManager.WifiLock wifiLock;
     
     // Native methods are accessed through NativeSrtlaJni wrapper
+    
+    private static int currentRetryCount = 0;
     
     @Override
     public void onCreate() {
@@ -715,6 +718,57 @@ public class NativeSrtlaService extends Service {
             
             NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
+        }
+    }
+    
+    /**
+     * Get the current retry count
+     */
+    public static int getRetryCount() {
+        if (!isServiceRunning) return 0;
+        try {
+            return NativeSrtlaJni.getRetryCount();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get retry count", e);
+            return 0;
+        }
+    }
+    
+    private void updateStats() {
+        if (!isServiceRunning) return;
+        
+        try {
+            // Get stats with minimal overhead
+            String stats = NativeSrtlaJni.getAllStats();
+            
+            // Check retry status
+            int retryCount = NativeSrtlaJni.getRetryCount();
+            if (retryCount != currentRetryCount) {
+                currentRetryCount = retryCount;
+                // Broadcast retry status change
+                Intent retryIntent = new Intent("srtla-retry-status");
+                retryIntent.putExtra("retry_count", retryCount);
+                retryIntent.putExtra("is_retrying", retryCount > 0);
+                LocalBroadcastManager.getInstance(this).sendBroadcast(retryIntent);
+            }
+            
+            if (stats != null && !stats.isEmpty()) {
+                // Broadcast stats
+                Intent intent = new Intent("srtla-stats");
+                intent.putExtra("stats", stats);
+                LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+                
+                // If we have valid stats and were retrying, reset retry count
+                if (currentRetryCount > 0 && stats.contains("Total bitrate:")) {
+                    currentRetryCount = 0;
+                    Intent connectedIntent = new Intent("srtla-retry-status");
+                    connectedIntent.putExtra("retry_count", 0);
+                    connectedIntent.putExtra("is_retrying", false);
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(connectedIntent);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to update stats", e);
         }
     }
 }

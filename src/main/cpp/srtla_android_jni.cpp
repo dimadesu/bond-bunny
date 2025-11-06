@@ -49,6 +49,7 @@ static std::atomic<bool> srtla_running(false);
 static std::atomic<bool> srtla_should_stop(false);
 static std::atomic<bool> srtla_retry_enabled(false);
 static std::atomic<int> srtla_retry_count(0);
+static std::atomic<bool> srtla_connected(false);
 
 struct SrtlaParams {
     char listen_port[16];
@@ -60,13 +61,17 @@ struct SrtlaParams {
 // Thread function to run SRTLA with retry logic
 static void* srtla_thread_func(void* args) {
     SrtlaParams* params = (SrtlaParams*)args;
-    const int MAX_RETRIES = -1;  // Infinite retries
     const int RETRY_DELAY_MS = 3000;  // 3 seconds between retries
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA with retry support...");
     
-    while (!srtla_should_stop.load() && (MAX_RETRIES < 0 || srtla_retry_count.load() < MAX_RETRIES)) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA attempt %d", srtla_retry_count.load() + 1);
+    srtla_retry_count.store(0);
+    srtla_connected.store(false);
+    
+    while (!srtla_should_stop.load()) {
+        if (srtla_retry_count.load() > 0) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA retry attempt %d", srtla_retry_count.load());
+        }
         
         // Call the Android-patched SRTLA function
         int result = srtla_start_android(params->listen_port, params->srtla_host,
@@ -79,12 +84,16 @@ static void* srtla_thread_func(void* args) {
         
         if (result == 0) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally");
+            srtla_connected.store(false);
             break;
         } else {
-            __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", 
-                "SRTLA failed with code %d, will retry in %dms...", result, RETRY_DELAY_MS);
-            
+            // Connection failed, increment retry count
             srtla_retry_count.fetch_add(1);
+            srtla_connected.store(false);
+            
+            __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", 
+                "SRTLA failed with code %d, will retry in %dms... (attempt %d)", 
+                result, RETRY_DELAY_MS, srtla_retry_count.load());
             
             // Sleep with interruption check
             for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
@@ -96,6 +105,7 @@ static void* srtla_thread_func(void* args) {
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA thread exiting");
     delete params;
     srtla_running.store(false);
+    srtla_retry_count.store(0);
     return nullptr;
 }
 
@@ -173,6 +183,13 @@ Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass c
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_srtla_NativeSrtlaJni_getRetryCount(JNIEnv *env, jclass clazz) {
     return srtla_retry_count.load();
+}
+
+// Add a callback that SRTLA can call when connection is established
+extern "C" void srtla_on_connection_established() {
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, resetting retry count");
+    srtla_connected.store(true);
+    srtla_retry_count.store(0);
 }
 
 extern "C" JNIEXPORT void JNICALL

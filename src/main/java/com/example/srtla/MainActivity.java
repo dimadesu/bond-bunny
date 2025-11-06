@@ -24,6 +24,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
+import android.view.View;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.app.NotificationCompat;
@@ -32,6 +33,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.Context;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
@@ -73,10 +75,13 @@ public class MainActivity extends Activity {
     private BroadcastReceiver retryStatusReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            int retryCount = NativeSrtlaJni.getRetryCount();
-            if (retryCount > 0) {
+            int retryCount = intent.getIntExtra("retry_count", 0);
+            boolean isRetrying = intent.getBooleanExtra("is_retrying", false);
+            
+            if (isRetrying && retryCount > 0) {
                 String message = String.format("⚠️ Connection failed. Retrying... (attempt %d)", retryCount);
                 textStatus.setText(message);
+                textStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
             }
         }
     };
@@ -230,17 +235,24 @@ public class MainActivity extends Activity {
     
     private void parseAndDisplayConnections(String statsText) {
         if (statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
-            // Check if we're in retry mode
-            int retryCount = NativeSrtlaJni.getRetryCount();
-            if (retryCount > 0) {
-                // Show retry status instead of clearing display
-                textTotalBitrate.setText(String.format("Reconnecting... (attempt %d)", retryCount));
-                textTotalBitrate.setVisibility(android.view.View.VISIBLE);
-                return;
+            // Check if we're in retry mode via the service
+            if (NativeSrtlaService.isServiceRunning()) {
+                int retryCount = NativeSrtlaService.getRetryCount();
+                if (retryCount > 0) {
+                    // Show retry status in the bitrate area
+                    textTotalBitrate.setText(String.format("Reconnecting... (attempt %d)", retryCount));
+                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                    textTotalBitrate.setVisibility(View.VISIBLE);
+                    clearConnectionsDisplay();
+                    return;
+                }
             }
             clearConnectionsDisplay();
             return;
         }
+        
+        // Reset text color when connection is established
+        textTotalBitrate.setTextColor(getResources().getColor(android.R.color.primary_text_dark));
         
         // Clear existing views
         connectionsContainer.removeAllViews();
@@ -349,22 +361,20 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        
+        // Register receivers
+        LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
+            new IntentFilter("srtla-error"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(networkChangeReceiver, 
+            new IntentFilter("network-changed"));
+        // Register retry status receiver
+        LocalBroadcastManager.getInstance(this).registerReceiver(retryStatusReceiver,
+            new IntentFilter("srtla-retry-status"));
+        
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
         // Also check native SRTLA state
         updateNativeSrtlaUI();
-        
-        // Register network change receiver
-        IntentFilter networkFilter = new IntentFilter("com.example.srtla.NETWORK_CHANGED");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(networkChangeReceiver, networkFilter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(networkChangeReceiver, networkFilter);
-        }
-        Log.i("MainActivity", "Registered network change receiver");
-        
-        // Register error receiver
-        setupErrorReceiver();
     }
     
     @Override
@@ -397,6 +407,9 @@ public class MainActivity extends Activity {
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Error receiver was not registered");
         }
+        
+        // Unregister retry status receiver
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(retryStatusReceiver);
     }
     
     private void loadPreferences() {
