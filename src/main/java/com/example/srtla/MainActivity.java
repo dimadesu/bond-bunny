@@ -262,7 +262,7 @@ public class MainActivity extends Activity {
     private void parseAndDisplayConnections(String statsText) {
         // Handle empty or no-connection state
         if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
-            // Don't clear display if we're showing retry status
+            // Check if we're showing retry status
             View retryView = findViewById(R.id.text_total_bitrate);
             if (retryView != null && retryView.getVisibility() == View.VISIBLE) {
                 String text = textTotalBitrate.getText().toString();
@@ -272,6 +272,19 @@ public class MainActivity extends Activity {
                     textNoConnections.setVisibility(View.GONE);
                     return;
                 }
+            }
+            
+            // If native SRTLA is running but we have no stats, show connecting status
+            if (NativeSrtlaService.isServiceRunning()) {
+                // Show connecting status
+                textTotalBitrate.setText("Connecting to SRTLA server...");
+                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                // Clear connections display but keep the retry message visible
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+                return;
             }
             
             clearConnectionsDisplay();

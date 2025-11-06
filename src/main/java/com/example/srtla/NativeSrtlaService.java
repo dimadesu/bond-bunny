@@ -768,72 +768,65 @@ public class NativeSrtlaService extends Service {
         if (!isServiceRunning) return;
         
         try {
-            // Get stats with minimal overhead
-            String stats = NativeSrtlaJni.getAllStats();
-            
-            // Check retry status first
+            // Check connection and retry status first
+            boolean isConnected = NativeSrtlaJni.isConnected();
+            boolean isRetrying = NativeSrtlaJni.isRetrying();
             int retryCount = NativeSrtlaJni.getRetryCount();
             
-            // Determine if we have an active connection
-            boolean isConnected = stats != null && !stats.isEmpty() && 
-                                  stats.contains("Total bitrate:") && 
-                                  !stats.contains("Total bitrate: 0.00 Mbps");
+            // Determine what state we're in
+            if (!isConnected && !hasEstablishedConnection) {
+                // Initial connection attempt or waiting to retry
+                Intent connectingIntent = new Intent("srtla-retry-status");
+                connectingIntent.putExtra("retry_count", retryCount);
+                connectingIntent.putExtra("is_retrying", true);
+                connectingIntent.putExtra("is_initial", !hasEstablishedConnection);
+                connectingIntent.putExtra("is_connected", false);
+                LocalBroadcastManager.getInstance(this).sendBroadcast(connectingIntent);
+                
+                // Update our tracking
+                currentRetryCount = retryCount;
+                return; // Don't send stats while connecting
+            }
             
-            // Update retry count and broadcast status changes
-            if (retryCount != currentRetryCount) {
+            // Check if we just connected
+            if (isConnected && (!hasEstablishedConnection || currentRetryCount > 0)) {
+                // First time connected or reconnected after retry
+                hasEstablishedConnection = true;
+                currentRetryCount = 0;
+                
+                // Send connection established notification
+                Intent connectedIntent = new Intent("srtla-retry-status");
+                connectedIntent.putExtra("retry_count", 0);
+                connectedIntent.putExtra("is_retrying", false);
+                connectedIntent.putExtra("is_connected", true);
+                LocalBroadcastManager.getInstance(this).sendBroadcast(connectedIntent);
+            }
+            
+            // Check if we lost connection
+            if (!isConnected && hasEstablishedConnection) {
+                // Lost connection, will start retrying
+                hasEstablishedConnection = false;
                 currentRetryCount = retryCount;
                 
-                if (retryCount > 0) {
-                    // We're retrying - don't send stats, send retry status instead
-                    hasEstablishedConnection = false;
-                    Intent retryIntent = new Intent("srtla-retry-status");
-                    retryIntent.putExtra("retry_count", retryCount);
-                    retryIntent.putExtra("is_retrying", true);
-                    LocalBroadcastManager.getInstance(this).sendBroadcast(retryIntent);
-                    
-                    // Don't send stats while retrying
-                    return;
-                }
+                Intent retryIntent = new Intent("srtla-retry-status");
+                retryIntent.putExtra("retry_count", retryCount);
+                retryIntent.putExtra("is_retrying", true);
+                retryIntent.putExtra("is_initial", false);
+                retryIntent.putExtra("is_connected", false);
+                LocalBroadcastManager.getInstance(this).sendBroadcast(retryIntent);
+                return; // Don't send stats while disconnected
             }
             
-            // If we're not connected and not actively retrying, we might be in initial connection attempt
-            if (!isConnected && !hasEstablishedConnection) {
-                // Check if this is the initial connection attempt (no retry count yet)
-                if (currentRetryCount == 0) {
-                    // Broadcast initial connecting status
-                    Intent connectingIntent = new Intent("srtla-retry-status");
-                    connectingIntent.putExtra("retry_count", 0);
-                    connectingIntent.putExtra("is_retrying", true);
-                    connectingIntent.putExtra("is_initial", true);
-                    LocalBroadcastManager.getInstance(this).sendBroadcast(connectingIntent);
-                }
-                // Don't send empty stats during initial connection
-                return;
-            }
-            
-            // If we have valid stats and a connection
+            // If we're connected, get and send stats
             if (isConnected) {
-                if (!hasEstablishedConnection || currentRetryCount > 0) {
-                    // First time connected or reconnected after retry
-                    hasEstablishedConnection = true;
-                    currentRetryCount = 0;
-                    
-                    // Send connection established notification
-                    Intent connectedIntent = new Intent("srtla-retry-status");
-                    connectedIntent.putExtra("retry_count", 0);
-                    connectedIntent.putExtra("is_retrying", false);
-                    connectedIntent.putExtra("is_connected", true);
-                    LocalBroadcastManager.getInstance(this).sendBroadcast(connectedIntent);
-                }
+                String stats = NativeSrtlaJni.getAllStats();
                 
-                // Now send the actual stats
-                Intent statsIntent = new Intent("srtla-stats");
-                statsIntent.putExtra("stats", stats);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(statsIntent);
-            } else if (hasEstablishedConnection) {
-                // We had a connection but lost it - this will trigger retry in native code
-                hasEstablishedConnection = false;
-                // Don't send empty stats, wait for retry status update
+                // Only send stats if we have actual data
+                if (stats != null && !stats.isEmpty() && !stats.equals("No native SRTLA connections")) {
+                    Intent statsIntent = new Intent("srtla-stats");
+                    statsIntent.putExtra("stats", stats);
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(statsIntent);
+                }
             }
             
         } catch (Exception e) {

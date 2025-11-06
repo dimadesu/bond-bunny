@@ -254,6 +254,16 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         return env->NewStringUTF("No native SRTLA connections");
     }
     
+    // Check if we're retrying
+    if (srtla_retry_count.load() > 0 && !srtla_connected.load()) {
+        return env->NewStringUTF("");  // Return empty during retry
+    }
+    
+    // Check if initial connection hasn't been established yet
+    if (!srtla_has_ever_connected.load() && !srtla_connected.load()) {
+        return env->NewStringUTF("");  // Return empty during initial connection
+    }
+    
     // Get summary stats
     int totalConnections = srtla_get_connection_count();
     int activeConnections = srtla_get_active_connection_count();
@@ -266,13 +276,35 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getAllStats: total=%d, active=%d, inflight=%d", 
                        totalConnections, activeConnections, inFlightPackets);
     
+    // Check if we actually have connection details to show
+    if (detailsLen <= 0 || activeConnections == 0) {
+        // No active connections, we might be disconnected
+        if (srtla_has_ever_connected.load()) {
+            // We had a connection but lost it
+            srtla_connected.store(false);
+        }
+        return env->NewStringUTF("");
+    }
+    
     // Format combined stats string
     char statsBuffer[1536];
     int len = snprintf(statsBuffer, sizeof(statsBuffer),
                        "%s",
-                       (detailsLen > 0) ? detailsBuffer : "No connection details available");
+                       detailsBuffer);
     
     return env->NewStringUTF(statsBuffer);
+}
+
+// Add a new JNI method to check if connected
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_srtla_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz) {
+    return srtla_connected.load();
+}
+
+// Add a new JNI method to check if retrying
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
+    return srtla_retry_count.load() > 0;
 }
 
 // Virtual IP JNI function
