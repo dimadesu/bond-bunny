@@ -71,9 +71,6 @@ public class NativeSrtlaService extends Service {
     
     // Native methods are accessed through NativeSrtlaJni wrapper
     
-    private static int currentRetryCount = 0;
-    private static boolean hasEstablishedConnection = false;
-    
     @Override
     public void onCreate() {
         super.onCreate();
@@ -172,10 +169,6 @@ public class NativeSrtlaService extends Service {
             // Update notification
             updateNotification("Starting service...");
             
-            // Reset connection state
-            hasEstablishedConnection = false;
-            currentRetryCount = 0;
-            
             // Start native SRTLA
             int result = NativeSrtlaJni.startSrtlaNative(listenPort, srtlaHost, srtlaPort, ipsFile.getAbsolutePath());
             
@@ -185,9 +178,6 @@ public class NativeSrtlaService extends Service {
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     isServiceRunning = true;
                     updateNotification("Service is running on port " + listenPort);
-                    
-                    // Start monitoring thread for stats and retry status
-                    new Thread(this::monitorNativeSrtla).start();
                 } else {
                     Log.w(TAG, "Native SRTLA start returned 0 but process is not running");
                     updateNotification("Service failed to start. Native code returned 0");
@@ -203,20 +193,6 @@ public class NativeSrtlaService extends Service {
             Log.e(TAG, "Error starting native SRTLA", e);
             updateNotification("Error starting service: " + e.getMessage());
             stopSelf();
-        }
-    }
-    
-    private void monitorNativeSrtla() {
-        while (isServiceRunning) {
-            try {
-                Thread.sleep(1000); // Update every second
-                updateStats();
-            } catch (InterruptedException e) {
-                Log.i(TAG, "Monitor thread interrupted");
-                break;
-            } catch (Exception e) {
-                Log.e(TAG, "Error in monitor thread", e);
-            }
         }
     }
     
@@ -516,38 +492,30 @@ public class NativeSrtlaService extends Service {
     
     /**
      * Get simple statistics from native SRTLA
-     * @return formatted statistics string or empty if not connected
+     * @return formatted statistics string
      */
     public static String getNativeStats() {
         try {
+            // Log.i(TAG, "getNativeStats called, isServiceRunning=" + isServiceRunning);
+            
             if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
-                return "";
+                // Log.i(TAG, "Native SRTLA not running, returning default message");
+                return "No native SRTLA connections";
             }
             
-            // Only return stats if we have an established connection
-            if (!hasEstablishedConnection && currentRetryCount == 0) {
-                // Initial connection attempt
-                return "";
-            }
-            
-            if (currentRetryCount > 0) {
-                // Currently retrying
-                return "";
-            }
-            
+            // Log.i(TAG, "Calling optimized native stats function...");
+            // Single JNI call instead of 4 separate calls - much more efficient!
             String nativeStats = NativeSrtlaJni.getAllStats();
             
-            // Validate that we have actual connection data
-            if (nativeStats != null && nativeStats.contains("Total bitrate:") && 
-                !nativeStats.contains("Total bitrate: 0.00 Mbps")) {
-                return nativeStats;
-            }
+            // Add timestamp to see if values change over time
+            // Log.i(TAG, "Stats timestamp: " + System.currentTimeMillis());
+            // Log.i(TAG, "Native stats result: " + nativeStats);
             
-            return "";
+            return nativeStats;
             
         } catch (Exception e) {
             Log.e(TAG, "Error getting native stats", e);
-            return "";
+            return "Error getting native stats: " + e.getMessage();
         }
     }
     
@@ -748,76 +716,6 @@ public class NativeSrtlaService extends Service {
             
             NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
-        }
-    }
-    
-    /**
-     * Get the current retry count
-     */
-    public static int getRetryCount() {
-        if (!isServiceRunning) return 0;
-        try {
-            return NativeSrtlaJni.getRetryCount();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to get retry count", e);
-            return 0;
-        }
-    }
-    
-    private void updateStats() {
-        if (!isServiceRunning) return;
-        
-        try {
-            // Get stats from native SRTLA
-            String stats = NativeSrtlaJni.getAllStats();
-            
-            // Check connection status
-            boolean isConnected = NativeSrtlaJni.isConnected();
-            int retryCount = NativeSrtlaJni.getRetryCount();
-            
-            // Handle different states
-            if (!isConnected && retryCount > 0) {
-                // We're retrying
-                Intent retryIntent = new Intent("srtla-retry-status");
-                retryIntent.putExtra("retry_count", retryCount);
-                retryIntent.putExtra("is_retrying", true);
-                retryIntent.putExtra("is_connected", false);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(retryIntent);
-                
-                currentRetryCount = retryCount;
-                hasEstablishedConnection = false;
-                return;
-            }
-            
-            if (isConnected && !hasEstablishedConnection) {
-                // First time connected
-                hasEstablishedConnection = true;
-                currentRetryCount = 0;
-                
-                Intent connectedIntent = new Intent("srtla-retry-status");
-                connectedIntent.putExtra("retry_count", 0);
-                connectedIntent.putExtra("is_retrying", false);
-                connectedIntent.putExtra("is_connected", true);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(connectedIntent);
-            }
-            
-            // Send stats if we have valid data
-            if (stats != null && !stats.isEmpty() && !stats.equals("No native SRTLA connections")) {
-                Intent statsIntent = new Intent("srtla-stats");
-                statsIntent.putExtra("stats", stats);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(statsIntent);
-            } else if (!isConnected && !hasEstablishedConnection) {
-                // Initial connection attempt - show connecting state
-                Intent connectingIntent = new Intent("srtla-retry-status");
-                connectingIntent.putExtra("retry_count", 0);
-                connectingIntent.putExtra("is_retrying", false);
-                connectingIntent.putExtra("is_initial", true);
-                connectingIntent.putExtra("is_connected", false);
-                LocalBroadcastManager.getInstance(this).sendBroadcast(connectingIntent);
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to update stats", e);
         }
     }
 }
