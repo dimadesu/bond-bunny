@@ -70,43 +70,6 @@ public class MainActivity extends Activity {
             updateConnectionStats();
         }
     };
-    
-    // Add retry status receiver
-    private final BroadcastReceiver retryReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            int retryCount = intent.getIntExtra("retry_count", 0);
-            boolean isRetrying = intent.getBooleanExtra("is_retrying", false);
-            boolean isConnected = intent.getBooleanExtra("is_connected", false);
-            boolean isInitial = intent.getBooleanExtra("is_initial", false);
-            
-            Log.i("MainActivity", String.format("retryReceiver: retrying=%b, count=%d, connected=%b, initial=%b", 
-                  isRetrying, retryCount, isConnected, isInitial));
-            
-            runOnUiThread(() -> {
-                TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
-                
-                if (isConnected) {
-                    // Connected - hide retry status
-                    textTotalBitrate.setVisibility(View.GONE);
-                    Log.i("MainActivity", "retryReceiver: Hiding bitrate text (connected)");
-                } else if (isRetrying) {
-                    // Retrying
-                    String message = String.format("🔄 Reconnecting... (attempt %d)", retryCount);
-                    textTotalBitrate.setText(message);
-                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                    textTotalBitrate.setVisibility(View.VISIBLE);
-                    Log.i("MainActivity", "retryReceiver: Set retry message: " + message);
-                } else if (isInitial) {
-                    // Initial connection attempt
-                    textTotalBitrate.setText("Connecting to SRTLA server...");
-                    textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                    textTotalBitrate.setVisibility(View.VISIBLE);
-                    Log.i("MainActivity", "retryReceiver: Set connecting message");
-                }
-            });
-        }
-    };
 
     private Runnable statsUpdateRunnable;
 
@@ -255,13 +218,6 @@ public class MainActivity extends Activity {
             // Get stats - this might return empty string if retrying/connecting
             String nativeStats = NativeSrtlaService.getNativeStats();
             boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
-            
-            // Broadcast the connection state
-            Intent intent = new Intent("srtla-retry-status");
-            intent.putExtra("is_connected", isConnected);
-            intent.putExtra("is_retrying", isRetrying || retryCount > 0);
-            intent.putExtra("retry_count", retryCount);
-            LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
             
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
@@ -473,9 +429,6 @@ public class MainActivity extends Activity {
             new IntentFilter("srtla-error"));
         LocalBroadcastManager.getInstance(this).registerReceiver(networkChangeReceiver, 
             new IntentFilter("network-changed"));
-        // Register retry status receiver
-        LocalBroadcastManager.getInstance(this).registerReceiver(retryReceiver,
-            new IntentFilter("srtla-retry-status"));
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
@@ -513,9 +466,6 @@ public class MainActivity extends Activity {
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Error receiver was not registered");
         }
-        
-        // Unregister retry status receiver
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(retryReceiver);
     }
     
     private void loadPreferences() {
