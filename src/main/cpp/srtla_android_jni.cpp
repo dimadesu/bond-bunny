@@ -354,12 +354,11 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     // Check if stats show actual data
     bool hasZeroBitrate = (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL || 
                            strstr(detailsBuffer, "Total bitrate: 0.00 Mbps") != NULL);
-    bool hasMinimalData = (strlen(detailsBuffer) < 50);  // Just the header line
     
-    // If we only have "Total bitrate: 0.0 Mbps" with no connections, return empty
-    if (hasZeroBitrate && (totalConnections == 0 || activeConnections == 0)) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Only zero bitrate, no real data (total=%d, active=%d)", 
-                          totalConnections, activeConnections);
+    // If we only have zero bitrate with no connections AND not connected, return empty
+    // But if we ARE connected, show stats even if zero (connection exists but no data flowing)
+    if (!isConnected && hasZeroBitrate && (totalConnections == 0 || activeConnections == 0)) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Not connected, only zero bitrate, no real data");
         return env->NewStringUTF("");
     }
     
