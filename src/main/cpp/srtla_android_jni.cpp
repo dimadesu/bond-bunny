@@ -324,20 +324,22 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         return env->NewStringUTF("");
     }
     
-    // If not connected and no connections, we might be in initial connection or failed state
-    if (!isConnected && totalConnections == 0) {
+    // If not connected and no active connections, we might be in initial connection or failed state
+    if (!isConnected && activeConnections == 0) {
         // Check how long we've been trying to connect
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - srtla_start_time).count();
         
         if (elapsed > 5) {
-            // Been trying for more than 5 seconds with no connections - trigger retry
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection timeout, triggering retry mode");
+            // Been trying for more than 5 seconds with no active connections - trigger retry
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection timeout after %ld sec, triggering retry mode (total=%d, active=%d)", 
+                              elapsed, totalConnections, activeConnections);
             srtla_retry_count.store(1);
             return env->NewStringUTF("");
         }
         
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still attempting initial connection");
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still attempting initial connection (elapsed=%ld, total=%d, active=%d)", 
+                          elapsed, totalConnections, activeConnections);
         return env->NewStringUTF("");
     }
     
