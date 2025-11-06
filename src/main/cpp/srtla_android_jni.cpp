@@ -111,13 +111,15 @@ static void* srtla_thread_func(void* args) {
             break;
         }
         
+        // Check if connection was successful (we ever got connected)
+        bool wasConnected = srtla_has_ever_connected.load();
+        
         if (result == 0) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally");
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally (result=0)");
             srtla_connected.store(false);
             
-            // If we've connected before and exit normally, this is a disconnect
-            if (srtla_has_ever_connected.load()) {
-                // Increment retry count immediately for reconnection
+            // If we've connected before and exit normally, this is a disconnect - retry
+            if (wasConnected) {
                 srtla_retry_count.fetch_add(1);
                 __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
                     "Connection lost after successful connection, will retry (attempt %d)", 
@@ -125,13 +127,31 @@ static void* srtla_thread_func(void* args) {
                 
                 // Sleep with interruption check
                 for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
-                    usleep(100 * 1000);  // Sleep 100ms at a time
+                    usleep(100 * 1000);
                 }
-                continue;  // Retry the connection
+                continue;
             }
-            break;  // First connection never succeeded, don't retry
+            
+            // First connection attempt never connected - also retry if timeout triggered
+            if (srtla_retry_count.load() > 0) {
+                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+                    "Initial connection failed (timeout), will retry (attempt %d)", 
+                    srtla_retry_count.load());
+                
+                srtla_retry_count.fetch_add(1);
+                
+                // Sleep with interruption check
+                for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
+                    usleep(100 * 1000);
+                }
+                continue;
+            }
+            
+            // No timeout triggered yet, just exit
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited before timeout, stopping");
+            break;
         } else {
-            // Connection failed
+            // Connection failed with error code
             srtla_connected.store(false);
             
             // Increment retry count for any failure
@@ -140,15 +160,9 @@ static void* srtla_thread_func(void* args) {
                 "SRTLA failed with code %d, will retry in %dms... (attempt %d)", 
                 result, RETRY_DELAY_MS, srtla_retry_count.load());
             
-            // Mark that we've at least attempted to connect
-            if (srtla_retry_count.load() == 1) {
-                // First failure of initial connection attempt
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt failed");
-            }
-            
             // Sleep with interruption check
             for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
-                usleep(100 * 1000);  // Sleep 100ms at a time
+                usleep(100 * 1000);
             }
         }
     }
