@@ -16,6 +16,8 @@
 #include <errno.h>
 #include <atomic>
 #include <chrono>  // Add this include for std::chrono
+#include <set>
+#include <mutex>
 
 // Forward declarations for all SRTLA C functions we call
 extern "C" {
@@ -59,6 +61,11 @@ static std::atomic<bool> srtla_retry_enabled(false);
 static std::atomic<int> srtla_retry_count(0);
 static std::atomic<bool> srtla_connected(false);
 static std::atomic<bool> srtla_has_ever_connected(false);
+
+// File descriptor tracking to prevent leaks
+// Java-owned FDs (from network callbacks) should not be closed by native code
+static std::set<int> java_owned_fds;
+static std::mutex java_fds_mutex;
 
 struct SrtlaParams {
     char listen_port[16];
@@ -270,6 +277,12 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     srtla_has_ever_connected.store(false);
     srtla_retry_enabled.store(false);
     
+    // Clear Java FD tracking
+    {
+        std::lock_guard<std::mutex> lock(java_fds_mutex);
+        java_owned_fds.clear();
+    }
+    
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA fully stopped and state completely reset");
     
     return 0;
@@ -305,6 +318,12 @@ extern "C" void srtla_on_connection_established() {
     if (!hadEverConnected) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "First successful connection achieved");
     }
+}
+
+// Function to check if an FD is owned by Java (exported for srtla_send.c)
+extern "C" int srtla_is_java_owned_fd(int fd) {
+    std::lock_guard<std::mutex> lock(java_fds_mutex);
+    return java_owned_fds.find(fd) != java_owned_fds.end() ? 1 : 0;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -454,6 +473,15 @@ Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz
                                                       jint network_type, jint socket_fd) {
     const char *virtual_ip_str = env->GetStringUTFChars(virtual_ip, nullptr);
     const char *real_ip_str = env->GetStringUTFChars(real_ip, nullptr);
+    
+    // Track this as a Java-owned FD
+    {
+        std::lock_guard<std::mutex> lock(java_fds_mutex);
+        java_owned_fds.insert(socket_fd);
+        __android_log_print(ANDROID_LOG_DEBUG, "SRTLA-JNI", 
+                          "Tracking Java-owned FD %d for %s->%s", 
+                          socket_fd, virtual_ip_str, real_ip_str);
+    }
     
     srtla_set_network_socket(virtual_ip_str, real_ip_str, network_type, socket_fd);
     
