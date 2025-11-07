@@ -29,6 +29,7 @@ extern "C" int srtla_get_active_connection_count(void);
 extern "C" int srtla_get_total_in_flight_packets(void);
 extern "C" int srtla_get_total_window_size(void);
 extern "C" int srtla_get_connection_details(char* buffer, int buffer_size);
+extern "C" int srtla_is_reconnecting(void);
 
 // Virtual IP functions
 extern "C" void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
@@ -375,10 +376,11 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     int retryCount = srtla_retry_count.load();
     bool isConnected = srtla_connected.load();
     bool hasEverConnected = srtla_has_ever_connected.load();
+    bool isReconnecting = srtla_is_reconnecting();
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-        "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
-        totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
+        "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d, reconnecting=%d", 
+        totalConnections, activeConnections, retryCount, isConnected, hasEverConnected, isReconnecting);
     
     // If we have active connections but not marked as connected, update state
     if (!isConnected && activeConnections > 0) {
@@ -390,10 +392,23 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         retryCount = 0;      // Update local variable
     }
     
+    // If no active connections but we were connected, mark as disconnected
+    if (isConnected && activeConnections == 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Lost all connections, marking as disconnected");
+        srtla_connected.store(false);
+        isConnected = false;
+    }
+    
     // Determine what to show based on state
     if (!hasEverConnected && retryCount == 0) {
         // Initial connection attempt, show "Connecting..."
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt in progress");
+        return env->NewStringUTF("");
+    }
+    
+    if (isReconnecting || (!isConnected && hasEverConnected)) {
+        // We're reconnecting (lost connection and trying to restore)
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnecting after connection loss");
         return env->NewStringUTF("");
     }
     
