@@ -236,6 +236,17 @@ public class MainActivity extends Activity {
                 textStatus.setText("⏳ Retrying connection...");
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
+            } else if (isConnected && !hasStats) {
+                // Connected but stats not available yet (brief data pause)
+                textTotalBitrate.setText("Connected (loading stats...)");
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+                
+                textStatus.setText("✅ Service is running");
+                
+                Log.i("MainActivity", "Connected but waiting for stats");
             } else if (!isConnected && !hasStats) {
                 // Show initial connecting status
                 String statusMessage = "Connecting to SRTLA receiver...";
