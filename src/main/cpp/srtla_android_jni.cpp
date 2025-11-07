@@ -83,24 +83,32 @@ struct SrtlaParams {
 static void* srtla_thread_func(void* args) {
     SrtlaParams* params = (SrtlaParams*)args;
     const int RETRY_DELAY_MS = 3000;  // 3 seconds between retries
-    const int INITIAL_CONNECTION_TIMEOUT_MS = 15000;  // 15 seconds for initial connection
+    const int INITIAL_CONNECTION_TIMEOUT_MS = 10000;  // 10 seconds for initial connection
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA with retry support...");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA thread with params: host=%s port=%s", 
+                       params->srtla_host, params->srtla_port);
     
-    // Reset ALL state at thread start
+    // Reset ALL state at thread start to ensure clean slate
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
     
-    // Track when we started for timeout detection
+    // Track when we started for timeout detection (local to this thread)
     auto thread_start_time = std::chrono::steady_clock::now();
-    bool initial_timeout_triggered = false;
     
     while (!srtla_should_stop.load()) {
-        if (srtla_retry_count.load() > 0) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA retry attempt %d", srtla_retry_count.load());
+        // Log current attempt
+        if (srtla_has_ever_connected.load()) {
+            // We had a connection before, this is a reconnection attempt
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnection attempt %d after disconnect", 
+                              srtla_retry_count.load() + 1);
+        } else if (srtla_retry_count.load() > 0) {
+            // Never connected but retrying
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection retry attempt %d", 
+                              srtla_retry_count.load());
         } else {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA initial connection attempt");
+            // Very first attempt
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt");
         }
         
         // Call the Android-patched SRTLA function
@@ -109,95 +117,71 @@ static void* srtla_thread_func(void* args) {
                                        params->srtla_port, params->ips_file);
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "srtla_start_android() returned: %d", result);
         
+        // Check if we should stop
         if (srtla_should_stop.load()) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stopped by user");
             break;
         }
         
-        // Check if we've been trying for too long without ever connecting
-        if (!srtla_has_ever_connected.load() && !initial_timeout_triggered) {
+        // Mark as disconnected since srtla_start_android returned
+        srtla_connected.store(false);
+        
+        // Determine if we should retry based on the result and connection history
+        bool shouldRetry = false;
+        const char* failureReason = "";
+        
+        if (srtla_has_ever_connected.load()) {
+            // We had a successful connection before, always retry
+            shouldRetry = true;
+            failureReason = "connection lost after being established";
+        } else {
+            // Never connected successfully yet
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - thread_start_time).count();
             
             if (elapsed > INITIAL_CONNECTION_TIMEOUT_MS) {
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Initial connection timeout after %lld ms, entering retry mode", (long long)elapsed);
-                initial_timeout_triggered = true;
-                srtla_retry_count.store(1);
+                // Been trying for a while, keep retrying
+                shouldRetry = true;
+                failureReason = "initial connection timeout reached, continuing retries";
+            } else if (result != 0) {
+                // Connection failed with error, retry immediately
+                shouldRetry = true;
+                failureReason = "initial connection failed with error";
+            } else {
+                // result == 0 but never connected and within timeout
+                // This could be a quick failure, retry
+                shouldRetry = true;
+                failureReason = "initial connection failed quickly";
             }
         }
         
-        // Check if connection was successful (we ever got connected)
-        bool wasConnected = srtla_has_ever_connected.load();
-        
-        if (result == 0) {
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally (result=0)");
-            srtla_connected.store(false);
-            
-            // Check if we should stop before retrying
-            if (srtla_should_stop.load()) {
-                break;
-            }
-            
-            // If we've connected before and exit normally, this is a disconnect - retry
-            if (wasConnected) {
-                srtla_retry_count.fetch_add(1);
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Connection lost after successful connection, will retry (attempt %d)", 
-                    srtla_retry_count.load());
-                
-                // Sleep with interruption check
-                for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
-                    usleep(100 * 1000);
-                }
-                continue;
-            }
-            
-            // First connection attempt never connected - retry if timeout was triggered
-            if (initial_timeout_triggered) {
-                srtla_retry_count.fetch_add(1);
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Initial connection failed after timeout, will retry (attempt %d)", 
-                    srtla_retry_count.load());
-                
-                // Sleep with interruption check
-                for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
-                    usleep(100 * 1000);
-                }
-                continue;
-            }
-            
-            // No timeout triggered yet, just exit
-            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited before timeout, stopping");
+        if (!shouldRetry) {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Not retrying, exiting thread");
             break;
-        } else {
-            // Connection failed with error code
-            srtla_connected.store(false);
-            
-            // Check if we should stop before incrementing retry counter
-            if (srtla_should_stop.load()) {
-                break;
-            }
-            
-            // Increment retry count for any failure
-            srtla_retry_count.fetch_add(1);
-            __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", 
-                "SRTLA failed with code %d, will retry in %dms... (attempt %d)", 
-                result, RETRY_DELAY_MS, srtla_retry_count.load());
-            
-            // Sleep with interruption check
-            for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
-                usleep(100 * 1000);
-            }
+        }
+        
+        // Increment retry count
+        srtla_retry_count.fetch_add(1);
+        
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+            "Will retry in %dms (attempt %d) - reason: %s", 
+            RETRY_DELAY_MS, srtla_retry_count.load(), failureReason);
+        
+        // Sleep with interruption check
+        for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
+            usleep(100 * 1000);
         }
     }
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA thread exiting");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA thread exiting, cleaning up");
     delete params;
+    
+    // Reset state when thread exits
     srtla_running.store(false);
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
+    
     return nullptr;
 }
 
@@ -261,20 +245,38 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     srtla_should_stop.store(true);
     srtla_stop_android();
     
-    // Wait for thread to actually exit (pthread_join blocks until thread completes)
+    // Wait for thread to actually exit with a reasonable timeout
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Waiting for thread to exit...");
-    void* thread_result;
-    pthread_join(srtla_thread, &thread_result);
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
     
-    // Reset ALL state after stopping
+    // Use a loop to check if thread is still running with timeout
+    int wait_count = 0;
+    const int max_wait = 50; // 5 seconds (50 * 100ms)
+    
+    while (srtla_running.load() && wait_count < max_wait) {
+        usleep(100000); // 100ms
+        wait_count++;
+    }
+    
+    if (wait_count >= max_wait) {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Thread did not exit in time, detaching thread");
+        pthread_detach(srtla_thread);
+    } else {
+        // Thread exited, join it
+        void* thread_result;
+        pthread_join(srtla_thread, &thread_result);
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread joined successfully after %d ms", wait_count * 100);
+    }
+    
+    // Force reset ALL state after stopping - ensure clean slate for next start
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Force resetting all state after stop");
     srtla_running.store(false);
     srtla_should_stop.store(false);
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
+    srtla_retry_enabled.store(false);
     
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA fully stopped and state reset");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA fully stopped and state completely reset");
     
     return 0;
 }
@@ -292,10 +294,23 @@ Java_com_example_srtla_NativeSrtlaJni_getRetryCount(JNIEnv *env, jclass clazz) {
 
 // Add a callback that SRTLA can call when connection is established
 extern "C" void srtla_on_connection_established() {
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, resetting retry count");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established callback from SRTLA");
+    
+    bool wasConnected = srtla_connected.load();
+    bool hadEverConnected = srtla_has_ever_connected.load();
+    
     srtla_connected.store(true);
     srtla_has_ever_connected.store(true);
-    srtla_retry_count.store(0);
+    
+    // Only reset retry count if this is a new connection or reconnection
+    if (!wasConnected) {
+        srtla_retry_count.store(0);
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, retry count reset");
+    }
+    
+    if (!hadEverConnected) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "First successful connection achieved");
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -358,9 +373,9 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         "getAllStats: total=%d, active=%d, retry_count=%d, connected=%d, ever_connected=%d", 
         totalConnections, activeConnections, retryCount, isConnected, hasEverConnected);
     
-    // We have valid stats - mark as connected if not already
+    // If we have active connections but not marked as connected, update state
     if (!isConnected && activeConnections > 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Marking as connected based on active connections");
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Detected active connections, marking as connected");
         srtla_connected.store(true);
         srtla_has_ever_connected.store(true);
         srtla_retry_count.store(0);
@@ -368,15 +383,16 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         retryCount = 0;      // Update local variable
     }
     
-    // If we're retrying AND not connected, return empty to trigger retry UI
-    if (retryCount > 0 && !isConnected) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
+    // Determine what to show based on state
+    if (!hasEverConnected && retryCount == 0) {
+        // Initial connection attempt, show "Connecting..."
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Initial connection attempt in progress");
         return env->NewStringUTF("");
     }
     
-    // If not connected and no active connections, return empty (showing "Connecting...")
-    if (!isConnected && activeConnections == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still attempting initial connection");
+    if (!isConnected && retryCount > 0) {
+        // We're in retry mode (either never connected or lost connection)
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
         return env->NewStringUTF("");
     }
     
@@ -386,25 +402,14 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     
     // If we have no stats data yet
     if (detailsLen <= 0 || strlen(detailsBuffer) == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats data available");
-        return env->NewStringUTF("");
-    }
-    
-    // Check if stats show actual data
-    bool hasZeroBitrate = (strstr(detailsBuffer, "Total bitrate: 0.0 Mbps") != NULL || 
-                           strstr(detailsBuffer, "Total bitrate: 0.00 Mbps") != NULL);
-    
-    // If we only have zero bitrate with no connections AND not connected, return empty
-    // But if we ARE connected, show stats even if zero (connection exists but no data flowing)
-    if (!isConnected && hasZeroBitrate && (totalConnections == 0 || activeConnections == 0)) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Not connected, only zero bitrate, no real data");
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats data available yet");
         return env->NewStringUTF("");
     }
     
     return env->NewStringUTF(detailsBuffer);
 }
 
-// Update isRetrying to be more comprehensive
+// Update isRetrying to be more accurate
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
@@ -414,13 +419,12 @@ Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     int retryCount = srtla_retry_count.load();
     bool isConnected = srtla_connected.load();
     
-    // We're retrying if:
-    // 1. Retry count is greater than 0
-    // 2. AND we're not currently connected
+    // We're retrying if retry count > 0 AND not connected
     bool isRetrying = (retryCount > 0) && !isConnected;
     
     if (isRetrying) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "isRetrying: true (retry_count=%d, connected=%d)", 
+        __android_log_print(ANDROID_LOG_DEBUG, "SRTLA-JNI", 
+                          "isRetrying: true (retry_count=%d, connected=%d)", 
                           retryCount, isConnected);
     }
     
