@@ -128,11 +128,13 @@ static void* srtla_thread_func(void* args) {
         
         // Determine if we should retry based on the result and connection history
         bool shouldRetry = false;
+        bool shouldIncrementRetryCount = false;
         const char* failureReason = "";
         
         if (srtla_has_ever_connected.load()) {
-            // We had a successful connection before, always retry
+            // We had a successful connection before, always retry and count it
             shouldRetry = true;
+            shouldIncrementRetryCount = true;
             failureReason = "connection lost after being established";
         } else {
             // Never connected successfully yet
@@ -140,18 +142,15 @@ static void* srtla_thread_func(void* args) {
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - thread_start_time).count();
             
             if (elapsed > INITIAL_CONNECTION_TIMEOUT_MS) {
-                // Been trying for a while, keep retrying
+                // Been trying for a while, now count retries
                 shouldRetry = true;
+                shouldIncrementRetryCount = true;
                 failureReason = "initial connection timeout reached, continuing retries";
-            } else if (result != 0) {
-                // Connection failed with error, retry immediately
-                shouldRetry = true;
-                failureReason = "initial connection failed with error";
             } else {
-                // result == 0 but never connected and within timeout
-                // This could be a quick failure, retry
+                // Still within initial timeout window, retry but don't count it yet
                 shouldRetry = true;
-                failureReason = "initial connection failed quickly";
+                shouldIncrementRetryCount = false;
+                failureReason = "initial connection failed, retrying within timeout window";
             }
         }
         
@@ -160,8 +159,10 @@ static void* srtla_thread_func(void* args) {
             break;
         }
         
-        // Increment retry count
-        srtla_retry_count.fetch_add(1);
+        // Only increment retry count after timeout period or if reconnecting
+        if (shouldIncrementRetryCount) {
+            srtla_retry_count.fetch_add(1);
+        }
         
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
             "Will retry in %dms (attempt %d) - reason: %s", 
