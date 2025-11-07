@@ -431,7 +431,7 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     return env->NewStringUTF(detailsBuffer);
 }
 
-// Update isRetrying to be more accurate
+// Update isRetrying to check both retry count and reconnecting flag
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
@@ -440,14 +440,22 @@ Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     
     int retryCount = srtla_retry_count.load();
     bool isConnected = srtla_connected.load();
+    bool isReconnecting = srtla_is_reconnecting();
+    int activeCount = srtla_get_active_connection_count();
     
-    // We're retrying if retry count > 0 AND not connected
-    bool isRetrying = (retryCount > 0) && !isConnected;
+    // We're retrying/reconnecting if:
+    // 1. retry count > 0 AND not connected (initial connection attempts)
+    // 2. is_reconnecting flag is set (lost connection and attempting to reconnect)
+    // 3. not connected but has ever connected (detected disconnection)
+    bool hasEverConnected = srtla_has_ever_connected.load();
+    bool isRetrying = ((retryCount > 0) && !isConnected) || 
+                      isReconnecting || 
+                      (!isConnected && hasEverConnected && activeCount == 0);
     
     if (isRetrying) {
-        __android_log_print(ANDROID_LOG_DEBUG, "SRTLA-JNI", 
-                          "isRetrying: true (retry_count=%d, connected=%d)", 
-                          retryCount, isConnected);
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+                          "isRetrying: true (retry_count=%d, connected=%d, reconnecting=%d, active=%d)", 
+                          retryCount, isConnected, isReconnecting, activeCount);
     }
     
     return isRetrying ? JNI_TRUE : JNI_FALSE;
