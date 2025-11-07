@@ -121,7 +121,7 @@ static void* srtla_thread_func(void* args) {
             
             if (elapsed > INITIAL_CONNECTION_TIMEOUT_MS) {
                 __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Initial connection timeout after %ld ms, entering retry mode", elapsed);
+                    "Initial connection timeout after %lld ms, entering retry mode", (long long)elapsed);
                 initial_timeout_triggered = true;
                 srtla_retry_count.store(1);
             }
@@ -261,24 +261,11 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     srtla_should_stop.store(true);
     srtla_stop_android();
     
-    // Wait for thread to actually exit with timeout
+    // Wait for thread to actually exit (pthread_join blocks until thread completes)
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Waiting for thread to exit...");
-    
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 5; // 5 second timeout
-    
     void* thread_result;
-    int join_result = pthread_timedjoin_np(srtla_thread, &thread_result, &ts);
-    
-    if (join_result == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
-    } else if (join_result == ETIMEDOUT) {
-        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Thread join timed out, forcing cleanup");
-        pthread_detach(srtla_thread);
-    } else {
-        __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Thread join failed: %d", join_result);
-    }
+    pthread_join(srtla_thread, &thread_result);
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
     
     // Reset ALL state after stopping
     srtla_running.store(false);
