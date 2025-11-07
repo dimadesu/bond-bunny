@@ -325,37 +325,13 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         retryCount = 0;      // Update local variable
     }
     
-    // If not connected and no active connections, check/update retry count based on elapsed time
-    if (!isConnected && activeConnections == 0) {
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - srtla_start_time).count();
-        
-        if (elapsed > 5) {
-            // Been trying for more than 5 seconds - calculate attempt based on time
-            int calculatedAttempt = 1 + (elapsed - 5) / 10;
-            
-            if (calculatedAttempt > retryCount) {
-                srtla_retry_count.store(calculatedAttempt);
-                retryCount = calculatedAttempt;  // Update local variable
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Incrementing to attempt %d after %ld sec (total=%d, active=%d)", 
-                    calculatedAttempt, elapsed, totalConnections, activeConnections);
-            } else if (retryCount == 0) {
-                srtla_retry_count.store(1);
-                retryCount = 1;
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Connection timeout after %ld sec, starting retry mode", elapsed);
-            }
-        }
-    }
-    
     // If we're retrying AND not connected, return empty to trigger retry UI
     if (retryCount > 0 && !isConnected) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
         return env->NewStringUTF("");
     }
     
-    // If not connected and no active connections, return empty
+    // If not connected and no active connections, return empty (showing "Connecting...")
     if (!isConnected && activeConnections == 0) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Still attempting initial connection");
         return env->NewStringUTF("");
