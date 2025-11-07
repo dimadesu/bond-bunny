@@ -93,11 +93,15 @@ static void* srtla_thread_func(void* args) {
     while (!srtla_should_stop.load()) {
         if (srtla_retry_count.load() > 0) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA retry attempt %d", srtla_retry_count.load());
+        } else {
+            __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA initial connection attempt");
         }
         
         // Call the Android-patched SRTLA function
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Calling srtla_start_android()...");
         int result = srtla_start_android(params->listen_port, params->srtla_host,
                                        params->srtla_port, params->ips_file);
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "srtla_start_android() returned: %d", result);
         
         if (srtla_should_stop.load()) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stopped by user");
