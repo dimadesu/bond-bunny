@@ -115,6 +115,11 @@ static void* srtla_thread_func(void* args) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA exited normally (result=0)");
             srtla_connected.store(false);
             
+            // Check if we should stop before retrying
+            if (srtla_should_stop.load()) {
+                break;
+            }
+            
             // If we've connected before and exit normally, this is a disconnect - retry
             if (wasConnected) {
                 srtla_retry_count.fetch_add(1);
@@ -150,6 +155,11 @@ static void* srtla_thread_func(void* args) {
         } else {
             // Connection failed with error code
             srtla_connected.store(false);
+            
+            // Check if we should stop before incrementing retry counter
+            if (srtla_should_stop.load()) {
+                break;
+            }
             
             // Increment retry count for any failure
             srtla_retry_count.fetch_add(1);
@@ -199,9 +209,19 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
     env->ReleaseStringUTFChars(srtla_port, c_srtla_port);
     env->ReleaseStringUTFChars(ips_file, c_ips_file);
     
-    // Reset state
-    srtla_should_stop.store(false);
+    // Reset state FIRST before any delays
     srtla_retry_count.store(0);
+    srtla_connected.store(false);
+    srtla_has_ever_connected.store(false);
+    
+    // Signal any old thread to stop
+    srtla_should_stop.store(true);
+    
+    // Wait a moment for old thread to actually exit
+    usleep(100000); // 100ms
+    
+    // Now safe to start new thread
+    srtla_should_stop.store(false);
     srtla_running.store(true);
     
     // Record start time for timeout detection
@@ -229,11 +249,19 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     srtla_should_stop.store(true);
     srtla_stop_android();
     
-    // Mark as not running immediately - the thread will finish cleanup
-    srtla_running.store(false);
+    // Wait for thread to actually exit (don't detach - properly join)
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Waiting for thread to exit...");
+    void* thread_result;
+    pthread_join(srtla_thread, &thread_result);
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
     
-    // Detach the thread so it can clean up itself without blocking the UI
-    pthread_detach(srtla_thread);
+    // Reset state immediately so UI sees clean state
+    srtla_retry_count.store(0);
+    srtla_connected.store(false);
+    srtla_has_ever_connected.store(false);
+    
+    // Mark as not running
+    srtla_running.store(false);
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stop signal sent, thread detached");
     
