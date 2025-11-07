@@ -83,12 +83,18 @@ struct SrtlaParams {
 static void* srtla_thread_func(void* args) {
     SrtlaParams* params = (SrtlaParams*)args;
     const int RETRY_DELAY_MS = 3000;  // 3 seconds between retries
+    const int INITIAL_CONNECTION_TIMEOUT_MS = 15000;  // 15 seconds for initial connection
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA with retry support...");
     
+    // Reset ALL state at thread start
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
+    
+    // Track when we started for timeout detection
+    auto thread_start_time = std::chrono::steady_clock::now();
+    bool initial_timeout_triggered = false;
     
     while (!srtla_should_stop.load()) {
         if (srtla_retry_count.load() > 0) {
@@ -106,6 +112,19 @@ static void* srtla_thread_func(void* args) {
         if (srtla_should_stop.load()) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stopped by user");
             break;
+        }
+        
+        // Check if we've been trying for too long without ever connecting
+        if (!srtla_has_ever_connected.load() && !initial_timeout_triggered) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - thread_start_time).count();
+            
+            if (elapsed > INITIAL_CONNECTION_TIMEOUT_MS) {
+                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+                    "Initial connection timeout after %ld ms, entering retry mode", elapsed);
+                initial_timeout_triggered = true;
+                srtla_retry_count.store(1);
+            }
         }
         
         // Check if connection was successful (we ever got connected)
@@ -134,13 +153,12 @@ static void* srtla_thread_func(void* args) {
                 continue;
             }
             
-            // First connection attempt never connected - also retry if timeout triggered
-            if (srtla_retry_count.load() > 0) {
-                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
-                    "Initial connection failed (timeout), will retry (attempt %d)", 
-                    srtla_retry_count.load());
-                
+            // First connection attempt never connected - retry if timeout was triggered
+            if (initial_timeout_triggered) {
                 srtla_retry_count.fetch_add(1);
+                __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+                    "Initial connection failed after timeout, will retry (attempt %d)", 
+                    srtla_retry_count.load());
                 
                 // Sleep with interruption check
                 for (int i = 0; i < RETRY_DELAY_MS / 100 && !srtla_should_stop.load(); i++) {
@@ -179,6 +197,7 @@ static void* srtla_thread_func(void* args) {
     srtla_running.store(false);
     srtla_retry_count.store(0);
     srtla_connected.store(false);
+    srtla_has_ever_connected.store(false);
     return nullptr;
 }
 
@@ -187,6 +206,7 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
                                                      jstring listen_port, jstring srtla_host,
                                                      jstring srtla_port, jstring ips_file) {
     if (srtla_running.load()) {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "SRTLA already running, ignoring start request");
         return -1; // Already running
     }
     
@@ -209,37 +229,29 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
     env->ReleaseStringUTFChars(srtla_port, c_srtla_port);
     env->ReleaseStringUTFChars(ips_file, c_ips_file);
     
-    // Reset state FIRST before any delays
+    // Reset ALL state before starting
+    srtla_should_stop.store(false);
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
-    
-    // Signal any old thread to stop
-    srtla_should_stop.store(true);
-    
-    // Wait a moment for old thread to actually exit
-    usleep(100000); // 100ms
-    
-    // Now safe to start new thread
-    srtla_should_stop.store(false);
     srtla_running.store(true);
-    
-    // Record start time for timeout detection
-    srtla_start_time = std::chrono::steady_clock::now();
     
     // Start SRTLA in background thread with retry logic
     if (pthread_create(&srtla_thread, nullptr, srtla_thread_func, params) != 0) {
         srtla_running.store(false);
         delete params;
+        __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Failed to create SRTLA thread");
         return -1;
     }
     
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA thread started successfully");
     return 0;
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA not running, nothing to stop");
         return 0;
     }
     
@@ -249,21 +261,33 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     srtla_should_stop.store(true);
     srtla_stop_android();
     
-    // Wait for thread to actually exit (don't detach - properly join)
+    // Wait for thread to actually exit with timeout
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Waiting for thread to exit...");
-    void* thread_result;
-    pthread_join(srtla_thread, &thread_result);
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
     
-    // Reset state immediately so UI sees clean state
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5; // 5 second timeout
+    
+    void* thread_result;
+    int join_result = pthread_timedjoin_np(srtla_thread, &thread_result, &ts);
+    
+    if (join_result == 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Thread exited cleanly");
+    } else if (join_result == ETIMEDOUT) {
+        __android_log_print(ANDROID_LOG_WARN, "SRTLA-JNI", "Thread join timed out, forcing cleanup");
+        pthread_detach(srtla_thread);
+    } else {
+        __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Thread join failed: %d", join_result);
+    }
+    
+    // Reset ALL state after stopping
+    srtla_running.store(false);
+    srtla_should_stop.store(false);
     srtla_retry_count.store(0);
     srtla_connected.store(false);
     srtla_has_ever_connected.store(false);
     
-    // Mark as not running
-    srtla_running.store(false);
-    
-    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA stop signal sent, thread detached");
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA fully stopped and state reset");
     
     return 0;
 }
