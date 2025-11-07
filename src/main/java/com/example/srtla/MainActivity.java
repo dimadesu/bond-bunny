@@ -227,7 +227,6 @@ public class MainActivity extends Activity {
                 // Show retry status
                 String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
                 textTotalBitrate.setText(statusMessage);
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 // Clear connection list
@@ -235,14 +234,12 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 textStatus.setText("⏳ Retrying connection...");
-                textStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
             } else if (!isConnected && !hasStats) {
                 // Show initial connecting status
                 String statusMessage = "Connecting to SRTLA receiver...";
                 textTotalBitrate.setText(statusMessage);
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 // Clear connection list
@@ -250,7 +247,6 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 textStatus.setText("⏳ Connecting...");
-                textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 
                 Log.i("MainActivity", "Showing connecting UI");
             } else if (hasStats) {
@@ -259,23 +255,19 @@ public class MainActivity extends Activity {
                 
                 if (isConnected) {
                     textStatus.setText("✅ Service is running");
-                    textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
                 } else {
                     // Has stats but not marked as connected yet
                     textStatus.setText("⏳ Establishing connection...");
-                    textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 }
             } else {
                 // No stats and no specific state - might be starting up
                 textTotalBitrate.setText("Starting SRTLA service...");
-                textTotalBitrate.setTextColor(getResources().getColor(android.R.color.darker_gray));
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
                 
                 textStatus.setText("⏳ Service starting...");
-                textStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
             }
         } else {
             // Service not running - clear display
@@ -311,10 +303,6 @@ public class MainActivity extends Activity {
             clearConnectionsDisplay();
             return;
         }
-        
-        // Reset text color when connection is established - use black for better visibility
-        textTotalBitrate.setTextColor(getResources().getColor(android.R.color.black));
-        textStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
         
         // Clear existing views
         connectionsContainer.removeAllViews();
