@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +47,7 @@ public class NativeSrtlaService extends Service {
     
     // Service state
     private static boolean isServiceRunning = false;
+    private boolean isSrtlaRunning = false; // Add this variable to track SRTLA running state
     private String srtlaHost;
     private String srtlaPort;
     private String listenPort;
@@ -174,6 +177,8 @@ public class NativeSrtlaService extends Service {
             
             if (result == 0) {
                 Log.i(TAG, "Native SRTLA started successfully");
+                isSrtlaRunning = true;  // Set the flag when SRTLA starts successfully
+                
                 // Verify native state before marking as running
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     isServiceRunning = true;
@@ -230,6 +235,7 @@ public class NativeSrtlaService extends Service {
             Log.e(TAG, "Error stopping native SRTLA", e);
         } finally {
             isServiceRunning = false;
+            isSrtlaRunning = false; // Clear the flag when SRTLA stops
         }
     }
     
@@ -716,6 +722,115 @@ public class NativeSrtlaService extends Service {
             
             NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
+        }
+    }
+    
+    // Add this inner class for tracking network socket information
+    private static class NetworkSocketInfo {
+        String virtualIp;
+        String realIp;
+        int networkType;
+        int socketFd;
+        
+        NetworkSocketInfo(String virtualIp, String realIp, int networkType, int socketFd) {
+            this.virtualIp = virtualIp;
+            this.realIp = realIp;
+            this.networkType = networkType;
+            this.socketFd = socketFd;
+        }
+    }
+    
+    // Add this map to track network sockets
+    private Map<String, NetworkSocketInfo> networkSockets = new HashMap<>();
+    
+    /**
+     * Handle when a network becomes available
+     */
+    private void handleNetworkAvailable(Network network) {
+        NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+        if (capabilities == null) return;
+        
+        // Determine network type and virtual IP
+        String virtualIp;
+        int networkType;
+        
+        if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            virtualIp = "10.0.1.1";
+            networkType = 1; // WIFI
+        } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+            virtualIp = "10.0.2.1";
+            networkType = 2; // CELLULAR
+        } else {
+            return; // Ignore other network types
+        }
+        
+        // Get the real IP address
+        String realIp = getNetworkAddress(network);
+        if (realIp == null) return;
+        
+        // Create socket for this network if not already created
+        String key = virtualIp;
+        if (!networkSockets.containsKey(key)) {
+            int socketFd = createUdpSocketNative();
+            if (socketFd >= 0) {
+                NetworkSocketInfo info = new NetworkSocketInfo(virtualIp, realIp, networkType, socketFd);
+                networkSockets.put(key, info);
+                
+                // Register with native SRTLA if it's running
+                if (isSrtlaRunning) {
+                    NativeSrtlaJni.setNetworkSocket(virtualIp, realIp, networkType, socketFd);
+                    Log.i(TAG, "Registered network socket: " + virtualIp + " -> " + realIp + " (fd=" + socketFd + ")");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get IP address for a specific network
+     */
+    private String getNetworkAddress(Network network) {
+        try {
+            LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
+            if (linkProperties != null) {
+                for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                    InetAddress address = linkAddress.getAddress();
+                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        return address.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting network address", e);
+        }
+        return null;
+    }
+    
+    /**
+     * Close and recreate all sockets when SRTLA is stopped
+     * This ensures fresh FDs are created for the next start
+     */
+    private void recreateAllSockets() {
+        Log.i(TAG, "Recreating all sockets after SRTLA stop");
+        
+        // Close existing sockets
+        for (Map.Entry<String, NetworkSocketInfo> entry : networkSockets.entrySet()) {
+            NetworkSocketInfo info = entry.getValue();
+            if (info.socketFd >= 0) {
+                Log.i(TAG, "Closing socket for " + entry.getKey() + " (fd=" + info.socketFd + ")");
+                closeSocketNative(info.socketFd);
+                info.socketFd = -1;
+            }
+        }
+        
+        // Clear the map to force recreation
+        networkSockets.clear();
+        
+        // Re-register networks to create fresh sockets
+        if (connectivityManager != null) {
+            Network[] networks = connectivityManager.getAllNetworks();
+            for (Network network : networks) {
+                handleNetworkAvailable(network);
+            }
         }
     }
 }

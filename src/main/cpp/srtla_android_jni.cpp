@@ -59,6 +59,7 @@ extern "C" {
     int srtla_get_connection_details(char* buffer, int buffer_size);
     void srtla_on_connection_established();
     void srtla_notify_network_change();
+    void srtla_clear_all_sockets();  // Add this declaration
 }
 
 static pthread_t srtla_thread;
@@ -245,6 +246,11 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
     // Signal the SRTLA process to stop
     srtla_should_stop.store(true);
     srtla_stop_android();
+    
+    // IMPORTANT: Clear any virtual IP socket mappings in the native SRTLA code
+    // This ensures we don't try to use stale FDs after restart
+    __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Clearing virtual IP socket mappings");
+    srtla_clear_all_sockets();
     
     // Wait for thread to actually exit with a reasonable timeout
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Waiting for thread to exit...");
