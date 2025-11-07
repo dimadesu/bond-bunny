@@ -25,6 +25,9 @@ public class NativeSrtlaJni {
     public static native int stopSrtlaNative();
     public static native boolean isRunningSrtlaNative();
     
+    // New retry status method
+    public static native int getRetryCount();
+    
     // Stats methods for minimal UI integration
     public static native int getConnectionCount();
     public static native int getActiveConnectionCount();
@@ -43,6 +46,10 @@ public class NativeSrtlaJni {
     public static native int[] getConnectionWindowSizes();
     public static native int[] getConnectionInFlightPackets();
     public static native boolean[] getConnectionActiveStatus();
+    
+    // Add new connection status methods
+    public static native boolean isConnected();
+    public static native boolean isRetrying();
     
     // Helper method to get all connection bitrate data in one call
     public static ConnectionBitrateData[] getAllConnectionBitrates() {
