@@ -17,50 +17,39 @@
 #include <atomic>
 #include <chrono>  // Add this include for std::chrono
 
-// Forward declare the Android SRTLA functions from patched srtla_send.c
-extern "C" int srtla_start_android(const char* listen_port, const char* srtla_host, 
-                                  const char* srtla_port, const char* ips_file);
-extern "C" void srtla_stop_android(void);
-extern "C" void schedule_update_conns(int signal);
-
-// Stats functions
-extern "C" int srtla_get_connection_count(void);
-extern "C" int srtla_get_active_connection_count(void);
-extern "C" int srtla_get_total_in_flight_packets(void);
-extern "C" int srtla_get_total_window_size(void);
-extern "C" int srtla_get_connection_details(char* buffer, int buffer_size);
-extern "C" int srtla_is_reconnecting(void);
-
-// Virtual IP functions
-extern "C" void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
-                                        int network_type, int socket_fd);
-
-// Per-connection bitrate functions
-extern "C" int srtla_get_connection_bitrates(double* bitrates_mbps, char connection_types[][16], 
-                                            char connection_ips[][64], int* load_percentages,
-                                            int max_connections);
-
-// Comprehensive connection window data function
-extern "C" int srtla_get_connection_window_data(double* bitrates_mbps, char connection_types[][16], 
-                                               char connection_ips[][64], int* load_percentages,
-                                               int* window_sizes, int* inflight_packets,
-                                               int max_connections);
-
 // Forward declarations for all SRTLA C functions we call
 extern "C" {
     int srtla_start_android(const char* listen_port, const char* srtla_host, 
                            const char* srtla_port, const char* ips_file);
     void srtla_stop_android();
-    void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
-                                 int network_type, int socket_fd);
+    void schedule_update_conns(int signal);
+    
+    // Stats functions
     int srtla_get_connection_count();
     int srtla_get_active_connection_count();
     int srtla_get_total_in_flight_packets();
     int srtla_get_total_window_size();
     int srtla_get_connection_details(char* buffer, int buffer_size);
+    int srtla_is_reconnecting();
+    
+    // Virtual IP functions
+    void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
+                                  int network_type, int socket_fd);
+    
+    // Per-connection bitrate functions
+    int srtla_get_connection_bitrates(double* bitrates_mbps, char connection_types[][16], 
+                                      char connection_ips[][64], int* load_percentages,
+                                      int max_connections);
+    
+    // Comprehensive connection window data function
+    int srtla_get_connection_window_data(double* bitrates_mbps, char connection_types[][16], 
+                                        char connection_ips[][64], int* load_percentages,
+                                        int* window_sizes, int* inflight_packets,
+                                        int max_connections);
+    
     void srtla_on_connection_established();
     void srtla_notify_network_change();
-    void srtla_clear_all_sockets();  // Add this declaration
+    void srtla_clear_all_sockets();
 }
 
 static pthread_t srtla_thread;
@@ -70,9 +59,6 @@ static std::atomic<bool> srtla_retry_enabled(false);
 static std::atomic<int> srtla_retry_count(0);
 static std::atomic<bool> srtla_connected(false);
 static std::atomic<bool> srtla_has_ever_connected(false);
-
-// Add this global variable to track when SRTLA started
-static std::chrono::steady_clock::time_point srtla_start_time;
 
 struct SrtlaParams {
     char listen_port[16];
