@@ -222,8 +222,8 @@ public class MainActivity extends Activity {
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
             
-            // Always check retry state first
-            if (!isConnected && (isRetrying || retryCount > 0)) {
+            // Check retry state first - regardless of isConnected (handles server stops)
+            if (isRetrying || retryCount > 0) {
                 // Show retry status
                 String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
                 textTotalBitrate.setText(statusMessage);
@@ -236,6 +236,18 @@ public class MainActivity extends Activity {
                 textStatus.setText("⏳ Retrying connection...");
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
+            } else if (isConnected && !hasStats && NativeSrtlaJni.isRunningSrtlaNative()) {
+                // Connected but stats not available yet (brief data pause)
+                // Only show if: connected, no retry in progress, and thread is running
+                textTotalBitrate.setText("Connected (loading stats...)");
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+                
+                textStatus.setText("✅ Service is running");
+                
+                Log.i("MainActivity", "Connected but waiting for stats");
             } else if (!isConnected && !hasStats) {
                 // Show initial connecting status
                 String statusMessage = "Connecting to SRTLA receiver...";

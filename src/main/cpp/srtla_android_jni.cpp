@@ -397,12 +397,9 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
         retryCount = 0;      // Update local variable
     }
     
-    // If no active connections but we were connected, mark as disconnected
-    if (isConnected && activeConnections == 0) {
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Lost all connections, marking as disconnected");
-        srtla_connected.store(false);
-        isConnected = false;
-    }
+    // Don't mark as disconnected just because activeConnections temporarily dropped to 0
+    // Only mark disconnected if we're actually reconnecting or have errors
+    // The srtla_on_connection_established() callback and reconnection logic handle state properly
     
     // Determine what to show based on state
     if (!hasEverConnected && retryCount == 0) {
