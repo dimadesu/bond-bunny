@@ -116,6 +116,10 @@ public class NativeSrtlaService extends Service {
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
             
+            // Recreate sockets for currently available networks
+            // This is important after stop/start because network callbacks won't fire again
+            recreateNetworkSockets();
+            
             // Start native SRTLA in background thread
             new Thread(this::startNativeSrtla).start();
         }
@@ -543,6 +547,38 @@ public class NativeSrtlaService extends Service {
         ethernetCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_ETHERNET, "ETHERNET");
         
         Log.i(TAG, "Dedicated network callbacks setup complete");
+    }
+    
+    /**
+     * Manually recreate sockets for all currently available networks
+     * This is needed after stop/start since network callbacks won't fire again for existing networks
+     */
+    private void recreateNetworkSockets() {
+        Log.i(TAG, "Recreating network sockets for currently available networks");
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            Log.e(TAG, "ConnectivityManager not available");
+            return;
+        }
+        
+        // Get all currently active networks
+        Network[] networks = cm.getAllNetworks();
+        for (Network network : networks) {
+            NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+            if (caps == null) continue;
+            
+            // Check each transport type and recreate socket
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                Log.i(TAG, "Found existing CELLULAR network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "CELLULAR", "");
+            } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                Log.i(TAG, "Found existing WIFI network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "WIFI", "");
+            } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                Log.i(TAG, "Found existing ETHERNET network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "ETHERNET", "");
+            }
+        }
     }
     
     /**
