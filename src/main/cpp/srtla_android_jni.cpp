@@ -71,7 +71,7 @@ struct SrtlaParams {
 static void* srtla_thread_func(void* args) {
     SrtlaParams* params = (SrtlaParams*)args;
     const int RETRY_DELAY_MS = 3000;  // 3 seconds between retries
-    const int INITIAL_CONNECTION_TIMEOUT_MS = 10000;  // 10 seconds for initial connection
+    const int INITIAL_CONNECTION_TIMEOUT_MS = 5000;  // 5 seconds for initial connection
     
     __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Starting SRTLA thread with params: host=%s port=%s", 
                        params->srtla_host, params->srtla_port);
