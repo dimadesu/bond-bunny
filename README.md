@@ -6,9 +6,9 @@ This is compatible with any apps that can stream SRT and it essentially extends 
 
 Android implementation of [SRTLA](https://github.com/BELABOX/srtla).
 
-Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblink](https://github.com/eerimoq/moblink).
+![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
 
-Discord https://discord.gg/2UzEkU2AJW
+Share ideas or report issues in Discord https://discord.gg/2UzEkU2AJW or create Git issues.
 
 ## Apps that can work together
 
@@ -30,11 +30,10 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
 - Enjoy!
 
 ## Apps that can stream SRT on Android
+- [LifeStreamer](https://github.com/dimadesu/LifeStreamer)
 - IRL Pro (free)
 - Larix Broadcaster (subscription)
 - Larix Screencaster (subscription)
 - Can do HDMI/USB/UVC as input:
   - USB Camera (free with ads) / USB Camera Pro (one-time payment to remove ads)
   - CameraFi (free version with ads or subscription)
-
-![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
