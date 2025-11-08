@@ -13,7 +13,7 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="URL Builder"
+      android:text="SRT URLs for your live-streaming app"
       android:textStyle="bold"
       android:textSize="18sp"
       android:layout_marginBottom="8dp" />
@@ -23,7 +23,7 @@
       android:layout_height="wrap_content"
       android:text="Configure your live-streaming app to send SRT to the localhost or device's IP address."
       android:textSize="16sp"
-      android:layout_marginBottom="4dp" />
+      android:layout_marginBottom="8dp" />
 
     <TextView
       android:layout_width="wrap_content"
@@ -50,7 +50,7 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="SRT URLs for your streaming app:"
+      android:text="Tap a URL to copy it"
       android:textSize="16sp"
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
