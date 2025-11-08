@@ -146,8 +146,6 @@ public class UrlBuilderActivity extends Activity {
                 String networkType = null;
                 if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                     networkType = "Wi-Fi";
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    networkType = "Cellular";
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
                     networkType = "Ethernet";
                 }
@@ -182,16 +180,18 @@ public class UrlBuilderActivity extends Activity {
                             if (networkType != null) {
                                 networkInfo.append(" (").append(networkType).append(")");
                             } else {
-                                // Fallback: detect from interface name
+                                // Fallback: detect from interface name (skip cellular)
                                 String interfaceName = networkInterface.getDisplayName().toLowerCase();
                                 if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
                                     networkInfo.append(" (Wi-Fi)");
+                                } else if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
+                                    networkInfo.append(" (Ethernet)");
                                 } else if (interfaceName.contains("rmnet") || interfaceName.contains("mobile") || 
                                           interfaceName.contains("cellular") || interfaceName.contains("ccmni") ||
                                           interfaceName.contains("pdp") || interfaceName.contains("ppp")) {
-                                    networkInfo.append(" (Cellular)");
-                                } else if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
-                                    networkInfo.append(" (Ethernet)");
+                                    // Skip cellular interfaces
+                                    interfaceCount--;
+                                    continue;
                                 } else {
                                     networkInfo.append(" (").append(networkInterface.getDisplayName()).append(")");
                                 }
@@ -214,14 +214,14 @@ public class UrlBuilderActivity extends Activity {
         for (Network network : networks) {
             NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
             if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                availableNetworks++;
                 if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    availableNetworks++;
                     networkInfo.append("\n• Wi-Fi");
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    networkInfo.append("\n• Cellular");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    availableNetworks++;
                     networkInfo.append("\n• Ethernet");
                 }
+                // Skip cellular networks
             }
         }
         if (availableNetworks == 0) {
