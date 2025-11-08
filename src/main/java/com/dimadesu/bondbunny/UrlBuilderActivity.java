@@ -29,6 +29,8 @@ public class UrlBuilderActivity extends Activity {
     private Button buttonCopyWifi;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
+    private android.os.Handler updateHandler = new android.os.Handler();
+    private Runnable updateRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,17 +89,44 @@ public class UrlBuilderActivity extends Activity {
         buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
 
         buttonCopyWifi.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
+
+        // Start periodic updates
+        startPeriodicUpdates();
+    }
+
+    private void startPeriodicUpdates() {
+        updateRunnable = new Runnable() {
+            @Override
+            public void run() {
+                updateNetworkInfo();
+                updateHandler.postDelayed(this, 2000); // Update every 2 seconds
+            }
+        };
+        updateHandler.post(updateRunnable);
+    }
+
+    private void stopPeriodicUpdates() {
+        if (updateRunnable != null) {
+            updateHandler.removeCallbacks(updateRunnable);
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        updateNetworkInfo();
+        startPeriodicUpdates();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopPeriodicUpdates();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        stopPeriodicUpdates();
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);
@@ -107,6 +136,33 @@ public class UrlBuilderActivity extends Activity {
 
     private void updateNetworkInfo() {
         StringBuilder networkInfo = new StringBuilder("IP addresses of this device:\n");
+
+        // Build a map of IP to network type using NetworkCapabilities
+        java.util.Map<String, String> ipToNetworkType = new java.util.HashMap<>();
+        Network[] networks = connectivityManager.getAllNetworks();
+        for (Network network : networks) {
+            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
+            android.net.LinkProperties linkProps = connectivityManager.getLinkProperties(network);
+            if (caps != null && linkProps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                String networkType = null;
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    networkType = "Wi-Fi";
+                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    networkType = "Cellular";
+                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    networkType = "Ethernet";
+                }
+                
+                if (networkType != null) {
+                    for (android.net.LinkAddress linkAddress : linkProps.getLinkAddresses()) {
+                        java.net.InetAddress addr = linkAddress.getAddress();
+                        if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
+                            ipToNetworkType.put(addr.getHostAddress(), networkType);
+                        }
+                    }
+                }
+            }
+        }
 
         try {
             java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
@@ -119,17 +175,27 @@ public class UrlBuilderActivity extends Activity {
                         java.net.InetAddress address = addresses.nextElement();
                         if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
                             interfaceCount++;
-                            String interfaceName = networkInterface.getDisplayName();
                             String ipAddress = address.getHostAddress();
                             networkInfo.append("• ").append(ipAddress);
-                            if (interfaceName.toLowerCase().contains("wlan") || interfaceName.toLowerCase().contains("wifi")) {
-                                networkInfo.append(" (Wi-Fi)");
-                            } else if (interfaceName.toLowerCase().contains("rmnet") || interfaceName.toLowerCase().contains("mobile") || interfaceName.toLowerCase().contains("cellular")) {
-                                networkInfo.append(" (Cellular)");
-                            } else if (interfaceName.toLowerCase().contains("eth")) {
-                                networkInfo.append(" (Ethernet)");
+                            
+                            // Use NetworkCapabilities info if available, otherwise fall back to interface name
+                            String networkType = ipToNetworkType.get(ipAddress);
+                            if (networkType != null) {
+                                networkInfo.append(" (").append(networkType).append(")");
                             } else {
-                                networkInfo.append(" (").append(interfaceName).append(")");
+                                // Fallback: detect from interface name
+                                String interfaceName = networkInterface.getDisplayName().toLowerCase();
+                                if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
+                                    networkInfo.append(" (Wi-Fi)");
+                                } else if (interfaceName.contains("rmnet") || interfaceName.contains("mobile") || 
+                                          interfaceName.contains("cellular") || interfaceName.contains("ccmni") ||
+                                          interfaceName.contains("pdp") || interfaceName.contains("ppp")) {
+                                    networkInfo.append(" (Cellular)");
+                                } else if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
+                                    networkInfo.append(" (Ethernet)");
+                                } else {
+                                    networkInfo.append(" (").append(networkInterface.getDisplayName()).append(")");
+                                }
                             }
                             networkInfo.append("\n");
                         }
@@ -145,7 +211,6 @@ public class UrlBuilderActivity extends Activity {
 
         // Connectivity manager networks
         networkInfo.append("\nConnected networks:");
-        Network[] networks = connectivityManager.getAllNetworks();
         int availableNetworks = 0;
         for (Network network : networks) {
             NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
