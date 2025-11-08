@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 import android.app.Activity;
 import android.content.ClipData;
@@ -489,7 +489,7 @@ public class MainActivity extends Activity {
             }
         };
         
-        IntentFilter errorFilter = new IntentFilter("com.example.srtla.ERROR");
+        IntentFilter errorFilter = new IntentFilter("com.dimadesu.bondbunny.ERROR");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(errorReceiver, errorFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {

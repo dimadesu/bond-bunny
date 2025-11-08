@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 import android.content.Context;
 import android.graphics.Canvas;

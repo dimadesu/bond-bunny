@@ -182,7 +182,7 @@ static void* srtla_thread_func(void* args) {
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz,
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz,
                                                      jstring listen_port, jstring srtla_host,
                                                      jstring srtla_port, jstring ips_file) {
     if (srtla_running.load()) {
@@ -229,7 +229,7 @@ Java_com_example_srtla_NativeSrtlaJni_startSrtlaNative(JNIEnv *env, jclass clazz
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "SRTLA not running, nothing to stop");
         return 0;
@@ -289,13 +289,13 @@ Java_com_example_srtla_NativeSrtlaJni_stopSrtlaNative(JNIEnv *env, jclass clazz)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_isRunningSrtlaNative(JNIEnv *env, jclass clazz) {
     return srtla_running.load();
 }
 
 // New function to get retry status
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getRetryCount(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getRetryCount(JNIEnv *env, jclass clazz) {
     return srtla_retry_count.load();
 }
 
@@ -333,7 +333,7 @@ extern "C" int srtla_is_java_owned_fd(int fd) {
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_srtla_NativeSrtlaJni_notifyNetworkChange(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_notifyNetworkChange(JNIEnv *env, jclass clazz) {
     if (srtla_running) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Network change notification received");
         schedule_update_conns(0);  // Pass 0 as dummy signal parameter
@@ -343,7 +343,7 @@ Java_com_example_srtla_NativeSrtlaJni_notifyNetworkChange(JNIEnv *env, jclass cl
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionCount(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionCount(JNIEnv *env, jclass clazz) {
     if (!srtla_running) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "getConnectionCount: SRTLA not running");
         return 0;
@@ -354,7 +354,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionCount(JNIEnv *env, jclass cla
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getActiveConnectionCount(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getActiveConnectionCount(JNIEnv *env, jclass clazz) {
     if (!srtla_running) {
         return 0;
     }
@@ -364,7 +364,7 @@ Java_com_example_srtla_NativeSrtlaJni_getActiveConnectionCount(JNIEnv *env, jcla
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclass clazz) {
     if (!srtla_running) {
         return 0;
     }
@@ -376,7 +376,7 @@ Java_com_example_srtla_NativeSrtlaJni_getTotalInFlightPackets(JNIEnv *env, jclas
 
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
         return env->NewStringUTF("");
     }
@@ -441,7 +441,7 @@ Java_com_example_srtla_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz) {
 
 // Update isRetrying to check both retry count and reconnecting flag
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     if (!srtla_running.load()) {
         return JNI_FALSE;
     }
@@ -471,7 +471,7 @@ Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
 
 // Virtual IP JNI function
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz,
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz,
                                                       jstring virtual_ip, jstring real_ip,
                                                       jint network_type, jint socket_fd) {
     const char *virtual_ip_str = env->GetStringUTFChars(virtual_ip, nullptr);
@@ -494,13 +494,13 @@ Java_com_example_srtla_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass clazz
 
 // Add a new JNI method to check if connected
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_srtla_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz) {
     return srtla_connected.load();
 }
 
 // Native UDP socket creation for NativeSrtlaService
 extern "C" JNIEXPORT jint JNICALL
-Java_com_example_srtla_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, jobject thiz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, jobject thiz) {
     int sockfd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
     if (sockfd < 0) {
         __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Failed to create UDP socket: %s", strerror(errno));
@@ -522,7 +522,7 @@ Java_com_example_srtla_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, job
 
 // Native socket close for NativeSrtlaService
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_srtla_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject thiz, jint sockfd) {
+Java_com_dimadesu_bondbunny_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject thiz, jint sockfd) {
     if (sockfd >= 0) {
         if (close(sockfd) == 0) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Successfully closed socket FD: %d", sockfd);
@@ -536,7 +536,7 @@ Java_com_example_srtla_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject
 
 // Per-connection bitrate JNI functions
 extern "C" JNIEXPORT jdoubleArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionBitrates(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionBitrates(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -557,7 +557,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionBitrates(JNIEnv *env, jclass 
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionTypes(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionTypes(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -583,7 +583,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionTypes(JNIEnv *env, jclass cla
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionIPs(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionIPs(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -609,7 +609,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionIPs(JNIEnv *env, jclass clazz
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionLoadPercentages(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionLoadPercentages(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -631,7 +631,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionLoadPercentages(JNIEnv *env, 
 
 // New JNI functions for comprehensive window data
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionWindowSizes(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionWindowSizes(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -655,7 +655,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionWindowSizes(JNIEnv *env, jcla
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionInFlightPackets(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionInFlightPackets(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];
@@ -679,7 +679,7 @@ Java_com_example_srtla_NativeSrtlaJni_getConnectionInFlightPackets(JNIEnv *env, 
 }
 
 extern "C" JNIEXPORT jbooleanArray JNICALL
-Java_com_example_srtla_NativeSrtlaJni_getConnectionActiveStatus(JNIEnv *env, jclass clazz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_getConnectionActiveStatus(JNIEnv *env, jclass clazz) {
     const int MAX_CONNECTIONS = 10;
     double bitrates[MAX_CONNECTIONS];
     char connection_types[MAX_CONNECTIONS][16];

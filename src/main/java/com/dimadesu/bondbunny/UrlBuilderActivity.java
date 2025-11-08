@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 import android.app.Activity;
 import android.content.ClipboardManager;

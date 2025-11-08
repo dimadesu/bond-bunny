@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 /**
  * Data class to hold per-connection bitrate information
