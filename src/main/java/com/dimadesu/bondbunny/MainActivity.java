@@ -143,9 +143,9 @@ public class MainActivity extends Activity {
     
     private void updateUI() {
         if (serviceRunning) {
-            textStatus.setText("Status: running");
+            textStatus.setText("✅ Service is running");
         } else {
-            textStatus.setText("Status: stopped");
+            textStatus.setText("❌ Service is stopped");
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
@@ -222,6 +222,9 @@ public class MainActivity extends Activity {
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
             
+            // Service is running - just show that
+            textStatus.setText("✅ Service is running");
+            
             // Check retry state first - regardless of isConnected (handles server stops)
             if (isRetrying || retryCount > 0) {
                 // Show retry status
@@ -233,23 +236,12 @@ public class MainActivity extends Activity {
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
                 
-                textStatus.setText("⏳ Retrying connection...");
-                
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (isConnected && !hasStats && NativeSrtlaJni.isRunningSrtlaNative()) {
-                // Connected but stats not available yet (brief data pause)
-                // Only show if: connected, no retry in progress, and thread is running
-                textTotalBitrate.setText("Connected (loading stats...)");
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                textStatus.setText("✅ Service is running");
-                
-                Log.i("MainActivity", "Connected but waiting for stats");
+            } else if (hasStats) {
+                // We have actual stats to display
+                parseAndDisplayConnections(nativeStats);
             } else if (!isConnected && !hasStats) {
-                // Show initial connecting status
+                // Show initial connecting status (not connected, no stats yet)
                 String statusMessage = "Connecting to SRTLA receiver...";
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setVisibility(View.VISIBLE);
@@ -258,28 +250,14 @@ public class MainActivity extends Activity {
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
                 
-                textStatus.setText("⏳ Connecting...");
-                
                 Log.i("MainActivity", "Showing connecting UI");
-            } else if (hasStats) {
-                // We have actual stats to display
-                parseAndDisplayConnections(nativeStats);
-                
-                if (isConnected) {
-                    textStatus.setText("✅ Service is running");
-                } else {
-                    // Has stats but not marked as connected yet
-                    textStatus.setText("⏳ Establishing connection...");
-                }
             } else {
-                // No stats and no specific state - might be starting up
-                textTotalBitrate.setText("Starting SRTLA service...");
+                // No stats and no specific state - service starting or brief gap
+                textTotalBitrate.setText("Waiting for connection data...");
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
-                
-                textStatus.setText("⏳ Service starting...");
             }
         } else {
             // Service not running - clear display
@@ -614,7 +592,7 @@ public class MainActivity extends Activity {
         // Clear any previous error messages
         clearError();
         
-        textStatus.setText("Starting service...");
+        textStatus.setText("⏳ Service is starting...");
         
         try {
             // Get configuration from preferences (similar to regular SRTLA service)
@@ -647,7 +625,7 @@ public class MainActivity extends Activity {
             // Start the native SRTLA service
             NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             
-            textStatus.setText("⏳ Service starting...");
+            textStatus.setText("⏳ Service is starting...");
             Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
             
             // Poll service status intelligently instead of fixed delay
@@ -698,7 +676,7 @@ public class MainActivity extends Activity {
     }
     
     private void stopNativeSrtla() {
-        textStatus.setText("⏳ Stopping service...");
+        textStatus.setText("⏳ Service is stopping...");
         
         try {
             NativeSrtlaService.stopService(this);
@@ -711,14 +689,14 @@ public class MainActivity extends Activity {
             uiHandler.postDelayed(() -> {
                 updateNativeSrtlaUI();
                 if (!NativeSrtlaService.isServiceRunning()) {
-                    textStatus.setText("✅ Service stopped");
+                    textStatus.setText("❌ Service is stopped");
                 } else {
-                    textStatus.setText("⏳ Service stopping...");
+                    textStatus.setText("⏳ Service is stopping...");
                     // Try again after another delay
                     uiHandler.postDelayed(() -> {
                         updateNativeSrtlaUI();
                         if (!NativeSrtlaService.isServiceRunning()) {
-                            textStatus.setText("✅ Service stopped");
+                            textStatus.setText("❌ Service is stopped");
                         } else {
                             textStatus.setText("⚠️ Service may still be running");
                         }
