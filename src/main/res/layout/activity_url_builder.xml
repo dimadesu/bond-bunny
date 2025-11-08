@@ -66,6 +66,16 @@
       android:background="#e8f5e8"
       android:layout_marginBottom="4dp" />
 
+    <Button
+      android:id="@+id/button_copy_localhost"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="📋 Copy Localhost URL"
+      android:textSize="12sp"
+      android:layout_marginBottom="12dp"
+      android:background="?android:attr/selectableItemBackground"
+      android:padding="8dp" />
+
     <TextView
       android:id="@+id/text_srt_url_wifi"
       android:layout_width="match_parent"
@@ -75,37 +85,17 @@
       android:fontFamily="monospace"
       android:padding="8dp"
       android:background="#e3f2fd"
-      android:layout_marginBottom="12dp" />
+      android:layout_marginBottom="4dp" />
 
-    <LinearLayout
+    <Button
+      android:id="@+id/button_copy_wifi"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:layout_marginBottom="8dp">
-
-      <Button
-        android:id="@+id/button_copy_localhost"
-        android:layout_width="0dp"
-        android:layout_height="32dp"
-        android:layout_weight="1"
-        android:text="📋 Copy Localhost URL"
-        android:textSize="12sp"
-        android:layout_marginEnd="4dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:padding="4dp" />
-
-      <Button
-        android:id="@+id/button_copy_wifi"
-        android:layout_width="0dp"
-        android:layout_height="32dp"
-        android:layout_weight="1"
-        android:text="📋 Copy Wi-Fi URL"
-        android:textSize="12sp"
-        android:layout_marginStart="4dp"
-        android:background="?android:attr/selectableItemBackground"
-        android:padding="4dp" />
-
-    </LinearLayout>
+      android:text="📋 Copy Wi-Fi URL"
+      android:textSize="12sp"
+      android:layout_marginBottom="12dp"
+      android:background="?android:attr/selectableItemBackground"
+      android:padding="8dp" />
 
     <ScrollView
       android:layout_width="match_parent"
