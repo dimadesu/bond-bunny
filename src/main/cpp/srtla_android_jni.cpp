@@ -309,10 +309,16 @@ extern "C" void srtla_on_connection_established() {
     srtla_connected.store(true);
     srtla_has_ever_connected.store(true);
     
+    // Clear the is_reconnecting flag from native SRTLA code
+    extern void srtla_clear_reconnecting(void);
+    srtla_clear_reconnecting();
+    
     // Only reset retry count if this is a new connection or reconnection
     if (!wasConnected) {
         srtla_retry_count.store(0);
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, retry count reset");
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, retry count reset and reconnecting flag cleared");
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Connection established, reconnecting flag cleared");
     }
     
     if (!hadEverConnected) {
