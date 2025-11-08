@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.srtla'
+    namespace 'com.dimadesu.bondbunny'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.srtla"
+        applicationId "com.dimadesu.bondbunny"
         minSdk 26
         targetSdk 34
         versionCode 1

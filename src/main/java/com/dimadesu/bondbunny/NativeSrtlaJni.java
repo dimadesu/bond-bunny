@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 import android.util.Log;
 

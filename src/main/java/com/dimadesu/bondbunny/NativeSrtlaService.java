@@ -1,4 +1,4 @@
-package com.example.srtla;
+package com.dimadesu.bondbunny;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -421,7 +421,7 @@ public class NativeSrtlaService extends Service {
     }
     
     private void broadcastError(String errorMessage) {
-        Intent intent = new Intent("com.example.srtla.ERROR");
+        Intent intent = new Intent("com.dimadesu.bondbunny.ERROR");
         intent.putExtra("error_message", errorMessage);
         sendBroadcast(intent);
     }
