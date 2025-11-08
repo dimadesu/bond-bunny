@@ -6,9 +6,9 @@ This is compatible with any apps that can stream SRT and it essentially extends 
 
 Android implementation of [SRTLA](https://github.com/BELABOX/srtla).
 
-Some ideas borrowed from [Moblin](https://github.com/eerimoq/moblin) and [Moblink](https://github.com/eerimoq/moblink).
+![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
 
-Discord https://discord.gg/2UzEkU2AJW
+Share ideas or report issues in Discord https://discord.gg/2UzEkU2AJW or create Git issues.
 
 ## Apps that can work together
 
@@ -18,7 +18,7 @@ See the [demo video on YouTube](https://www.youtube.com/watch?v=_zlWsQYxrE4).
 - [LifeStreamer](https://github.com/dimadesu/LifeStreamer) - Can use RTMP as source: playback RTMP stream from server and restream it as SRT with great dynamic bitrate.
 - Bond Bunny - You can use LifeStreamer to publish SRT stream into Bond Bunny.
 
-## Installation Instructions
+## Installation instructions
 
 Not sure yet when app will be ready for publishing to Google Play store if ever.
 
@@ -30,6 +30,8 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
 - Enjoy!
 
 ## Apps that can stream SRT on Android
+
+- [LifeStreamer](https://github.com/dimadesu/LifeStreamer)
 - IRL Pro (free)
 - Larix Broadcaster (subscription)
 - Larix Screencaster (subscription)
@@ -37,4 +39,11 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
   - USB Camera (free with ads) / USB Camera Pro (one-time payment to remove ads)
   - CameraFi (free version with ads or subscription)
 
-![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
+## Similar/related projects
+
+- [BELABOX](https://belabox.net/)
+  - [SRTLA](https://github.com/BELABOX/srtla)
+  - [belaUI](https://github.com/BELABOX/belaUI)
+- [Moblin](https://github.com/eerimoq/moblin)
+- [Moblink](https://github.com/eerimoq/moblink)
+- [IRL Pro](https://irlpro.app/)
