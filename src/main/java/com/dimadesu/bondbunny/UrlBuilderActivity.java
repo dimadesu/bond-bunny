@@ -152,11 +152,11 @@ public class UrlBuilderActivity extends Activity {
             if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
                 availableNetworks++;
                 if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    networkInfo.append("• Wi-Fi Network (Internet)\n");
+                    networkInfo.append("• Wi-Fi\n");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    networkInfo.append("• Cellular Network (Internet)\n");
+                    networkInfo.append("• Cellular\n");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    networkInfo.append("• Ethernet Network (Internet)\n");
+                    networkInfo.append("• Ethernet\n");
                 }
             }
         }
