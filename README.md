@@ -18,7 +18,7 @@ See the [demo video on YouTube](https://www.youtube.com/watch?v=_zlWsQYxrE4).
 - [LifeStreamer](https://github.com/dimadesu/LifeStreamer) - Can use RTMP as source: playback RTMP stream from server and restream it as SRT with great dynamic bitrate.
 - Bond Bunny - You can use LifeStreamer to publish SRT stream into Bond Bunny.
 
-## Installation Instructions
+## Installation instructions
 
 Not sure yet when app will be ready for publishing to Google Play store if ever.
 
@@ -30,6 +30,7 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
 - Enjoy!
 
 ## Apps that can stream SRT on Android
+
 - [LifeStreamer](https://github.com/dimadesu/LifeStreamer)
 - IRL Pro (free)
 - Larix Broadcaster (subscription)
@@ -37,3 +38,12 @@ For now I'll be publishing .apk files periodically via GitHub releases on this r
 - Can do HDMI/USB/UVC as input:
   - USB Camera (free with ads) / USB Camera Pro (one-time payment to remove ads)
   - CameraFi (free version with ads or subscription)
+
+## Similar/related projects
+
+- [BELABOX](https://belabox.net/)
+  - [SRTLA](https://github.com/BELABOX/srtla)
+  - [belaUI](https://github.com/BELABOX/belaUI)
+- [Moblin](https://github.com/eerimoq/moblin)
+- [Moblink](https://github.com/eerimoq/moblink)
+- [IRL Pro](https://irlpro.app/)
