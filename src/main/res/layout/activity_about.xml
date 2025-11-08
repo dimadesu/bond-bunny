@@ -32,6 +32,28 @@
       android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="What are connection windows?"
+      android:layout_marginBottom="4dp"
+      android:textStyle="bold"
+      android:textSize="18sp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="When multiple connections are available and the app receives an SRT data packet, it needs to choose which connection will be used to send the packet to the SRTLA server. It evaluates each connection's RTT (round-trip time), number of packets in-flight, and connection window size, then picks a connection."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="After sending a packet, the SRTLA server will reply with either ACK (acknowledged) or NAK (negatively acknowledged). When a connection successfully delivers a packet (ACK), the connection window grows. If a packet was lost (NAK), the connection window shrinks. So it's one of the ways to track how a connection performs over time and it's used to decide if the connection should be used for sending data."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
   </LinearLayout>
 
 </ScrollView>
