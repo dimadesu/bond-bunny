@@ -11,10 +11,10 @@ import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.LinearLayout;
 
 public class UrlBuilderActivity extends Activity {
     private static final String PREFS_NAME = "SrtlaAppPrefs";
@@ -25,8 +25,8 @@ public class UrlBuilderActivity extends Activity {
     private TextView textWifi;
     private TextView textNetworks;
     private EditText editStreamId;
-    private Button buttonCopyLocalhost;
-    private Button buttonCopyWifi;
+    private LinearLayout layoutLocalhostUrl;
+    private LinearLayout layoutWifiUrl;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private android.os.Handler updateHandler = new android.os.Handler();
@@ -41,8 +41,8 @@ public class UrlBuilderActivity extends Activity {
         textWifi = findViewById(R.id.text_srt_url_wifi);
         textNetworks = findViewById(R.id.text_networks);
         editStreamId = findViewById(R.id.edit_stream_id);
-        buttonCopyLocalhost = findViewById(R.id.button_copy_localhost);
-        buttonCopyWifi = findViewById(R.id.button_copy_wifi);
+        layoutLocalhostUrl = findViewById(R.id.layout_localhost_url);
+        layoutWifiUrl = findViewById(R.id.layout_wifi_url);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 
         // Initial update
@@ -85,10 +85,9 @@ public class UrlBuilderActivity extends Activity {
             }
         });
 
-        // Copy buttons handle clipboard operations
-        buttonCopyLocalhost.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
-
-        buttonCopyWifi.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
+        // Clickable URL layouts for copying
+        layoutLocalhostUrl.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
+        layoutWifiUrl.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
 
         // Start periodic updates
         startPeriodicUpdates();
