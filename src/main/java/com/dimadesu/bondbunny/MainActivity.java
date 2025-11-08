@@ -237,18 +237,11 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (isConnected && !hasStats && NativeSrtlaJni.isRunningSrtlaNative()) {
-                // Connected but stats not available yet (brief data pause)
-                // Only show if: connected, no retry in progress, and thread is running
-                textTotalBitrate.setText("Connected (loading stats...)");
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                Log.i("MainActivity", "Connected but waiting for stats");
+            } else if (hasStats) {
+                // We have actual stats to display
+                parseAndDisplayConnections(nativeStats);
             } else if (!isConnected && !hasStats) {
-                // Show initial connecting status
+                // Show initial connecting status (not connected, no stats yet)
                 String statusMessage = "Connecting to SRTLA receiver...";
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setVisibility(View.VISIBLE);
@@ -258,12 +251,9 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 Log.i("MainActivity", "Showing connecting UI");
-            } else if (hasStats) {
-                // We have actual stats to display
-                parseAndDisplayConnections(nativeStats);
             } else {
-                // No stats and no specific state - might be starting up
-                textTotalBitrate.setText("Starting SRTLA service...");
+                // No stats and no specific state - service starting or brief gap
+                textTotalBitrate.setText("Waiting for connection data...");
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 connectionsContainer.removeAllViews();
