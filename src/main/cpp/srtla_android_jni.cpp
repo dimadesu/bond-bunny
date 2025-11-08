@@ -451,7 +451,7 @@ Java_com_example_srtla_NativeSrtlaJni_isRetrying(JNIEnv *env, jclass clazz) {
     // 3. not connected but has ever connected (detected disconnection)
     bool hasEverConnected = srtla_has_ever_connected.load();
     bool isRetrying = ((retryCount > 0) && !isConnected) || 
-                      isReconnecting || 
+                      (isReconnecting && !isConnected) || 
                       (!isConnected && hasEverConnected && activeCount == 0);
     
     if (isRetrying) {
