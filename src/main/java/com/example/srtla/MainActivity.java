@@ -743,12 +743,14 @@ public class MainActivity extends Activity {
         if (isRunning) {
             buttonNativeSrtla.setText("Stop Service");
             buttonNativeSrtla.setBackgroundColor(0xFFD32F2F); // Proper red color
+            buttonSettings.setEnabled(false); // Disable settings while service is running
             // Log.i("MainActivity", "UI updated to STOP state");
             
             // Update connection window visualization with native data
         } else {
             buttonNativeSrtla.setText("Start Service");
             buttonNativeSrtla.setBackgroundColor(0xFF4CAF50); // Green color
+            buttonSettings.setEnabled(true); // Enable settings when service is stopped
             
             // Clear connections display when not running
             clearConnectionsDisplay();
