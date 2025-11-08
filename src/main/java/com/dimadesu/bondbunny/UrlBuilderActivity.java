@@ -106,7 +106,7 @@ public class UrlBuilderActivity extends Activity {
     }
 
     private void updateNetworkInfo() {
-        StringBuilder networkInfo = new StringBuilder("IP Addresses of this device:\n");
+        StringBuilder networkInfo = new StringBuilder("IP addresses of this device:\n");
 
         try {
             java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
@@ -137,14 +137,14 @@ public class UrlBuilderActivity extends Activity {
                 }
             }
             if (interfaceCount == 0) {
-                networkInfo.append("No external IP addresses found\n");
+                networkInfo.append("No networks available\n");
             }
         } catch (Exception e) {
             networkInfo.append("Error discovering addresses: ").append(e.getMessage()).append("\n");
         }
 
         // Connectivity manager networks
-        networkInfo.append("\nConnected Networks:\n");
+        networkInfo.append("\nConnected networks:");
         Network[] networks = connectivityManager.getAllNetworks();
         int availableNetworks = 0;
         for (Network network : networks) {
@@ -152,16 +152,16 @@ public class UrlBuilderActivity extends Activity {
             if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
                 availableNetworks++;
                 if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    networkInfo.append("• Wi-Fi\n");
+                    networkInfo.append("\n• Wi-Fi");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                    networkInfo.append("• Cellular\n");
+                    networkInfo.append("\n• Cellular");
                 } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    networkInfo.append("• Ethernet\n");
+                    networkInfo.append("\n• Ethernet");
                 }
             }
         }
         if (availableNetworks == 0) {
-            networkInfo.append("• No internet networks available\n");
+            networkInfo.append("\n• No networks available");
         }
 
         textNetworks.setText(networkInfo.toString());
