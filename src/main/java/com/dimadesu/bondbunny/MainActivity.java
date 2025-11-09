@@ -62,18 +62,6 @@ public class MainActivity extends Activity {
     
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
-    
-    // Network change receiver
-    private BroadcastReceiver networkChangeReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String reason = intent.getStringExtra("reason");
-            Log.i("MainActivity", "Network change received: " + reason);
-            
-            // Immediately update stats when network changes
-            updateConnectionStats();
-        }
-    };
 
     private Runnable statsUpdateRunnable;
 
@@ -414,11 +402,9 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         
-        // Register receivers
+        // Register error receiver
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(networkChangeReceiver, 
-            new IntentFilter("network-changed"));
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
@@ -439,14 +425,7 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
         
-        // Unregister receivers using LocalBroadcastManager
-        try {
-            LocalBroadcastManager.getInstance(this).unregisterReceiver(networkChangeReceiver);
-            Log.i("MainActivity", "Unregistered network change receiver");
-        } catch (IllegalArgumentException e) {
-            Log.w("MainActivity", "Network change receiver was not registered");
-        }
-        
+        // Unregister error receiver
         try {
             if (errorReceiver != null) {
                 LocalBroadcastManager.getInstance(this).unregisterReceiver(errorReceiver);
