@@ -50,9 +50,15 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Tap a URL to copy it"
+      android:text="URLs below get refreshed automatically when device networks change."
       android:textSize="16sp"
-      android:textStyle="bold"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Tap a URL to copy it."
+      android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
     <!-- Localhost URL section (always visible) -->
