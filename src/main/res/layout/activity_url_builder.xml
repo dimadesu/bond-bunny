@@ -56,151 +56,22 @@
       android:layout_marginBottom="8dp" />
 
     <!-- Localhost URL section (always visible) -->
-    <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Localhost"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:textColor="#666666"
-      android:layout_marginBottom="4dp" />
-
-    <LinearLayout
-      android:id="@+id/layout_localhost_url"
+    <com.dimadesu.bondbunny.UrlItemView
+      android:id="@+id/url_localhost"
       android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:background="#e8f5e8"
-      android:paddingStart="8dp"
-      android:paddingEnd="8dp"
-      android:paddingTop="8dp"
-      android:paddingBottom="12dp"
-      android:layout_marginBottom="12dp"
-      android:clickable="true"
-      android:focusable="true"
-      android:foreground="?android:attr/selectableItemBackground">
-
-      <TextView
-        android:id="@+id/text_srt_url_localhost"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="srt://localhost:6000"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:layout_gravity="center_vertical" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="📋"
-        android:textSize="16sp"
-        android:layout_gravity="center_vertical"
-        android:gravity="center"
-        android:paddingStart="8dp"
-        android:paddingEnd="0dp" />
-
-    </LinearLayout>
+      android:layout_height="wrap_content" />
 
     <!-- Wi-Fi URL section (dynamic) -->
-    <TextView
-      android:id="@+id/label_wifi"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Wi-Fi"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:textColor="#666666"
-      android:layout_marginBottom="4dp"
-      android:visibility="gone" />
-
-    <LinearLayout
-      android:id="@+id/layout_wifi_url"
+    <com.dimadesu.bondbunny.UrlItemView
+      android:id="@+id/url_wifi"
       android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:background="#e3f2fd"
-      android:paddingStart="8dp"
-      android:paddingEnd="8dp"
-      android:paddingTop="8dp"
-      android:paddingBottom="12dp"
-      android:layout_marginBottom="12dp"
-      android:clickable="true"
-      android:focusable="true"
-      android:foreground="?android:attr/selectableItemBackground"
-      android:visibility="gone">
-
-      <TextView
-        android:id="@+id/text_srt_url_wifi"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="srt://192.168.1.xxx:6000"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:layout_gravity="center_vertical" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="📋"
-        android:textSize="16sp"
-        android:layout_gravity="center_vertical"
-        android:gravity="center"
-        android:paddingStart="8dp"
-        android:paddingEnd="0dp" />
-
-    </LinearLayout>
+      android:layout_height="wrap_content" />
 
     <!-- Ethernet URL section (dynamic) -->
-    <TextView
-      android:id="@+id/label_ethernet"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Ethernet"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:textColor="#666666"
-      android:layout_marginBottom="4dp"
-      android:visibility="gone" />
-
-    <LinearLayout
-      android:id="@+id/layout_ethernet_url"
+    <com.dimadesu.bondbunny.UrlItemView
+      android:id="@+id/url_ethernet"
       android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="horizontal"
-      android:background="#fff3e0"
-      android:paddingStart="8dp"
-      android:paddingEnd="8dp"
-      android:paddingTop="8dp"
-      android:paddingBottom="12dp"
-      android:layout_marginBottom="12dp"
-      android:clickable="true"
-      android:focusable="true"
-      android:foreground="?android:attr/selectableItemBackground"
-      android:visibility="gone">
-
-      <TextView
-        android:id="@+id/text_srt_url_ethernet"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="srt://192.168.1.xxx:6000"
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:layout_gravity="center_vertical" />
-
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="📋"
-        android:textSize="16sp"
-        android:layout_gravity="center_vertical"
-        android:gravity="center"
-        android:paddingStart="8dp"
-        android:paddingEnd="0dp" />
-
-    </LinearLayout>
+      android:layout_height="wrap_content" />
 
   </LinearLayout>
 

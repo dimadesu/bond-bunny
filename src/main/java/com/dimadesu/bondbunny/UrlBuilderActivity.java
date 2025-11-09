@@ -1,9 +1,6 @@
 package com.dimadesu.bondbunny;
 
 import android.app.Activity;
-import android.content.ClipboardManager;
-import android.content.ClipData;
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -12,23 +9,16 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.LinearLayout;
 
 public class UrlBuilderActivity extends Activity {
     private static final String PREFS_NAME = "SrtlaAppPrefs";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
 
-    private TextView textLocal;
-    private TextView textWifi;
-    private TextView textEthernet;
-    private TextView labelWifi;
-    private TextView labelEthernet;
+    private UrlItemView urlLocalhost;
+    private UrlItemView urlWifi;
+    private UrlItemView urlEthernet;
     private EditText editStreamId;
-    private LinearLayout layoutLocalhostUrl;
-    private LinearLayout layoutWifiUrl;
-    private LinearLayout layoutEthernetUrl;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private android.os.Handler updateHandler = new android.os.Handler();
@@ -39,16 +29,20 @@ public class UrlBuilderActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_url_builder);
 
-        textLocal = findViewById(R.id.text_srt_url_localhost);
-        textWifi = findViewById(R.id.text_srt_url_wifi);
-        textEthernet = findViewById(R.id.text_srt_url_ethernet);
-        labelWifi = findViewById(R.id.label_wifi);
-        labelEthernet = findViewById(R.id.label_ethernet);
+        urlLocalhost = findViewById(R.id.url_localhost);
+        urlWifi = findViewById(R.id.url_wifi);
+        urlEthernet = findViewById(R.id.url_ethernet);
         editStreamId = findViewById(R.id.edit_stream_id);
-        layoutLocalhostUrl = findViewById(R.id.layout_localhost_url);
-        layoutWifiUrl = findViewById(R.id.layout_wifi_url);
-        layoutEthernetUrl = findViewById(R.id.layout_ethernet_url);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+
+        // Set labels
+        urlLocalhost.setLabel("Localhost");
+        urlWifi.setLabel("Wi-Fi");
+        urlEthernet.setLabel("Ethernet");
+
+        // Hide Wi-Fi and Ethernet initially
+        urlWifi.hide();
+        urlEthernet.hide();
 
         // Initial update
         updateNetworkInfo();
@@ -89,11 +83,6 @@ public class UrlBuilderActivity extends Activity {
                 updateNetworkInfo();
             }
         });
-
-        // Clickable URL layouts for copying
-        layoutLocalhostUrl.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
-        layoutWifiUrl.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
-        layoutEthernetUrl.setOnClickListener(v -> copyToClipboard(textEthernet.getText().toString()));
 
         // Start periodic updates
         startPeriodicUpdates();
@@ -147,30 +136,26 @@ public class UrlBuilderActivity extends Activity {
         String streamParam = streamId.isEmpty() ? "" : "?streamid=" + streamId;
 
         String localUrl = "srt://localhost:" + port + streamParam;
-        textLocal.setText(localUrl);
+        urlLocalhost.setUrl(localUrl);
 
         // Update Wi-Fi URL (show/hide dynamically)
         String wifiIp = getWifiIpAddress();
         if (wifiIp != null) {
             String wifiUrl = "srt://" + wifiIp + ":" + port + streamParam;
-            textWifi.setText(wifiUrl);
-            labelWifi.setVisibility(android.view.View.VISIBLE);
-            layoutWifiUrl.setVisibility(android.view.View.VISIBLE);
+            urlWifi.setUrl(wifiUrl);
+            urlWifi.show();
         } else {
-            labelWifi.setVisibility(android.view.View.GONE);
-            layoutWifiUrl.setVisibility(android.view.View.GONE);
+            urlWifi.hide();
         }
 
         // Update Ethernet URL (show/hide dynamically)
         String ethernetIp = getEthernetIpAddress();
         if (ethernetIp != null) {
             String ethernetUrl = "srt://" + ethernetIp + ":" + port + streamParam;
-            textEthernet.setText(ethernetUrl);
-            labelEthernet.setVisibility(android.view.View.VISIBLE);
-            layoutEthernetUrl.setVisibility(android.view.View.VISIBLE);
+            urlEthernet.setUrl(ethernetUrl);
+            urlEthernet.show();
         } else {
-            labelEthernet.setVisibility(android.view.View.GONE);
-            layoutEthernetUrl.setVisibility(android.view.View.GONE);
+            urlEthernet.hide();
         }
     }
 
@@ -222,13 +207,5 @@ public class UrlBuilderActivity extends Activity {
             // ignore
         }
         return null;
-    }
-
-    private void copyToClipboard(String text) {
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText("SRT URL", text);
-        clipboard.setPrimaryClip(clip);
-        // On Android 12+ (API 31+), the system automatically shows a toast/notification
-        // when content is copied to clipboard, so we don't need to show our own
     }
 }
