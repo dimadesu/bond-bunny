@@ -62,18 +62,6 @@ public class MainActivity extends Activity {
     
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
-    
-    // Network change receiver
-    private BroadcastReceiver networkChangeReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String reason = intent.getStringExtra("reason");
-            Log.i("MainActivity", "Network change received: " + reason);
-            
-            // Immediately update stats when network changes
-            updateConnectionStats();
-        }
-    };
 
     private Runnable statsUpdateRunnable;
 
@@ -83,6 +71,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         
         initViews();
+        initializeReceivers();
         // Request notification permission at app start (Android 13+) so Start button doesn't trigger it
         checkAndRequestNotificationPermissionOnLaunch();
         
@@ -413,11 +402,9 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         
-        // Register receivers
+        // Register error receiver
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(networkChangeReceiver, 
-            new IntentFilter("network-changed"));
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
@@ -438,18 +425,10 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
         
-        // Unregister network change receiver
-        try {
-            unregisterReceiver(networkChangeReceiver);
-            Log.i("MainActivity", "Unregistered network change receiver");
-        } catch (IllegalArgumentException e) {
-            Log.w("MainActivity", "Network change receiver was not registered");
-        }
-        
         // Unregister error receiver
         try {
             if (errorReceiver != null) {
-                unregisterReceiver(errorReceiver);
+                LocalBroadcastManager.getInstance(this).unregisterReceiver(errorReceiver);
                 Log.i("MainActivity", "Unregistered error receiver");
             }
         } catch (IllegalArgumentException e) {
@@ -467,7 +446,8 @@ public class MainActivity extends Activity {
         // No longer saving preferences in MainActivity
     }
     
-    private void setupErrorReceiver() {
+    private void initializeReceivers() {
+        // Initialize error receiver (registration happens in onResume)
         errorReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -477,14 +457,7 @@ public class MainActivity extends Activity {
                 }
             }
         };
-        
-        IntentFilter errorFilter = new IntentFilter("com.dimadesu.bondbunny.ERROR");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(errorReceiver, errorFilter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(errorReceiver, errorFilter);
-        }
-        Log.i("MainActivity", "Registered error receiver");
+        Log.i("MainActivity", "Initialized error receiver");
     }
     
     private void showError(String errorMessage) {
