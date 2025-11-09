@@ -55,6 +55,16 @@
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
 
+    <!-- Localhost URL section (always visible) -->
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Localhost"
+      android:textSize="12sp"
+      android:textStyle="bold"
+      android:textColor="#666666"
+      android:layout_marginBottom="4dp" />
+
     <LinearLayout
       android:id="@+id/layout_localhost_url"
       android:layout_width="match_parent"
@@ -62,7 +72,7 @@
       android:orientation="horizontal"
       android:background="#e8f5e8"
       android:padding="8dp"
-      android:layout_marginBottom="8dp"
+      android:layout_marginBottom="12dp"
       android:clickable="true"
       android:focusable="true"
       android:foreground="?android:attr/selectableItemBackground">
@@ -88,6 +98,18 @@
 
     </LinearLayout>
 
+    <!-- Wi-Fi URL section (dynamic) -->
+    <TextView
+      android:id="@+id/label_wifi"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Wi-Fi"
+      android:textSize="12sp"
+      android:textStyle="bold"
+      android:textColor="#666666"
+      android:layout_marginBottom="4dp"
+      android:visibility="gone" />
+
     <LinearLayout
       android:id="@+id/layout_wifi_url"
       android:layout_width="match_parent"
@@ -98,10 +120,57 @@
       android:layout_marginBottom="12dp"
       android:clickable="true"
       android:focusable="true"
-      android:foreground="?android:attr/selectableItemBackground">
+      android:foreground="?android:attr/selectableItemBackground"
+      android:visibility="gone">
 
       <TextView
         android:id="@+id/text_srt_url_wifi"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="srt://192.168.1.xxx:6000"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:layout_gravity="center_vertical" />
+
+      <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📋"
+        android:textSize="20sp"
+        android:layout_gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="0dp" />
+
+    </LinearLayout>
+
+    <!-- Ethernet URL section (dynamic) -->
+    <TextView
+      android:id="@+id/label_ethernet"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Ethernet"
+      android:textSize="12sp"
+      android:textStyle="bold"
+      android:textColor="#666666"
+      android:layout_marginBottom="4dp"
+      android:visibility="gone" />
+
+    <LinearLayout
+      android:id="@+id/layout_ethernet_url"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:background="#fff3e0"
+      android:padding="8dp"
+      android:layout_marginBottom="12dp"
+      android:clickable="true"
+      android:focusable="true"
+      android:foreground="?android:attr/selectableItemBackground"
+      android:visibility="gone">
+
+      <TextView
+        android:id="@+id/text_srt_url_ethernet"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"

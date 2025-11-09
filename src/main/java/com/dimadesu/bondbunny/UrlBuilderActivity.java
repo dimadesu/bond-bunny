@@ -23,10 +23,14 @@ public class UrlBuilderActivity extends Activity {
 
     private TextView textLocal;
     private TextView textWifi;
+    private TextView textEthernet;
     private TextView textNetworks;
+    private TextView labelWifi;
+    private TextView labelEthernet;
     private EditText editStreamId;
     private LinearLayout layoutLocalhostUrl;
     private LinearLayout layoutWifiUrl;
+    private LinearLayout layoutEthernetUrl;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private android.os.Handler updateHandler = new android.os.Handler();
@@ -39,10 +43,14 @@ public class UrlBuilderActivity extends Activity {
 
         textLocal = findViewById(R.id.text_srt_url_localhost);
         textWifi = findViewById(R.id.text_srt_url_wifi);
+        textEthernet = findViewById(R.id.text_srt_url_ethernet);
         textNetworks = findViewById(R.id.text_networks);
+        labelWifi = findViewById(R.id.label_wifi);
+        labelEthernet = findViewById(R.id.label_ethernet);
         editStreamId = findViewById(R.id.edit_stream_id);
         layoutLocalhostUrl = findViewById(R.id.layout_localhost_url);
         layoutWifiUrl = findViewById(R.id.layout_wifi_url);
+        layoutEthernetUrl = findViewById(R.id.layout_ethernet_url);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 
         // Initial update
@@ -88,6 +96,7 @@ public class UrlBuilderActivity extends Activity {
         // Clickable URL layouts for copying
         layoutLocalhostUrl.setOnClickListener(v -> copyToClipboard(textLocal.getText().toString()));
         layoutWifiUrl.setOnClickListener(v -> copyToClipboard(textWifi.getText().toString()));
+        layoutEthernetUrl.setOnClickListener(v -> copyToClipboard(textEthernet.getText().toString()));
 
         // Start periodic updates
         startPeriodicUpdates();
@@ -239,9 +248,29 @@ public class UrlBuilderActivity extends Activity {
         String localUrl = "srt://localhost:" + port + streamParam;
         textLocal.setText(localUrl);
 
+        // Update Wi-Fi URL (show/hide dynamically)
         String wifiIp = getWifiIpAddress();
-        String wifiUrl = wifiIp != null ? "srt://" + wifiIp + ":" + port + streamParam : "srt://192.168.1.xxx:" + port + streamParam;
-        textWifi.setText(wifiUrl);
+        if (wifiIp != null) {
+            String wifiUrl = "srt://" + wifiIp + ":" + port + streamParam;
+            textWifi.setText(wifiUrl);
+            labelWifi.setVisibility(android.view.View.VISIBLE);
+            layoutWifiUrl.setVisibility(android.view.View.VISIBLE);
+        } else {
+            labelWifi.setVisibility(android.view.View.GONE);
+            layoutWifiUrl.setVisibility(android.view.View.GONE);
+        }
+
+        // Update Ethernet URL (show/hide dynamically)
+        String ethernetIp = getEthernetIpAddress();
+        if (ethernetIp != null) {
+            String ethernetUrl = "srt://" + ethernetIp + ":" + port + streamParam;
+            textEthernet.setText(ethernetUrl);
+            labelEthernet.setVisibility(android.view.View.VISIBLE);
+            layoutEthernetUrl.setVisibility(android.view.View.VISIBLE);
+        } else {
+            labelEthernet.setVisibility(android.view.View.GONE);
+            layoutEthernetUrl.setVisibility(android.view.View.GONE);
+        }
     }
 
     private String getWifiIpAddress() {
@@ -257,6 +286,31 @@ public class UrlBuilderActivity extends Activity {
                             String interfaceName = networkInterface.getDisplayName().toLowerCase();
                             String ipAddress = address.getHostAddress();
                             if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
+                                return ipAddress;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return null;
+    }
+
+    private String getEthernetIpAddress() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
+                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
+                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        java.net.InetAddress address = addresses.nextElement();
+                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
+                            String interfaceName = networkInterface.getDisplayName().toLowerCase();
+                            String ipAddress = address.getHostAddress();
+                            if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
                                 return ipAddress;
                             }
                         }
