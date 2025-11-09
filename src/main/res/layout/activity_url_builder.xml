@@ -190,24 +190,6 @@
 
     </LinearLayout>
 
-    <ScrollView
-      android:layout_width="match_parent"
-      android:layout_height="0dp"
-      android:layout_weight="1"
-      android:layout_marginBottom="4dp">
-
-      <TextView
-        android:id="@+id/text_networks"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Available Networks:\nScanning..."
-        android:textSize="14sp"
-        android:fontFamily="monospace"
-        android:padding="8dp"
-        android:background="#f0f0f0" />
-
-    </ScrollView>
-
   </LinearLayout>
 
 </ScrollView>

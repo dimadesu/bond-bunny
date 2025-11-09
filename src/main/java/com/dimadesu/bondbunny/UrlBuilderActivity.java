@@ -13,7 +13,6 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 import android.widget.LinearLayout;
 
 public class UrlBuilderActivity extends Activity {
@@ -24,7 +23,6 @@ public class UrlBuilderActivity extends Activity {
     private TextView textLocal;
     private TextView textWifi;
     private TextView textEthernet;
-    private TextView textNetworks;
     private TextView labelWifi;
     private TextView labelEthernet;
     private EditText editStreamId;
@@ -44,7 +42,6 @@ public class UrlBuilderActivity extends Activity {
         textLocal = findViewById(R.id.text_srt_url_localhost);
         textWifi = findViewById(R.id.text_srt_url_wifi);
         textEthernet = findViewById(R.id.text_srt_url_ethernet);
-        textNetworks = findViewById(R.id.text_networks);
         labelWifi = findViewById(R.id.label_wifi);
         labelEthernet = findViewById(R.id.label_ethernet);
         editStreamId = findViewById(R.id.edit_stream_id);
@@ -143,102 +140,6 @@ public class UrlBuilderActivity extends Activity {
     }
 
     private void updateNetworkInfo() {
-        StringBuilder networkInfo = new StringBuilder("IP addresses of this device:\n");
-
-        // Build a map of IP to network type using NetworkCapabilities
-        java.util.Map<String, String> ipToNetworkType = new java.util.HashMap<>();
-        Network[] networks = connectivityManager.getAllNetworks();
-        for (Network network : networks) {
-            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
-            android.net.LinkProperties linkProps = connectivityManager.getLinkProperties(network);
-            if (caps != null && linkProps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                String networkType = null;
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    networkType = "Wi-Fi";
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    networkType = "Ethernet";
-                }
-                
-                if (networkType != null) {
-                    for (android.net.LinkAddress linkAddress : linkProps.getLinkAddresses()) {
-                        java.net.InetAddress addr = linkAddress.getAddress();
-                        if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
-                            ipToNetworkType.put(addr.getHostAddress(), networkType);
-                        }
-                    }
-                }
-            }
-        }
-
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
-            int interfaceCount = 0;
-            while (networkInterfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
-                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        java.net.InetAddress address = addresses.nextElement();
-                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                            interfaceCount++;
-                            String ipAddress = address.getHostAddress();
-                            networkInfo.append("• ").append(ipAddress);
-                            
-                            // Use NetworkCapabilities info if available, otherwise fall back to interface name
-                            String networkType = ipToNetworkType.get(ipAddress);
-                            if (networkType != null) {
-                                networkInfo.append(" (").append(networkType).append(")");
-                            } else {
-                                // Fallback: detect from interface name (skip cellular)
-                                String interfaceName = networkInterface.getDisplayName().toLowerCase();
-                                if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
-                                    networkInfo.append(" (Wi-Fi)");
-                                } else if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
-                                    networkInfo.append(" (Ethernet)");
-                                } else if (interfaceName.contains("rmnet") || interfaceName.contains("mobile") || 
-                                          interfaceName.contains("cellular") || interfaceName.contains("ccmni") ||
-                                          interfaceName.contains("pdp") || interfaceName.contains("ppp")) {
-                                    // Skip cellular interfaces
-                                    interfaceCount--;
-                                    continue;
-                                } else {
-                                    networkInfo.append(" (").append(networkInterface.getDisplayName()).append(")");
-                                }
-                            }
-                            networkInfo.append("\n");
-                        }
-                    }
-                }
-            }
-            if (interfaceCount == 0) {
-                networkInfo.append("No networks available\n");
-            }
-        } catch (Exception e) {
-            networkInfo.append("Error discovering addresses: ").append(e.getMessage()).append("\n");
-        }
-
-        // Connectivity manager networks
-        networkInfo.append("\nConnected networks:");
-        int availableNetworks = 0;
-        for (Network network : networks) {
-            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
-            if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    availableNetworks++;
-                    networkInfo.append("\n• Wi-Fi");
-                } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    availableNetworks++;
-                    networkInfo.append("\n• Ethernet");
-                }
-                // Skip cellular networks
-            }
-        }
-        if (availableNetworks == 0) {
-            networkInfo.append("\n• No networks available");
-        }
-
-        textNetworks.setText(networkInfo.toString());
-
         // Update URLs
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String port = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
