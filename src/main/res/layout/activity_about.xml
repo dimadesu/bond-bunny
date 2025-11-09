@@ -43,7 +43,7 @@
     <TextView
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="When multiple connections are available and the app receives an SRT data packet, it needs to choose which connection will be used to send the packet to the SRTLA server. It evaluates each connection's RTT (round-trip time), number of packets in-flight, and connection window size, then picks a connection."
+      android:text="When multiple connections are available and the app receives an SRT data packet, it needs to choose which connection will be used to send the packet to the SRTLA server. It evaluates each connection's number of packets in-flight and connection window size, then picks a connection."
       android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
