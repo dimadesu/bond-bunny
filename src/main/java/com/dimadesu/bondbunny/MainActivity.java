@@ -317,7 +317,7 @@ public class MainActivity extends Activity {
             // Parse connection section
             try {
                 String[] lines = section.trim().split("\n");
-                if (lines.length < 4) continue; // Need at least 4 lines: type, bitrate, window, in-flight
+                if (lines.length < 5) continue; // Need at least 5 lines: type, bitrate, window, in-flight, rtt
                 
                 // First line is network type
                 String networkType = lines[0].trim();
@@ -351,6 +351,13 @@ public class MainActivity extends Activity {
                     inFlight = Integer.parseInt(inFlightLine.substring(18).trim());
                 }
                 
+                // Parse RTT line: "  RTT: 45 ms" or "  RTT: N/A"
+                String rttLine = lines[4].trim();
+                String rtt = "N/A";
+                if (rttLine.startsWith("RTT:")) {
+                    rtt = rttLine.substring(4).trim(); // e.g., "45 ms" or "N/A"
+                }
+                
                 // Determine if connection is active (has bitrate > 0 or in-flight packets)
                 boolean isActive = inFlight > 0 || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
                 
@@ -379,8 +386,8 @@ public class MainActivity extends Activity {
                 // Set stats text
                 TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
                 String statsDisplay = String.format(
-                    "Bitrate: %s  %s\nPackets in-flight: %,d\nWindow: %,d / 60,000",
-                    bitrate, load, inFlight, windowSize
+                    "Bitrate: %s  %s\nPackets in-flight: %,d\nRTT: %s\nWindow: %,d / 60,000",
+                    bitrate, load, inFlight, rtt, windowSize
                 );
                 statsTextView.setText(statsDisplay);
                 
