@@ -56,6 +56,10 @@ public class MainActivity extends Activity {
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
     
+    // Debounce mechanism for start/stop button
+    private long lastToggleTime = 0;
+    private static final long TOGGLE_DEBOUNCE_MS = 3000; // 3 seconds debounce (matches startup timeout)
+    
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
     
@@ -588,6 +592,15 @@ public class MainActivity extends Activity {
     }
     
     private void toggleNativeSrtla() {
+        // Debounce rapid clicks
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastToggleTime < TOGGLE_DEBOUNCE_MS) {
+            long remainingTime = (TOGGLE_DEBOUNCE_MS - (currentTime - lastToggleTime)) / 1000;
+            Toast.makeText(this, "Please wait " + remainingTime + " more second(s)", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        lastToggleTime = currentTime;
+        
         if (NativeSrtlaService.isServiceRunning()) {
             stopNativeSrtla();
         } else {
