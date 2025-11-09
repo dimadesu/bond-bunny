@@ -95,7 +95,7 @@
       android:id="@+id/text_total_bitrate"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="Total: 0.0 Mbps"
+      android:text="Total: 0.00 Mbps"
       android:textSize="16sp"
       android:textColor="#495057"
       android:paddingTop="8dp"
