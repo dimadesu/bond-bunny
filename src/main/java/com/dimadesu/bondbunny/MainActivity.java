@@ -83,6 +83,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         
         initViews();
+        initializeReceivers();
         // Request notification permission at app start (Android 13+) so Start button doesn't trigger it
         checkAndRequestNotificationPermissionOnLaunch();
         
@@ -438,18 +439,17 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
         
-        // Unregister network change receiver
+        // Unregister receivers using LocalBroadcastManager
         try {
-            unregisterReceiver(networkChangeReceiver);
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(networkChangeReceiver);
             Log.i("MainActivity", "Unregistered network change receiver");
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Network change receiver was not registered");
         }
         
-        // Unregister error receiver
         try {
             if (errorReceiver != null) {
-                unregisterReceiver(errorReceiver);
+                LocalBroadcastManager.getInstance(this).unregisterReceiver(errorReceiver);
                 Log.i("MainActivity", "Unregistered error receiver");
             }
         } catch (IllegalArgumentException e) {
@@ -467,7 +467,8 @@ public class MainActivity extends Activity {
         // No longer saving preferences in MainActivity
     }
     
-    private void setupErrorReceiver() {
+    private void initializeReceivers() {
+        // Initialize error receiver (registration happens in onResume)
         errorReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -477,14 +478,7 @@ public class MainActivity extends Activity {
                 }
             }
         };
-        
-        IntentFilter errorFilter = new IntentFilter("com.dimadesu.bondbunny.ERROR");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(errorReceiver, errorFilter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(errorReceiver, errorFilter);
-        }
-        Log.i("MainActivity", "Registered error receiver");
+        Log.i("MainActivity", "Initialized error receiver");
     }
     
     private void showError(String errorMessage) {
