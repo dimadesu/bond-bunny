@@ -433,14 +433,21 @@ public class NativeSrtlaService extends Service {
         
         try {
             int port = Integer.parseInt(srtlaPort);
-            InetSocketAddress testAddress = new InetSocketAddress(srtlaHost, port);
-            if (testAddress.isUnresolved()) {
+            
+            // Actually resolve the hostname to test DNS
+            Log.i(TAG, "Testing DNS resolution for: " + srtlaHost);
+            InetAddress address = InetAddress.getByName(srtlaHost);
+            if (address == null) {
                 return "Cannot resolve hostname: " + srtlaHost;
             }
+            Log.i(TAG, "DNS resolution successful: " + srtlaHost + " -> " + address.getHostAddress());
+            
         } catch (NumberFormatException e) {
             return "Invalid port number: " + srtlaPort;
+        } catch (java.net.UnknownHostException e) {
+            return "Cannot resolve hostname: " + srtlaHost + " (DNS lookup failed)";
         } catch (Exception e) {
-            return "Invalid hostname or port: " + srtlaHost + ":" + srtlaPort;
+            return "Invalid hostname or port: " + srtlaHost + ":" + srtlaPort + " (" + e.getMessage() + ")";
         }
         
         return null; // No error
