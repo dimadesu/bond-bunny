@@ -421,9 +421,9 @@ public class NativeSrtlaService extends Service {
     }
     
     private void broadcastError(String errorMessage) {
-        Intent intent = new Intent("com.dimadesu.bondbunny.ERROR");
+        Intent intent = new Intent("srtla-error");
         intent.putExtra("error_message", errorMessage);
-        sendBroadcast(intent);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
     
     private String validateSrtlaConfig() {
