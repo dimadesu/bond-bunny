@@ -414,15 +414,17 @@ Java_com_dimadesu_bondbunny_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz
         return env->NewStringUTF("");
     }
     
-    if (isReconnecting || (!isConnected && hasEverConnected)) {
-        // We're reconnecting (lost connection and trying to restore)
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnecting after connection loss");
+    // Only hide stats if we're reconnecting AND have NO active connections
+    // This allows partial connectivity to show stats (e.g., WiFi down but Cellular still working)
+    if ((isReconnecting || (!isConnected && hasEverConnected)) && activeConnections == 0) {
+        // We're reconnecting and all connections are down
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Reconnecting with no active connections");
         return env->NewStringUTF("");
     }
     
-    if (!isConnected && retryCount > 0) {
-        // We're in retry mode (either never connected or lost connection)
-        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d)", retryCount);
+    if (!isConnected && retryCount > 0 && activeConnections == 0) {
+        // We're in retry mode with no active connections
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "In retry mode (attempt %d), no active connections", retryCount);
         return env->NewStringUTF("");
     }
     
@@ -434,6 +436,13 @@ Java_com_dimadesu_bondbunny_NativeSrtlaJni_getAllStats(JNIEnv *env, jclass clazz
     if (detailsLen <= 0 || strlen(detailsBuffer) == 0) {
         __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "No stats data available yet");
         return env->NewStringUTF("");
+    }
+    
+    // If we're reconnecting but have active connections, add indicator to stats
+    if (isReconnecting && activeConnections > 0) {
+        __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", 
+            "Showing stats during partial reconnection (active: %d, total: %d)", 
+            activeConnections, totalConnections);
     }
     
     return env->NewStringUTF(detailsBuffer);
