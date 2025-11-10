@@ -255,7 +255,7 @@ public class MainActivity extends Activity {
             } else {
                 // Connected but no stats yet - give it a moment
                 // This can happen briefly when connections are established but stats not ready
-                textTotalBitrate.setText("Preparing connection stats...");
+                textTotalBitrate.setText("Waiting for connection stats...");
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 connectionsContainer.removeAllViews();
