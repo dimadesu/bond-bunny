@@ -212,6 +212,13 @@ public class MainActivity extends Activity {
             String nativeStats = NativeSrtlaService.getNativeStats();
             boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
             
+            // Log stats state for debugging
+            Log.i("MainActivity", String.format("Stats check: hasStats=%b, statsLen=%d, isEmpty=%b, hasTotalBitrate=%b",
+                  hasStats, 
+                  nativeStats != null ? nativeStats.length() : -1,
+                  nativeStats == null || nativeStats.isEmpty(),
+                  nativeStats != null && nativeStats.contains("Total bitrate:")));
+            
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
             
@@ -230,9 +237,6 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (hasStats) {
-                // We have actual stats to display
-                parseAndDisplayConnections(nativeStats);
             } else if (!isConnected && !hasStats) {
                 // Show initial connecting status (not connected, no stats yet)
                 String statusMessage = "Connecting to SRTLA receiver...";
@@ -244,13 +248,20 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 Log.i("MainActivity", "Showing connecting UI");
+            } else if (hasStats) {
+                // We have actual stats to display (even if bitrate is 0)
+                parseAndDisplayConnections(nativeStats);
+                Log.i("MainActivity", "Displaying stats");
             } else {
-                // No stats and no specific state - service starting or brief gap
-                textTotalBitrate.setText("Waiting for connection data...");
+                // Connected but no stats yet - give it a moment
+                // This can happen briefly when connections are established but stats not ready
+                textTotalBitrate.setText("Preparing connection stats...");
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
+                
+                Log.i("MainActivity", "Waiting for stats (connected=" + isConnected + ", hasStats=" + hasStats + ")");
             }
         } else {
             // Service not running - clear display
