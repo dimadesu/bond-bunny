@@ -375,12 +375,15 @@ public class NativeSrtlaService extends Service {
                 !localAddress.isLoopbackAddress() && !localAddress.isAnyLocalAddress()) {
                 return localAddress.getHostAddress();
             }
-        } catch (SecurityException se) {
-            // EPERM - Samsung doesn't allow bindSocket without CHANGE_NETWORK_STATE permission
-            // Use a placeholder IP - the native socket binding works fine
-            Log.i(TAG, "Using placeholder IP for network (bindSocket permission denied)");
-            return "10.64.64.64"; // Placeholder that indicates "cellular with unknown IP"
         } catch (Exception e) {
+            // Check if it's a permission error (EPERM from Samsung devices)
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && errorMsg.contains("EPERM")) {
+                // Samsung doesn't allow bindSocket for cellular networks
+                // Use a placeholder IP - the native socket binding works fine
+                Log.i(TAG, "Using placeholder IP for network (bindSocket EPERM blocked by Samsung)");
+                return "10.64.64.64"; // Placeholder that indicates "cellular with unknown IP"
+            }
             Log.w(TAG, "getNetworkIPFromSocket failed: " + e.getMessage());
         } finally {
             if (socket != null && !socket.isClosed()) {
