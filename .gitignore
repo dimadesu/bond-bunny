@@ -36,3 +36,5 @@ google-services.json
 .DS_Store
 
 /inspiration/
+
+.vscode/

@@ -23,6 +23,7 @@ import android.net.LinkProperties;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -301,7 +302,6 @@ public class NativeSrtlaService extends Service {
         
         return ipsFile;
     }
-    
     private int createNetworkSocket(Network network) {
         try {
             // Create a native UDP socket using JNI
@@ -355,8 +355,47 @@ public class NativeSrtlaService extends Service {
         }
     }
     
+    /**
+     * Get IP address from a network by creating a test socket
+     * This works even for cellular networks on Samsung devices
+     */
+    private String getNetworkIPFromSocket(Network network) {
+        DatagramSocket socket = null;
+        try {
+            socket = new DatagramSocket();
+            // Samsung requires CHANGE_NETWORK_STATE for bindSocket on DatagramSocket
+            // But we CAN bind FileDescriptor sockets (native sockets) successfully
+            // So as a workaround, use a placeholder IP for cellular networks
+            network.bindSocket(socket);
+            // Connect to a public server to force socket to select a source address
+            socket.connect(InetAddress.getByName("8.8.8.8"), 53);
+            InetAddress localAddress = socket.getLocalAddress();
+            
+            if (localAddress != null && localAddress instanceof Inet4Address && 
+                !localAddress.isLoopbackAddress() && !localAddress.isAnyLocalAddress()) {
+                return localAddress.getHostAddress();
+            }
+        } catch (Exception e) {
+            // Check if it's a permission error (EPERM from Samsung devices)
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && errorMsg.contains("EPERM")) {
+                // Samsung doesn't allow bindSocket for cellular networks
+                // Use a placeholder IP - the native socket binding works fine
+                Log.i(TAG, "Using placeholder IP for network (bindSocket EPERM blocked by Samsung)");
+                return "10.64.64.64"; // Placeholder that indicates "cellular with unknown IP"
+            }
+            Log.w(TAG, "getNetworkIPFromSocket failed: " + e.getMessage());
+        } finally {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        }
+        return null;
+    }
+    
     private String getNetworkIP(Network network) {
         try {
+            // First try getting IP from LinkProperties (works for WiFi and some cellular)
             LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
             if (linkProperties != null) {
                 for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
@@ -365,6 +404,14 @@ public class NativeSrtlaService extends Service {
                         return address.getHostAddress();
                     }
                 }
+            }
+            
+            // Fallback: Try socket binding method (works for Samsung cellular)
+            Log.i(TAG, "LinkProperties didn't provide IPv4, trying socket binding method");
+            String ipFromSocket = getNetworkIPFromSocket(network);
+            if (ipFromSocket != null) {
+                Log.i(TAG, "Got IP via socket binding: " + ipFromSocket);
+                return ipFromSocket;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting network IP", e);
@@ -572,7 +619,11 @@ public class NativeSrtlaService extends Service {
             NetworkCapabilities caps = cm.getNetworkCapabilities(network);
             if (caps == null) continue;
             
+            // Skip VPN networks
+            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) continue;
+            
             // Check each transport type and recreate socket
+            // Note: Samsung devices may report cellular without NET_CAPABILITY_INTERNET, so we check transport type first
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                 Log.i(TAG, "Found existing CELLULAR network, recreating socket");
                 handleDedicatedNetworkAvailable(network, "CELLULAR", "");
@@ -660,10 +711,15 @@ public class NativeSrtlaService extends Service {
      */
     private synchronized void handleDedicatedNetworkAvailable(Network network, String networkType, String operatorName) {
         try {
+            Log.i(TAG, "DEDICATED: Handling " + networkType + " network: " + network);
             String realIP = getNetworkIP(network);
+            Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
+            
             if (realIP != null) {
                 String virtualIP = getVirtualIPForNetworkType(networkType);
                 int networkTypeId = getNetworkTypeId(networkType);
+                
+                Log.i(TAG, "DEDICATED: Virtual IP: " + virtualIP + ", already registered: " + virtualConnections.containsKey(virtualIP));
                 
                 if (virtualIP != null && !virtualConnections.containsKey(virtualIP)) {
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
@@ -686,6 +742,8 @@ public class NativeSrtlaService extends Service {
                                 Log.w(TAG, "Error updating virtual IPs file after dedicated network change", e);
                             }
                         }
+                    } else {
+                        Log.e(TAG, "DEDICATED: Failed to create socket for " + networkType + " (returned " + socket + ")");
                     }
                 }
             }
