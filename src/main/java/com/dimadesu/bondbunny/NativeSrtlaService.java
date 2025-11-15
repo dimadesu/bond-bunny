@@ -62,6 +62,9 @@ public class NativeSrtlaService extends Service {
     // Virtual connection tracking
     private java.util.Map<String, Integer> virtualConnections = new java.util.concurrent.ConcurrentHashMap<>();
     
+    // Track network ID + IP to avoid redundant socket recreation
+    private java.util.Map<String, String> networkState = new java.util.concurrent.ConcurrentHashMap<>();
+    
     // Synchronization for waiting for first network connection
     private CountDownLatch firstConnectionLatch = new CountDownLatch(1);
     
@@ -115,9 +118,14 @@ public class NativeSrtlaService extends Service {
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
             
-            // Recreate sockets for currently available networks
-            // This is important after stop/start because network callbacks won't fire again
-            recreateNetworkSockets();
+            // Ensure sockets exist (callbacks may not fire again if networks already connected)
+            // Only recreate if we have no sockets yet
+            if (virtualConnections.isEmpty()) {
+                Log.i(TAG, "No sockets detected, manually recreating for existing networks");
+                recreateNetworkSockets();
+            } else {
+                Log.i(TAG, "Sockets already exist (" + virtualConnections.size() + "), skipping recreation");
+            }
             
             // Start native SRTLA in background thread
             new Thread(this::startNativeSrtla).start();
@@ -603,7 +611,7 @@ public class NativeSrtlaService extends Service {
     
     /**
      * Manually recreate sockets for all currently available networks
-     * This is needed after stop/start since network callbacks won't fire again for existing networks
+     * This is needed when service restarts but callbacks don't fire (networks already connected)
      */
     private void recreateNetworkSockets() {
         Log.i(TAG, "Recreating network sockets for currently available networks");
@@ -623,7 +631,6 @@ public class NativeSrtlaService extends Service {
             if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) continue;
             
             // Check each transport type and recreate socket
-            // Note: Samsung devices may report cellular without NET_CAPABILITY_INTERNET, so we check transport type first
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                 Log.i(TAG, "Found existing CELLULAR network, recreating socket");
                 handleDedicatedNetworkAvailable(network, "CELLULAR", "");
@@ -663,8 +670,18 @@ public class NativeSrtlaService extends Service {
                 try {
                     // This fires when network capabilities change (e.g., mobile data toggled back on)
                     Log.i(TAG, "DEDICATED: " + networkTypeName + " network capabilities changed: " + network);
-                    // Re-handle network availability to recreate socket with fresh connection
-                    handleDedicatedNetworkAvailable(network, networkTypeName, "");
+                    
+                    // Only recreate socket if network state actually changed (different IP or first time)
+                    String stateKey = networkTypeName + ":" + network.toString();
+                    String currentIP = getNetworkIP(network);
+                    String previousIP = networkState.get(stateKey);
+                    
+                    if (currentIP != null && !currentIP.equals(previousIP)) {
+                        Log.i(TAG, "DEDICATED: " + networkTypeName + " IP changed: " + previousIP + " -> " + currentIP);
+                        handleDedicatedNetworkAvailable(network, networkTypeName, "");
+                    } else {
+                        Log.d(TAG, "DEDICATED: " + networkTypeName + " capabilities changed but IP unchanged, skipping recreation");
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "Error in " + networkTypeName.toLowerCase() + " capabilities changed callback", e);
                 }
@@ -734,6 +751,17 @@ public class NativeSrtlaService extends Service {
                 Log.i(TAG, "DEDICATED: Virtual IP: " + virtualIP + ", already registered: " + virtualConnections.containsKey(virtualIP));
                 
                 if (virtualIP != null) {
+                    // Track network state to prevent duplicate creations
+                    String stateKey = networkType + ":" + network.toString();
+                    String previousState = networkState.get(stateKey);
+                    String currentState = realIP;
+                    
+                    // Skip if this exact network+IP combination already exists
+                    if (currentState.equals(previousState) && virtualConnections.containsKey(virtualIP)) {
+                        Log.d(TAG, "DEDICATED: Socket already exists for " + networkType + " with same IP, skipping");
+                        return;
+                    }
+                    
                     // If already registered, remove old socket first (network may have changed)
                     if (virtualConnections.containsKey(virtualIP)) {
                         Log.i(TAG, "DEDICATED: Re-creating socket for " + networkType + " (network reconnected/changed)");
@@ -741,6 +769,7 @@ public class NativeSrtlaService extends Service {
                     }
                     
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
+                    networkState.put(stateKey, currentState);
                     int socket = createNetworkSocket(network);
                     if (socket >= 0) {
                         virtualConnections.put(virtualIP, socket);
@@ -781,6 +810,10 @@ public class NativeSrtlaService extends Service {
                 Log.i(TAG, "DEDICATED: Removing " + networkType + " connection: " + virtualIP);
                 // Note: Don't close socket here - native code owns it
                 virtualConnections.remove(virtualIP);
+                
+                // Clean up network state tracking
+                String stateKey = networkType + ":" + network.toString();
+                networkState.remove(stateKey);
                 
                 // Update virtual IPs file if service is running
                 if (isServiceRunning) {
