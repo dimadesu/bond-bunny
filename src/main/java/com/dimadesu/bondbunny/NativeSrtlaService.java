@@ -657,6 +657,18 @@ public class NativeSrtlaService extends Service {
                 Log.i(TAG, "DEDICATED: Lost " + networkTypeName.toLowerCase() + " network: " + network);
                 handleDedicatedNetworkLost(network, networkTypeName);
             }
+            
+            @Override
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
+                try {
+                    // This fires when network capabilities change (e.g., mobile data toggled back on)
+                    Log.i(TAG, "DEDICATED: " + networkTypeName + " network capabilities changed: " + network);
+                    // Re-handle network availability to recreate socket with fresh connection
+                    handleDedicatedNetworkAvailable(network, networkTypeName, "");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in " + networkTypeName.toLowerCase() + " capabilities changed callback", e);
+                }
+            }
         };
         
         try {
@@ -721,7 +733,13 @@ public class NativeSrtlaService extends Service {
                 
                 Log.i(TAG, "DEDICATED: Virtual IP: " + virtualIP + ", already registered: " + virtualConnections.containsKey(virtualIP));
                 
-                if (virtualIP != null && !virtualConnections.containsKey(virtualIP)) {
+                if (virtualIP != null) {
+                    // If already registered, remove old socket first (network may have changed)
+                    if (virtualConnections.containsKey(virtualIP)) {
+                        Log.i(TAG, "DEDICATED: Re-creating socket for " + networkType + " (network reconnected/changed)");
+                        virtualConnections.remove(virtualIP);
+                    }
+                    
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
                     int socket = createNetworkSocket(network);
                     if (socket >= 0) {
