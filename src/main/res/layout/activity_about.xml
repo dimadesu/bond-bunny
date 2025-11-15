@@ -35,7 +35,7 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="What are connection windows?"
+      android:text="What Are Connection Windows?"
       android:layout_marginBottom="4dp"
       android:textStyle="bold"
       android:textSize="18sp" />
@@ -51,6 +51,35 @@
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:text="After sending a packet, the SRTLA server will reply with either ACK (acknowledged) or NAK (negatively acknowledged). When a connection successfully delivers a packet (ACK), the connection window grows. If a packet was lost (NAK), the connection window shrinks. So it's one of the ways to track how a connection performs over time and it's used to decide if the connection should be used for sending data."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Issue With Detecting Cellular Connection When Wi-Fi is Active"
+      android:layout_marginBottom="4dp"
+      android:textStyle="bold"
+      android:textSize="18sp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Some phones like Samsung S23 FE can disable mobile data when Wi-Fi is active, which can make it harder for this app to detect cellular connection."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="One approach is to disable Wi-Fi temporarily before tapping 'Start Service' button and then re-enable it after the service has started."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Second approach is to enable 'Developer options' by going to Settings > About phone > Software information and tapping 'Build number' seven times. Go to 'Developer options' and find 'Mobile data always active' setting and toggle it ON."
       android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
