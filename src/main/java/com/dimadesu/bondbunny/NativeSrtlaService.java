@@ -62,10 +62,6 @@ public class NativeSrtlaService extends Service {
     // Virtual connection tracking
     private java.util.Map<String, Integer> virtualConnections = new java.util.concurrent.ConcurrentHashMap<>();
     
-    // Keep DatagramSocket references alive to prevent GC from closing the underlying FDs
-    // The FDs are transferred to native code, but Java will close the socket if the DatagramSocket is GC'd
-    private java.util.Map<String, DatagramSocket> activeDatagramSockets = new java.util.concurrent.ConcurrentHashMap<>();
-    
     // Track network ID + IP to avoid redundant socket recreation
     private java.util.Map<String, String> networkState = new java.util.concurrent.ConcurrentHashMap<>();
     
@@ -289,10 +285,6 @@ public class NativeSrtlaService extends Service {
         
         virtualConnections.clear();
         
-        // Clear DatagramSocket references - native code now owns the FDs
-        // We don't close these as native code will close the underlying FDs
-        activeDatagramSockets.clear();
-        
         Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
     
@@ -321,20 +313,14 @@ public class NativeSrtlaService extends Service {
     }
     /**
      * Create a network-bound socket and return the file descriptor.
-     * The DatagramSocket is stored in activeDatagramSockets to prevent GC from closing it.
-     * 
-     * @param network The network to bind the socket to
-     * @param virtualIP The virtual IP to use as a key for storing the socket reference
-     * @return The socket file descriptor, or -1 on failure
+     * Uses ParcelFileDescriptor.detachFd() to properly transfer FD ownership to native code.
      */
-    private int createNetworkSocket(Network network, String virtualIP) {
+    private int createNetworkSocket(Network network) {
         try {
             // Use the proper Android API: DatagramSocket → Network.bindSocket → ParcelFileDescriptor
-            // This is the standard approach for multi-network socket binding
             DatagramSocket datagramSocket = new DatagramSocket();
             
             // Bind the socket to the specific network
-            // This MUST succeed for true multi-network routing
             network.bindSocket(datagramSocket);
             
             // Use ParcelFileDescriptor to properly extract and detach the FD
@@ -342,14 +328,7 @@ public class NativeSrtlaService extends Service {
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.fromDatagramSocket(datagramSocket);
             int socketFD = pfd.detachFd();
             
-            // CRITICAL: Store DatagramSocket to prevent GC from closing the socket!
-            // Even after detachFd(), the DatagramSocket still has a reference to the underlying
-            // socket and will close it when garbage collected. In release builds, GC is more
-            // aggressive than debug builds, which is why debug works but release fails.
-            // DO NOT close old sockets - native code owns those FDs!
-            activeDatagramSockets.put(virtualIP, datagramSocket);
-            
-            Log.i(TAG, "Successfully created network-bound socket (FD: " + socketFD + ") for " + virtualIP);
+            Log.i(TAG, "Successfully created network-bound socket (FD: " + socketFD + ")");
             return socketFD;
             
         } catch (Exception e) {
@@ -765,7 +744,7 @@ public class NativeSrtlaService extends Service {
                     
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
                     networkState.put(stateKey, currentState);
-                    int socket = createNetworkSocket(network, virtualIP);
+                    int socket = createNetworkSocket(network);
                     if (socket >= 0) {
                         virtualConnections.put(virtualIP, socket);
                         NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
