@@ -62,6 +62,10 @@ public class NativeSrtlaService extends Service {
     // Virtual connection tracking
     private java.util.Map<String, Integer> virtualConnections = new java.util.concurrent.ConcurrentHashMap<>();
     
+    // Keep DatagramSocket references alive to prevent GC from closing the underlying FDs
+    // The FDs are transferred to native code, but Java will close the socket if the DatagramSocket is GC'd
+    private java.util.Map<String, DatagramSocket> activeDatagramSockets = new java.util.concurrent.ConcurrentHashMap<>();
+    
     // Track network ID + IP to avoid redundant socket recreation
     private java.util.Map<String, String> networkState = new java.util.concurrent.ConcurrentHashMap<>();
     
@@ -284,6 +288,11 @@ public class NativeSrtlaService extends Service {
         }
         
         virtualConnections.clear();
+        
+        // Clear DatagramSocket references - native code now owns the FDs
+        // We don't close these as native code will close the underlying FDs
+        activeDatagramSockets.clear();
+        
         Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
     
@@ -310,7 +319,15 @@ public class NativeSrtlaService extends Service {
         
         return ipsFile;
     }
-    private int createNetworkSocket(Network network) {
+    /**
+     * Create a network-bound socket and return the file descriptor.
+     * The DatagramSocket is stored in activeDatagramSockets to prevent GC from closing it.
+     * 
+     * @param network The network to bind the socket to
+     * @param virtualIP The virtual IP to use as a key for storing the socket reference
+     * @return The socket file descriptor, or -1 on failure
+     */
+    private int createNetworkSocket(Network network, String virtualIP) {
         try {
             // Use the proper Android API: DatagramSocket → Network.bindSocket → ParcelFileDescriptor
             // This is the standard approach for multi-network socket binding
@@ -321,11 +338,18 @@ public class NativeSrtlaService extends Service {
             network.bindSocket(datagramSocket);
             
             // Use ParcelFileDescriptor to properly extract and detach the FD
-            // detachFd() transfers ownership to native code and prevents Java from closing it
+            // detachFd() transfers ownership to native code - Java will NOT close the FD
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.fromDatagramSocket(datagramSocket);
             int socketFD = pfd.detachFd();
             
-            Log.i(TAG, "Successfully created network-bound socket (FD: " + socketFD + ")");
+            // CRITICAL: Store DatagramSocket to prevent GC from closing the socket!
+            // Even after detachFd(), the DatagramSocket still has a reference to the underlying
+            // socket and will close it when garbage collected. In release builds, GC is more
+            // aggressive than debug builds, which is why debug works but release fails.
+            // DO NOT close old sockets - native code owns those FDs!
+            activeDatagramSockets.put(virtualIP, datagramSocket);
+            
+            Log.i(TAG, "Successfully created network-bound socket (FD: " + socketFD + ") for " + virtualIP);
             return socketFD;
             
         } catch (Exception e) {
@@ -715,6 +739,13 @@ public class NativeSrtlaService extends Service {
             String realIP = getNetworkIP(network);
             Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
             
+            // Skip networks with placeholder IP - these are restricted by Samsung
+            // If we can't even get the real IP via socket binding, we can't bind sockets to it
+            // if ("10.64.64.64".equals(realIP)) {
+            //     Log.i(TAG, "DEDICATED: Skipping " + networkType + " network " + network + " (Samsung restricted network)");
+            //     return;
+            // }
+            
             if (realIP != null) {
                 String virtualIP = getVirtualIPForNetworkType(networkType);
                 int networkTypeId = getNetworkTypeId(networkType);
@@ -741,7 +772,7 @@ public class NativeSrtlaService extends Service {
                     
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
                     networkState.put(stateKey, currentState);
-                    int socket = createNetworkSocket(network);
+                    int socket = createNetworkSocket(network, virtualIP);
                     if (socket >= 0) {
                         virtualConnections.put(virtualIP, socket);
                         NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
