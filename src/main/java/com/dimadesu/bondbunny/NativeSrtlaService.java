@@ -312,53 +312,24 @@ public class NativeSrtlaService extends Service {
     }
     private int createNetworkSocket(Network network) {
         try {
-            // Create a native UDP socket using JNI
-            int socketFD = createUdpSocketNative();
-            if (socketFD < 0) {
-                Log.e(TAG, "Failed to create native UDP socket");
-                return -1;
-            }
+            // Use the proper Android API: DatagramSocket → Network.bindSocket → ParcelFileDescriptor
+            // This is the standard approach for multi-network socket binding
+            DatagramSocket datagramSocket = new DatagramSocket();
             
-            // Bind the socket to the specific network using FileDescriptor
-            java.io.FileDescriptor fd = new java.io.FileDescriptor();
+            // Bind the socket to the specific network
+            // This MUST succeed for true multi-network routing
+            network.bindSocket(datagramSocket);
             
-            // Use reflection to set the file descriptor value
-            try {
-                java.lang.reflect.Field fdField = java.io.FileDescriptor.class.getDeclaredField("descriptor");
-                fdField.setAccessible(true);
-                fdField.setInt(fd, socketFD);
-                
-                // Now bind the FileDescriptor to the network
-                network.bindSocket(fd);
-                
-                // Detach the FileDescriptor from fdsan tracking since we're transferring ownership
-                // to native code. This prevents fdsan crashes when native code closes the socket.
-                try {
-                    // Use reflection to call FileDescriptor.setInt$(-1) to detach from fdsan
-                    java.lang.reflect.Method setIntMethod = java.io.FileDescriptor.class.getDeclaredMethod("setInt$", int.class);
-                    setIntMethod.setAccessible(true);
-                    setIntMethod.invoke(fd, -1);
-                    Log.i(TAG, "Detached FD " + socketFD + " from fdsan tracking for native ownership");
-                } catch (Exception fdDetachEx) {
-                    Log.w(TAG, "Could not detach FD from fdsan (may cause crashes): " + fdDetachEx.getMessage());
-                }
-                
-                Log.i(TAG, "Successfully bound and transferred socket FD " + socketFD + " to native code");
-                return socketFD;
-                
-            } catch (Exception reflectionEx) {
-                Log.w(TAG, "Reflection approach failed, cleaning up native socket", reflectionEx);
-                
-                // If reflection failed, we can't properly bind the native socket
-                // Close the native socket to prevent FD leaks
-                closeSocketNative(socketFD);
-                
-                Log.e(TAG, "Failed to bind native socket to network - socket closed");
-                return -1;
-            }
+            // Use ParcelFileDescriptor to properly extract and detach the FD
+            // detachFd() transfers ownership to native code and prevents Java from closing it
+            android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.fromDatagramSocket(datagramSocket);
+            int socketFD = pfd.detachFd();
+            
+            Log.i(TAG, "Successfully created network-bound socket (FD: " + socketFD + ")");
+            return socketFD;
             
         } catch (Exception e) {
-            Log.e(TAG, "Failed to create and bind network socket: " + e.getMessage(), e);
+            Log.e(TAG, "Failed to create network-bound socket: " + e.getMessage(), e);
             return -1;
         }
     }
