@@ -739,13 +739,6 @@ public class NativeSrtlaService extends Service {
             String realIP = getNetworkIP(network);
             Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
             
-            // Skip networks with placeholder IP - these are restricted by Samsung
-            // If we can't even get the real IP via socket binding, we can't bind sockets to it
-            // if ("10.64.64.64".equals(realIP)) {
-            //     Log.i(TAG, "DEDICATED: Skipping " + networkType + " network " + network + " (Samsung restricted network)");
-            //     return;
-            // }
-            
             if (realIP != null) {
                 String virtualIP = getVirtualIPForNetworkType(networkType);
                 int networkTypeId = getNetworkTypeId(networkType);
