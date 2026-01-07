@@ -284,7 +284,6 @@ public class NativeSrtlaService extends Service {
         }
         
         virtualConnections.clear();
-        
         Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
     
