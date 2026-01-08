@@ -156,6 +156,7 @@ public class NativeSrtlaService extends Service {
     private void startSrtListener() {
         shouldStopListener.set(false);
         isListening = true;  // Service is now active (listening mode)
+        statusMessage = "⏳ Waiting for SRT stream";  // Set immediately for UI
         
         srtListenerThread = new Thread(() -> {
             Log.i(TAG, "SRT listener thread started");
@@ -251,8 +252,7 @@ public class NativeSrtlaService extends Service {
                 
                 Log.i(TAG, "Socket bound to " + srtListenerSocket.getLocalAddress() + ":" + srtListenerSocket.getLocalPort());
                 
-                statusMessage = "⏳ Waiting for SRT stream";
-                updateNotification(statusMessage);
+                updateNotification("⏳ Waiting for SRT stream");
                 Log.i(TAG, "Listening for SRT on port " + port);
                 
                 byte[] buffer = new byte[2048];
