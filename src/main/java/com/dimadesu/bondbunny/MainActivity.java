@@ -225,15 +225,8 @@ public class MainActivity extends Activity {
             // Get the current status message from service
             String serviceStatusMessage = NativeSrtlaService.getStatusMessage();
             boolean isWaitingForSrt = NativeSrtlaService.isWaitingForSrt();
-            
-            // Update status text based on service state
-            if (isWaitingForSrt) {
-                textStatus.setText("⏳ Waiting for SRT stream");
-            } else if (isConnected && hasStats) {
-                textStatus.setText("✅ Service is running");
-            } else {
-                textStatus.setText("🔗 Connecting...");
-            }
+
+            textStatus.setText("✅ Service is running");
             
             // Show service status message if we're waiting for SRT
             if (isWaitingForSrt && serviceStatusMessage != null && !serviceStatusMessage.isEmpty()) {

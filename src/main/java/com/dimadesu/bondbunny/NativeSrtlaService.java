@@ -174,7 +174,7 @@ public class NativeSrtlaService extends Service {
                     waitForNetworkConnections();
                     
                     // Wait for SRT to connect
-                    updateNotification("Waiting for SRT stream on port " + listenPort + "...");
+                    updateNotification("Waiting for SRT stream");
                     Log.i(TAG, "Waiting for SRT stream on port " + listenPort);
                     
                     if (!waitForSrtConnection()) {
@@ -251,7 +251,7 @@ public class NativeSrtlaService extends Service {
                 
                 Log.i(TAG, "Socket bound to " + srtListenerSocket.getLocalAddress() + ":" + srtListenerSocket.getLocalPort());
                 
-                statusMessage = "⏳ Waiting for SRT stream on port " + port + "...";
+                statusMessage = "⏳ Waiting for SRT stream";
                 updateNotification(statusMessage);
                 Log.i(TAG, "Listening for SRT on port " + port);
                 
@@ -259,7 +259,7 @@ public class NativeSrtlaService extends Service {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 
                 int waitCount = 0;
-                while (!shouldStopListener.get()) {
+                    while (!shouldStopListener.get()) {
                     try {
                         srtListenerSocket.receive(packet);
                         // Got data - SRT is connecting!
