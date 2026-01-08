@@ -29,6 +29,8 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.nio.channels.DatagramChannel;
+import java.net.StandardProtocolFamily;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -210,15 +212,44 @@ public class NativeSrtlaService extends Service {
     private boolean waitForSrtConnection() {
         int port = Integer.parseInt(listenPort);
         int retryCount = 0;
-        final int MAX_BIND_RETRIES = 5;
-        final int BIND_RETRY_DELAY_MS = 1000;
+        final int MAX_BIND_RETRIES = 10;  // Increased retries
+        final int BIND_RETRY_DELAY_MS = 500;  // Faster retries
+        
+        // If native SRTLA is still running from a previous session, wait for it to stop
+        if (NativeSrtlaJni.isRunningSrtlaNative()) {
+            Log.w(TAG, "Native SRTLA still running, waiting for it to stop...");
+            int waitCount = 0;
+            while (NativeSrtlaJni.isRunningSrtlaNative() && waitCount < 10 && !shouldStopListener.get()) {
+                try {
+                    Thread.sleep(500);
+                    waitCount++;
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+            if (NativeSrtlaJni.isRunningSrtlaNative()) {
+                Log.e(TAG, "Native SRTLA still running after waiting, forcing stop");
+                NativeSrtlaJni.stopSrtlaNative();
+                try { Thread.sleep(500); } catch (InterruptedException e) {}
+            }
+        }
         
         while (retryCount < MAX_BIND_RETRIES && !shouldStopListener.get()) {
             try {
-                srtListenerSocket = new DatagramSocket(null);  // Create unbound first
-                srtListenerSocket.setReuseAddress(true);  // Allow port reuse
-                srtListenerSocket.bind(new java.net.InetSocketAddress(port));
-                srtListenerSocket.setSoTimeout(1000); // Check for stop signal every 1 second
+                Log.d(TAG, "Creating socket for port " + port + " (attempt " + (retryCount + 1) + ")");
+                
+                // Use DatagramChannel with explicit IPv4 protocol family
+                DatagramChannel channel = DatagramChannel.open(StandardProtocolFamily.INET);
+                srtListenerSocket = channel.socket();
+                srtListenerSocket.setReuseAddress(true);
+                
+                // Bind to IPv4 0.0.0.0
+                java.net.InetSocketAddress bindAddr = new java.net.InetSocketAddress("0.0.0.0", port);
+                Log.d(TAG, "Binding to address: " + bindAddr);
+                srtListenerSocket.bind(bindAddr);
+                srtListenerSocket.setSoTimeout(1000);
+                
+                Log.i(TAG, "Socket bound to " + srtListenerSocket.getLocalAddress() + ":" + srtListenerSocket.getLocalPort());
                 
                 statusMessage = "⏳ Waiting for SRT stream on port " + port + "...";
                 updateNotification(statusMessage);
@@ -227,6 +258,7 @@ public class NativeSrtlaService extends Service {
                 byte[] buffer = new byte[2048];
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 
+                int waitCount = 0;
                 while (!shouldStopListener.get()) {
                     try {
                         srtListenerSocket.receive(packet);
@@ -237,9 +269,21 @@ public class NativeSrtlaService extends Service {
                         srtListenerSocket = null;
                         return true;
                     } catch (SocketTimeoutException e) {
-                        // Timeout - check if we should stop, then continue waiting
+                        // Timeout - log every 10 seconds to show we're still waiting
+                        waitCount++;
+                        if (waitCount % 10 == 0) {
+                            Log.d(TAG, "Still waiting for SRT... (" + waitCount + " seconds)");
+                        }
                     }
                 }
+                
+                // If we exit the loop because shouldStopListener was set, close and return
+                Log.i(TAG, "SRT listener stopped by request");
+                if (srtListenerSocket != null && !srtListenerSocket.isClosed()) {
+                    srtListenerSocket.close();
+                    srtListenerSocket = null;
+                }
+                return false;
                 
             } catch (java.net.BindException e) {
                 retryCount++;
@@ -393,23 +437,23 @@ public class NativeSrtlaService extends Service {
             if (result == 0) {
                 Log.i(TAG, "Native SRTLA stop signal sent successfully");
                 
-                // Wait a moment for the native process to actually stop
-                new Thread(() -> {
+                // Wait synchronously for the native process to stop (up to 3 seconds)
+                int waitCount = 0;
+                while (NativeSrtlaJni.isRunningSrtlaNative() && waitCount < 6) {
                     try {
-                        Thread.sleep(1000); // Wait 1 second
-                        
-                        // Check if native process actually stopped
-                        if (!NativeSrtlaJni.isRunningSrtlaNative()) {
-                            Log.i(TAG, "Native SRTLA process confirmed stopped");
-                            // Post a dismissible notification when service stops
-                            postStoppedNotification("Service stopped");
-                        } else {
-                            Log.w(TAG, "Native SRTLA process still running after stop signal");
-                        }
+                        Thread.sleep(500);
+                        waitCount++;
                     } catch (InterruptedException e) {
-                        Log.w(TAG, "Stop monitoring interrupted", e);
+                        break;
                     }
-                }).start();
+                }
+                
+                if (!NativeSrtlaJni.isRunningSrtlaNative()) {
+                    Log.i(TAG, "Native SRTLA process confirmed stopped");
+                    postStoppedNotification("Service stopped");
+                } else {
+                    Log.w(TAG, "Native SRTLA process still running after stop signal");
+                }
                 
             } else {
                 Log.w(TAG, "Native SRTLA stop returned code: " + result);
