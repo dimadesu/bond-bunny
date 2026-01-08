@@ -361,8 +361,13 @@ public class NativeSrtlaService extends Service {
     
     /**
      * Wait for SRTLA to stop (when SRT disconnects or error occurs).
+     * Also monitors for idle (no data) and stops SRTLA if idle for SRT_IDLE_TIMEOUT_MS.
      */
     private void waitForSrtlaToStop() {
+        long startTime = System.currentTimeMillis();
+        long lastDataTime = System.currentTimeMillis();
+        boolean hadDataBefore = false;
+        
         try {
             while (isSrtlaRunning && !shouldStopListener.get()) {
                 // Check if native SRTLA is still running
@@ -370,6 +375,57 @@ public class NativeSrtlaService extends Service {
                     Log.i(TAG, "SRTLA native process stopped");
                     break;
                 }
+                
+                // Check if we have active data flow by looking at bitrates
+                double[] bitrates = NativeSrtlaJni.getConnectionBitrates();
+                double totalBitrate = 0;
+                if (bitrates != null) {
+                    for (double br : bitrates) {
+                        totalBitrate += br;
+                    }
+                }
+                boolean hasData = totalBitrate > 0;
+                
+                if (hasData) {
+                    lastDataTime = System.currentTimeMillis();
+                    if (!hadDataBefore) {
+                        Log.i(TAG, "SRT data flow detected (" + (totalBitrate / 1000) + " kbps)");
+                        hadDataBefore = true;
+                    }
+                } else {
+                    // No data currently flowing
+                    long idleTime;
+                    String reason;
+                    
+                    if (hadDataBefore) {
+                        // Had data before, now idle - use last data time
+                        idleTime = System.currentTimeMillis() - lastDataTime;
+                        reason = "SRT stream stopped";
+                    } else {
+                        // Never had data - use start time (give longer timeout for initial connection)
+                        idleTime = System.currentTimeMillis() - startTime;
+                        reason = "No SRT data received";
+                    }
+                    
+                    // Log idle status periodically
+                    if (idleTime > 0 && idleTime % 2000 < 500) {
+                        Log.d(TAG, "Idle check: " + (idleTime / 1000) + "s, hadData=" + hadDataBefore + ", bitrate=" + totalBitrate);
+                    }
+                    
+                    if (idleTime >= SRT_IDLE_TIMEOUT_MS) {
+                        Log.i(TAG, reason + " for " + (idleTime / 1000) + " seconds, stopping SRTLA");
+                        statusMessage = "⏸️ " + reason + ", returning to listening mode";
+                        updateNotification(statusMessage);
+                        
+                        // Stop native SRTLA
+                        NativeSrtlaJni.stopSrtlaNative();
+                        
+                        // Wait briefly for it to stop
+                        Thread.sleep(500);
+                        break;
+                    }
+                }
+                
                 Thread.sleep(500);
             }
         } catch (InterruptedException e) {
@@ -377,6 +433,7 @@ public class NativeSrtlaService extends Service {
         }
         
         isSrtlaRunning = false;
+        isServiceRunning = false;
     }
     
     private void stopSrtListener() {
