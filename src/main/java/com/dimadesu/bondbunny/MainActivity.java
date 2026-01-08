@@ -249,19 +249,16 @@ public class MainActivity extends Activity {
                 textNoConnections.setVisibility(View.GONE);
                 
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (!isConnected && !hasStats) {
-                // Show initial connecting status - use service message if available
-                String displayMessage = (serviceStatusMessage != null && !serviceStatusMessage.isEmpty()) 
-                    ? serviceStatusMessage 
-                    : "Connecting to SRTLA receiver...";
-                textTotalBitrate.setText(displayMessage);
+            } else if (!isConnected && !hasStats && serviceStatusMessage != null && !serviceStatusMessage.isEmpty()) {
+                // Show service status message during connection phase
+                textTotalBitrate.setText(serviceStatusMessage);
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
                 // Clear connection list
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
                 
-                Log.i("MainActivity", "Showing connecting UI: " + displayMessage);
+                Log.i("MainActivity", "Showing connecting UI: " + serviceStatusMessage);
             } else if (hasStats) {
                 // We have actual stats to display (even if bitrate is 0)
                 parseAndDisplayConnections(nativeStats);
