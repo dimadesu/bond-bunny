@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
             if (isWaitingForSrt) {
                 textStatus.setText("⏳ Waiting for SRT stream");
             } else if (isConnected && hasStats) {
-                textStatus.setText("✅ Streaming");
+                textStatus.setText("✅ Service is running");
             } else {
                 textStatus.setText("🔗 Connecting...");
             }
