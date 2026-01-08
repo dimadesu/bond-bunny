@@ -331,7 +331,7 @@ public class NativeSrtlaService extends Service {
     private void startSrtlaForStream() {
         try {
             Log.i(TAG, "Starting SRTLA for stream...");
-            statusMessage = "🔗 Connecting to SRTLA server...";
+            statusMessage = "🔗 Connecting to SRTLA server";
             updateNotification(statusMessage);
             
             // Create IPs file with virtual IPs from detected networks
@@ -344,7 +344,7 @@ public class NativeSrtlaService extends Service {
                 Log.i(TAG, "SRTLA started successfully for stream");
                 isSrtlaRunning = true;
                 isServiceRunning = true;
-                statusMessage = "✅ Streaming on port " + listenPort;
+                statusMessage = "✅ Connected to SRTLA server";
                 updateNotification(statusMessage);
             } else {
                 Log.e(TAG, "SRTLA failed to start with code: " + result);
@@ -414,7 +414,7 @@ public class NativeSrtlaService extends Service {
                     
                     if (idleTime >= SRT_IDLE_TIMEOUT_MS) {
                         Log.i(TAG, reason + " for " + (idleTime / 1000) + " seconds, stopping SRTLA");
-                        statusMessage = "⏸️ " + reason + ", returning to listening mode";
+                        statusMessage = reason;
                         updateNotification(statusMessage);
                         
                         // Stop native SRTLA
