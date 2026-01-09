@@ -222,22 +222,11 @@ public class MainActivity extends Activity {
             TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
             TextView textStatus = findViewById(R.id.text_status);
             
-            boolean isWaitingForSrt = NativeSrtlaService.isWaitingForSrt();
-
+            // Service is running - just show that
             textStatus.setText("✅ Service is running");
             
-            // Show service status message if we're waiting for SRT
-            if (isWaitingForSrt) {
-                String statusMessage = "⏳ Waiting for SRT stream";
-                textTotalBitrate.setText(statusMessage);
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                // Clear connection list while waiting
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                Log.i("MainActivity", "Showing waiting for SRT UI: " + statusMessage);
-            } else if (isRetrying || retryCount > 0) {
+            // Check retry state first - regardless of isConnected (handles server stops)
+            if (isRetrying || retryCount > 0) {
                 // Show retry status
                 String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
                 textTotalBitrate.setText(statusMessage);
@@ -250,7 +239,7 @@ public class MainActivity extends Activity {
                 Log.i("MainActivity", "Showing retry UI: " + statusMessage);
             } else if (!isConnected && !hasStats) {
                 // Show initial connecting status (not connected, no stats yet)
-                String statusMessage = "🔗 Connecting to SRTLA server";
+                String statusMessage = "Connecting to SRTLA receiver...";
                 textTotalBitrate.setText(statusMessage);
                 textTotalBitrate.setVisibility(View.VISIBLE);
                 
@@ -258,7 +247,7 @@ public class MainActivity extends Activity {
                 connectionsContainer.removeAllViews();
                 textNoConnections.setVisibility(View.GONE);
                 
-                Log.i("MainActivity", "Showing connecting UI: " + statusMessage);
+                Log.i("MainActivity", "Showing connecting UI");
             } else if (hasStats) {
                 // We have actual stats to display (even if bitrate is 0)
                 parseAndDisplayConnections(nativeStats);
