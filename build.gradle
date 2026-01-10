@@ -46,6 +46,15 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    
+    // Custom APK output names
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def versionName = variant.versionName
+            def buildType = variant.buildType.name
+            outputFileName = "Bond-Bunny-v${versionName}-${buildType}.apk"
+        }
+    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -67,4 +76,19 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.10.0'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
+}
+
+// Custom AAB output names - create copy so Android Studio can still locate original
+afterEvaluate {
+    tasks.named("bundleRelease").configure {
+        doLast {
+            def originalBundle = file("${projectDir}/release/Bond Bunny-release.aab")
+            if (originalBundle.exists()) {
+                def newName = "Bond-Bunny-v${android.defaultConfig.versionName}-release.aab"
+                def newFile = new File(originalBundle.parent, newName)
+                java.nio.file.Files.copy(originalBundle.toPath(), newFile.toPath(), 
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
 }
