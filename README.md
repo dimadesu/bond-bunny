@@ -6,6 +6,10 @@ This is compatible with any apps that can stream SRT and it essentially extends 
 
 Android implementation of [SRTLA](https://github.com/BELABOX/srtla).
 
+## Become alpha tester
+
+To download app from Google Play store please join alpha testing first. This will also help to eventually publish app publicly. See more details [here](https://gist.github.com/dimadesu/00283dc48a672d6d9468126adeaf8566).
+
 ![Screenshort Bond Bunny](./docs/Screenshot-Bond-Bunny.jpg)
 
 Share ideas or report issues in Discord https://discord.gg/2UzEkU2AJW or create Git issues.
