@@ -35,6 +35,21 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
+      android:text="Exclude an app from battery optimisations"
+      android:layout_marginBottom="4dp"
+      android:textStyle="bold"
+      android:textSize="18sp" />
+
+    <TextView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="To make sure Android does not limit the app in any way when it's running in the background, go to Settings > Apps > [Select App] > Battery > Unrestricted."
+      android:textSize="16sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
       android:text="What Are Connection Windows?"
       android:layout_marginBottom="4dp"
       android:textStyle="bold"
