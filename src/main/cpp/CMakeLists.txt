@@ -23,6 +23,9 @@ target_compile_definitions(srtla_android PRIVATE
 # Original SRTLA compiler flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wall")
 
+# 16KB page size alignment for Android 15+ compatibility
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+
 target_include_directories(srtla_android PUBLIC ${SRTLA_DIR})
 
 target_link_libraries(srtla_android ${log-lib})
