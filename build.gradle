@@ -10,8 +10,8 @@ android {
         applicationId "com.dimadesu.bondbunny"
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName "1.8.4"
+        versionCode 5
+        versionName "1.9.0"
         
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
