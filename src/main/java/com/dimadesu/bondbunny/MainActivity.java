@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
     private static final String PREFS_NAME = "SrtlaAppPrefs";
     private static boolean hasPostedStartupNotification = false;
+    private static boolean isRequestingNotificationPermission = false;
     private static final String PREF_SRTLA_HOST = "srtla_host";
     private static final String PREF_SRTLA_PORT = "srtla_port";
     private static final String PREF_LISTEN_PORT = "listen_port";
@@ -490,25 +491,14 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CODE_POST_NOTIFICATIONS) {
-            // Only inform the user of the result when permission was requested
+            isRequestingNotificationPermission = false;
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Notification permission granted", Toast.LENGTH_SHORT).show();
                 Log.i("MainActivity", "POST_NOTIFICATIONS granted onRequestPermissionsResult");
                 postStartupNotification();
             } else {
-                Toast.makeText(this, "Notification permission denied. Foreground service notification may be suppressed.", Toast.LENGTH_LONG).show();
                 Log.i("MainActivity", "POST_NOTIFICATIONS denied onRequestPermissionsResult");
-                // Offer quick access to notification settings
-                try {
-                    Intent intent = new Intent();
-                    intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                    intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    intent.setData(android.net.Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                }
+                Toast.makeText(this, "Notification permission denied", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -516,7 +506,12 @@ public class MainActivity extends Activity {
     // Check notification permission at app launch and request if necessary.
     private void checkAndRequestNotificationPermissionOnLaunch() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS ) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                if (isRequestingNotificationPermission) {
+                    Log.i("MainActivity", "Notification permission request already in progress, skipping");
+                    return;
+                }
+                isRequestingNotificationPermission = true;
                 ActivityCompat.requestPermissions(
                     this,
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
