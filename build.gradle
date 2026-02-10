@@ -1,5 +1,5 @@
 plugins {
-    id 'com.android.application' version '8.1.4'
+    id 'com.android.application' version '8.5.2'
 }
 
 android {
@@ -59,6 +59,12 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     // Enable NDK
