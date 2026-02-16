@@ -14,7 +14,7 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="SRT URLs for Your Live-Streaming App"
+      android:text="SRT URLs for Your Livestreaming App"
       android:textStyle="bold"
       android:textSize="18sp"
       android:layout_marginBottom="8dp" />
@@ -22,14 +22,14 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Configure your live-streaming app to send SRT to the localhost or device's IP address."
+      android:text="Configure your livestreaming app to send SRT to the localhost or device's IP address."
       android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Stream ID is only used here for building SRT URL. Your streaming app must send it."
+      android:text="Stream ID is only used here for building SRT URL. Your livestreaming app must send it."
       android:textSize="16sp"
       android:layout_marginBottom="4dp" />
 
