@@ -68,17 +68,12 @@
       android:layout_width="match_parent"
       android:layout_height="wrap_content" />
 
-    <!-- Wi-Fi URL section (dynamic) -->
-    <com.dimadesu.bondbunny.UrlItemView
-      android:id="@+id/url_wifi"
+    <!-- Dynamic network URL sections are added here programmatically -->
+    <LinearLayout
+      android:id="@+id/network_urls_container"
       android:layout_width="match_parent"
-      android:layout_height="wrap_content" />
-
-    <!-- Ethernet URL section (dynamic) -->
-    <com.dimadesu.bondbunny.UrlItemView
-      android:id="@+id/url_ethernet"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content" />
+      android:layout_height="wrap_content"
+      android:orientation="vertical" />
 
   </LinearLayout>
 
