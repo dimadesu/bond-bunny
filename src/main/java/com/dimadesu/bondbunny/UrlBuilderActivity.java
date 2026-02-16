@@ -9,15 +9,27 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 
 public class UrlBuilderActivity extends Activity {
     private static final String PREFS_NAME = "SrtlaAppPrefs";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
 
+    /** Interface name prefixes considered cellular (excluded from display). */
+    private static final String[] CELLULAR_PREFIXES = {
+        "rmnet", "ccmni", "wwan", "clat", "v4-rmnet"
+    };
+
     private UrlItemView urlLocalhost;
-    private UrlItemView urlWifi;
-    private UrlItemView urlEthernet;
+    private LinearLayout networkUrlsContainer;
     private EditText editStreamId;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
@@ -30,19 +42,11 @@ public class UrlBuilderActivity extends Activity {
         setContentView(R.layout.activity_url_builder);
 
         urlLocalhost = findViewById(R.id.url_localhost);
-        urlWifi = findViewById(R.id.url_wifi);
-        urlEthernet = findViewById(R.id.url_ethernet);
+        networkUrlsContainer = findViewById(R.id.network_urls_container);
         editStreamId = findViewById(R.id.edit_stream_id);
         connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 
-        // Set labels
-        urlLocalhost.setLabel("Localhost");
-        urlWifi.setLabel("Wi-Fi");
-        urlEthernet.setLabel("Ethernet");
-
-        // Hide Wi-Fi and Ethernet initially
-        urlWifi.hide();
-        urlEthernet.hide();
+        urlLocalhost.setLabel("localhost");
 
         // Initial update
         updateNetworkInfo();
@@ -129,83 +133,76 @@ public class UrlBuilderActivity extends Activity {
     }
 
     private void updateNetworkInfo() {
-        // Update URLs
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String port = prefs.getString(PREF_LISTEN_PORT, "6000").trim();
         String streamId = prefs.getString(PREF_STREAM_ID, "").trim();
         String streamParam = streamId.isEmpty() ? "" : "?streamid=" + streamId;
 
+        // Localhost is always shown
         String localUrl = "srt://localhost:" + port + streamParam;
         urlLocalhost.setUrl(localUrl);
 
-        // Update Wi-Fi URL (show/hide dynamically)
-        String wifiIp = getWifiIpAddress();
-        if (wifiIp != null) {
-            String wifiUrl = "srt://" + wifiIp + ":" + port + streamParam;
-            urlWifi.setUrl(wifiUrl);
-            urlWifi.show();
-        } else {
-            urlWifi.hide();
-        }
+        // Collect all non-loopback, non-cellular IPv4 interfaces
+        List<InterfaceInfo> interfaces = getActiveInterfaces();
 
-        // Update Ethernet URL (show/hide dynamically)
-        String ethernetIp = getEthernetIpAddress();
-        if (ethernetIp != null) {
-            String ethernetUrl = "srt://" + ethernetIp + ":" + port + streamParam;
-            urlEthernet.setUrl(ethernetUrl);
-            urlEthernet.show();
-        } else {
-            urlEthernet.hide();
+        // Rebuild the dynamic container
+        networkUrlsContainer.removeAllViews();
+        for (InterfaceInfo info : interfaces) {
+            UrlItemView item = new UrlItemView(this);
+            item.setLabel(info.name);
+            item.setUrl("srt://" + info.ip + ":" + port + streamParam);
+            networkUrlsContainer.addView(item);
         }
     }
 
-    private String getWifiIpAddress() {
+    /**
+     * Returns a list of active network interfaces with their IPv4 addresses,
+     * excluding loopback and cellular interfaces.
+     */
+    private List<InterfaceInfo> getActiveInterfaces() {
+        List<InterfaceInfo> result = new ArrayList<>();
         try {
-            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
             while (networkInterfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
-                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        java.net.InetAddress address = addresses.nextElement();
-                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                            String interfaceName = networkInterface.getDisplayName().toLowerCase();
-                            String ipAddress = address.getHostAddress();
-                            if (interfaceName.contains("wlan") || interfaceName.contains("wifi")) {
-                                return ipAddress;
-                            }
-                        }
+                NetworkInterface networkInterface = networkInterfaces.nextElement();
+                if (!networkInterface.isUp() || networkInterface.isLoopback()) {
+                    continue;
+                }
+                String name = networkInterface.getDisplayName();
+                if (isCellularInterface(name)) {
+                    continue;
+                }
+                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        result.add(new InterfaceInfo(name, address.getHostAddress()));
                     }
                 }
             }
         } catch (Exception e) {
             // ignore
         }
-        return null;
+        return result;
     }
 
-    private String getEthernetIpAddress() {
-        try {
-            java.util.Enumeration<java.net.NetworkInterface> networkInterfaces = java.net.NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface.isUp() && !networkInterface.isLoopback()) {
-                    java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                    while (addresses.hasMoreElements()) {
-                        java.net.InetAddress address = addresses.nextElement();
-                        if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                            String interfaceName = networkInterface.getDisplayName().toLowerCase();
-                            String ipAddress = address.getHostAddress();
-                            if (interfaceName.contains("eth") || interfaceName.contains("usb")) {
-                                return ipAddress;
-                            }
-                        }
-                    }
-                }
+    private boolean isCellularInterface(String interfaceName) {
+        String lower = interfaceName.toLowerCase();
+        for (String prefix : CELLULAR_PREFIXES) {
+            if (lower.startsWith(prefix)) {
+                return true;
             }
-        } catch (Exception e) {
-            // ignore
         }
-        return null;
+        return false;
+    }
+
+    private static class InterfaceInfo {
+        final String name;
+        final String ip;
+
+        InterfaceInfo(String name, String ip) {
+            this.name = name;
+            this.ip = ip;
+        }
     }
 }
