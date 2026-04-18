@@ -61,6 +61,13 @@
 
     </LinearLayout>
 
+    <Switch
+      android:id="@+id/switch_auto_start"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Auto start service on app launch"
+      android:layout_marginBottom="8dp" />
+
     <TextView
       android:id="@+id/text_status"
       android:layout_width="wrap_content"
