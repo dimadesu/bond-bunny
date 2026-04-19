@@ -14,6 +14,7 @@ import android.text.TextWatcher;
 import android.text.Editable;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -44,6 +45,7 @@ public class MainActivity extends Activity {
     private static final String PREF_SRTLA_PORT = "srtla_port";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_STREAM_ID = "stream_id";
+    private static final String PREF_AUTO_START = "auto_start_service";
     
     private TextView textStatus;
     private TextView textError;
@@ -54,6 +56,7 @@ public class MainActivity extends Activity {
     private Button buttonSettings;
     private Button buttonUrlBuilder;
     private Button buttonNativeSrtla;
+    private Switch switchAutoStart;
     private boolean serviceRunning = false;
     private android.os.Handler uiHandler = new android.os.Handler();
     
@@ -78,6 +81,14 @@ public class MainActivity extends Activity {
         
         // Restore service state if activity was recreated
         checkServiceState();
+        
+        // Auto start service if enabled and not already running (only on fresh launch, not rotation/config change)
+        if (!serviceRunning && savedInstanceState == null) {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            if (prefs.getBoolean(PREF_AUTO_START, false)) {
+                startNativeSrtla();
+            }
+        }
     }
     
     /**
@@ -106,6 +117,12 @@ public class MainActivity extends Activity {
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
         buttonNativeSrtla = findViewById(R.id.button_native_srtla);
+        switchAutoStart = findViewById(R.id.switch_auto_start);
+        SharedPreferences autoStartPrefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        switchAutoStart.setChecked(autoStartPrefs.getBoolean(PREF_AUTO_START, false));
+        switchAutoStart.setOnCheckedChangeListener((buttonView, isChecked) ->
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .putBoolean(PREF_AUTO_START, isChecked).apply());
         
         buttonAbout.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
