@@ -82,8 +82,8 @@ public class MainActivity extends Activity {
         // Restore service state if activity was recreated
         checkServiceState();
         
-        // Auto start service if enabled and not already running
-        if (!serviceRunning) {
+        // Auto start service if enabled and not already running (only on fresh launch, not rotation/config change)
+        if (!serviceRunning && savedInstanceState == null) {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
             if (prefs.getBoolean(PREF_AUTO_START, false)) {
                 startNativeSrtla();
