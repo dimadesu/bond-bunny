@@ -383,16 +383,17 @@ public class MainActivity extends Activity {
                 // Determine if connection is active (has bitrate > 0 or in-flight packets)
                 boolean isActive = inFlight > 0 || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
                 
-                // Create connection item view
-                android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
+                // Create connection item view (layout lives in srtla-lib; use its R class
+                // because android.nonTransitiveRClass=true excludes library resources from app R)
+                android.view.View connectionView = inflater.inflate(com.dimadesu.bondbunny.srtlalib.R.layout.connection_item, connectionsContainer, false);
                 
                 // Set network type with display formatting
-                TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
+                TextView networkTypeView = connectionView.findViewById(com.dimadesu.bondbunny.srtlalib.R.id.connection_network_type);
                 String displayName = networkType.equals("WIFI") ? "WI-FI" : networkType;
                 networkTypeView.setText(displayName);
                 
                 // Set status
-                TextView statusView = connectionView.findViewById(R.id.connection_status);
+                TextView statusView = connectionView.findViewById(com.dimadesu.bondbunny.srtlalib.R.id.connection_status);
                 if (isActive) {
                     statusView.setText("ACTIVE");
                     statusView.setTextColor(android.graphics.Color.parseColor("#28a745"));
@@ -402,11 +403,11 @@ public class MainActivity extends Activity {
                 }
                 
                 // Set window bar
-                WindowBarView windowBar = connectionView.findViewById(R.id.window_bar);
+                WindowBarView windowBar = connectionView.findViewById(com.dimadesu.bondbunny.srtlalib.R.id.window_bar);
                 windowBar.setWindowData(windowSize, isActive);
                 
                 // Set stats text
-                TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
+                TextView statsTextView = connectionView.findViewById(com.dimadesu.bondbunny.srtlalib.R.id.connection_stats_text);
                 String statsDisplay = String.format(
                     "Bitrate: %s  %s\nPackets in-flight: %,d\nRTT: %s\nWindow: %,d / 60,000",
                     bitrate, load, inFlight, rtt, windowSize
