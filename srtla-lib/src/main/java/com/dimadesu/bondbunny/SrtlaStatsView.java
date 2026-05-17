@@ -37,6 +37,19 @@ public class SrtlaStatsView extends LinearLayout {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable updateRunnable;
+    private OnServiceStoppedListener onServiceStoppedListener;
+
+    /**
+     * Callback fired when the polling loop detects that the native SRTLA service
+     * is no longer running.  The host Activity can use this to update button state, etc.
+     */
+    public interface OnServiceStoppedListener {
+        void onServiceStopped();
+    }
+
+    public void setOnServiceStoppedListener(OnServiceStoppedListener listener) {
+        this.onServiceStoppedListener = listener;
+    }
 
     // -------------------------------------------------------------------------
     // Constructors
@@ -77,8 +90,15 @@ public class SrtlaStatsView extends LinearLayout {
         updateRunnable = new Runnable() {
             @Override
             public void run() {
-                updateConnectionStats();
-                handler.postDelayed(this, UPDATE_INTERVAL_MS);
+                if (NativeSrtlaJni.isRunningSrtlaNative()) {
+                    updateConnectionStats();
+                    handler.postDelayed(this, UPDATE_INTERVAL_MS);
+                } else {
+                    updateConnectionStats(); // One last update to show "Service not running"
+                    if (onServiceStoppedListener != null) {
+                        onServiceStoppedListener.onServiceStopped();
+                    }
+                }
             }
         };
         handler.post(updateRunnable);

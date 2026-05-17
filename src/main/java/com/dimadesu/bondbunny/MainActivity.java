@@ -105,6 +105,10 @@ public class MainActivity extends Activity {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
         srtlaStatsView = findViewById(R.id.srtla_stats_view);
+        srtlaStatsView.setOnServiceStoppedListener(() -> {
+            // Periodically refresh native SRTLA UI state (handles crashes)
+            updateNativeSrtlaUI();
+        });
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
