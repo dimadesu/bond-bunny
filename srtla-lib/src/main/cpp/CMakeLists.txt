@@ -1,40 +1,31 @@
 cmake_minimum_required(VERSION 3.22.1)
+
 project("srtla_android")
 
-# Path to bond-bunny root (4 levels up from this CMakeLists.txt: cpp/main/src/srtla-lib)
-set(BOND_BUNNY_ROOT ${CMAKE_SOURCE_DIR}/../../../../)
-set(SRTLA_DIR ${BOND_BUNNY_ROOT}/srtla)
+find_library(log-lib log)
 
-# Suppress the unused variable warning from the srtla sources
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable -Wno-unused-function")
+# Set path to SRTLA source (fork with Android patches)
+set(SRTLA_DIR ${CMAKE_SOURCE_DIR}/../../../../srtla)
 
-# 16KB page size alignment for Android 15+ compatibility
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
-
-add_library(
-    srtla_android
-    SHARED
-    # JNI wrapper (stats, start/stop, network socket API)
-    srtla_android_jni.cpp
-    # SRTLA C sources
-    ${SRTLA_DIR}/srtla_send.c
-    ${SRTLA_DIR}/common.c
+# Build SRTLA with Android patches - minimal JNI wrapper + original code
+add_library(srtla_android SHARED
+    srtla_android_jni.cpp      # Minimal JNI wrapper
+    ${SRTLA_DIR}/srtla_send.c  # Original SRTLA with Android patches
+    ${SRTLA_DIR}/common.c      # Original SRTLA common functions
 )
 
-# Android compatibility definitions required by srtla_send.c
-target_compile_definitions(srtla_android PRIVATE
+# Android build definitions - enables Android compatibility layer
+target_compile_definitions(srtla_android PRIVATE 
     ANDROID=1
     VERSION="android-fork"
 )
 
-find_library(log-lib log)
+# Original SRTLA compiler flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wall -Wno-unused-variable -Wno-unused-function")
 
-target_link_libraries(
-    srtla_android
-    ${log-lib}
-)
+# 16KB page size alignment for Android 15+ compatibility
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 
-target_include_directories(
-    srtla_android PRIVATE
-    ${SRTLA_DIR}
-)
+target_include_directories(srtla_android PRIVATE ${SRTLA_DIR})
+
+target_link_libraries(srtla_android ${log-lib})
