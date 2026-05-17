@@ -17,10 +17,10 @@ import com.dimadesu.bondbunny.srtlalib.R;
  *
  * <p>Embed directly in any layout:</p>
  * <pre>
- * &lt;com.dimadesu.bondbunny.SrtlaStatsView
+ * <com.dimadesu.bondbunny.SrtlaStatsView
  *     android:id="@+id/srtla_stats"
  *     android:layout_width="match_parent"
- *     android:layout_height="wrap_content" /&gt;
+ *     android:layout_height="wrap_content" />;
  * </pre>
  *
  * <p>Call {@link #startStatsUpdates()} in your Activity's {@code onResume()} and
