@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
         
         if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
             Log.i("MainActivity", "checkServiceState: Service running, starting stats updates");
-            srtlaStatsView.startUpdating();
+            srtlaStatsView.startStatsUpdates();
         } else {
             Log.i("MainActivity", "checkServiceState: No services running");
         }
@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
-                srtlaStatsView.stopUpdating();
+                srtlaStatsView.stopStatsUpdates();
             } else {
                 Log.i("MainActivity", "updateUI: Not clearing connection stats - native SRTLA still running");
             }
@@ -184,7 +184,7 @@ public class MainActivity extends Activity {
         // Don't stop stats updates if services are still running
         if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
             Log.i("MainActivity", "onPause: No services running, stopping stats updates");
-            srtlaStatsView.stopUpdating();
+            srtlaStatsView.stopStatsUpdates();
         } else {
             Log.i("MainActivity", "onPause: Services still running, keeping stats updates active");
         }
@@ -408,7 +408,7 @@ public class MainActivity extends Activity {
             Log.i("MainActivity", "Service started successfully after " + attemptCount + " polling attempts");
             textStatus.setText("✅ Service is running");
             updateNativeSrtlaUI();
-            srtlaStatsView.startUpdating();
+            srtlaStatsView.startStatsUpdates();
             return;
         }
         
@@ -436,7 +436,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
             
             // Stop stats updates and clear display immediately
-            srtlaStatsView.stopUpdating();
+            srtlaStatsView.stopStatsUpdates();
             
             // Update UI after a short delay to allow service to stop
             uiHandler.postDelayed(() -> {
@@ -484,7 +484,7 @@ public class MainActivity extends Activity {
             buttonSettings.setEnabled(true); // Enable settings when service is stopped
             
             // Clear connections display when not running
-            srtlaStatsView.stopUpdating();
+            srtlaStatsView.stopStatsUpdates();
         }
     }
 }

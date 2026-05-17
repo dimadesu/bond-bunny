@@ -23,8 +23,8 @@ import com.dimadesu.bondbunny.srtlalib.R;
  *     android:layout_height="wrap_content" /&gt;
  * </pre>
  *
- * <p>Call {@link #startUpdating()} in your Activity's {@code onResume()} and
- * {@link #stopUpdating()} in {@code onPause()}.</p>
+ * <p>Call {@link #startStatsUpdates()} in your Activity's {@code onResume()} and
+ * {@link #stopStatsUpdates()} in {@code onPause()}.</p>
  */
 public class SrtlaStatsView extends LinearLayout {
 
@@ -35,8 +35,8 @@ public class SrtlaStatsView extends LinearLayout {
     private LinearLayout connectionsContainer;
     private TextView textNoConnections;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private Runnable updateRunnable;
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private Runnable statsUpdateRunnable;
     private OnServiceStoppedListener onServiceStoppedListener;
 
     /**
@@ -82,18 +82,23 @@ public class SrtlaStatsView extends LinearLayout {
     // Lifecycle
     // -------------------------------------------------------------------------
 
-    /** Start polling stats. Call from Activity.onResume(). */
-    public void startUpdating() {
-        if (updateRunnable != null) {
-            handler.removeCallbacks(updateRunnable);
+    public void startStatsUpdates() {
+        Log.i(TAG, "Starting stats updates");
+        
+        // Stop any existing stats updates first to avoid multiple concurrent loops
+        if (statsUpdateRunnable != null) {
+            uiHandler.removeCallbacks(statsUpdateRunnable);
         }
-        updateRunnable = new Runnable() {
+        
+        statsUpdateRunnable = new Runnable() {
             @Override
             public void run() {
+                // Log.i(TAG, "Stats update tick - nativeRunning=" + NativeSrtlaJni.isRunningSrtlaNative());
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     updateConnectionStats();
-                    handler.postDelayed(this, UPDATE_INTERVAL_MS);
+                    uiHandler.postDelayed(this, UPDATE_INTERVAL_MS); // Update every second
                 } else {
+                    Log.i(TAG, "No services running, stopping stats updates");
                     updateConnectionStats(); // One last update to show "Service not running"
                     if (onServiceStoppedListener != null) {
                         onServiceStoppedListener.onServiceStopped();
@@ -101,15 +106,16 @@ public class SrtlaStatsView extends LinearLayout {
                 }
             }
         };
-        handler.post(updateRunnable);
+        uiHandler.post(statsUpdateRunnable);
     }
-
-    /** Stop polling. Call from Activity.onPause(). */
-    public void stopUpdating() {
-        if (updateRunnable != null) {
-            handler.removeCallbacks(updateRunnable);
-            updateRunnable = null;
+    
+    public void stopStatsUpdates() {
+        Log.i(TAG, "stopStatsUpdates called - nativeRunning=" + NativeSrtlaJni.isRunningSrtlaNative());
+        if (statsUpdateRunnable != null) {
+            uiHandler.removeCallbacks(statsUpdateRunnable);
         }
+        // Always clear stats when explicitly stopping updates
+        Log.i(TAG, "Clearing stats display");
         clearConnectionsDisplay();
     }
 
