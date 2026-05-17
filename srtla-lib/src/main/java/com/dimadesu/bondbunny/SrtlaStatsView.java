@@ -98,40 +98,55 @@ public class SrtlaStatsView extends LinearLayout {
     // -------------------------------------------------------------------------
 
     private void updateConnectionStats() {
-        if (!NativeSrtlaJni.isRunningSrtlaNative()) {
-            clearConnectionsDisplay();
-            return;
-        }
-
-        boolean isConnected = NativeSrtlaJni.isConnected();
-        boolean isRetrying  = NativeSrtlaJni.isRetrying();
-        int     retryCount  = NativeSrtlaJni.getRetryCount();
-
-        String statsText = NativeSrtlaJni.getAllStats();
-        boolean hasStats = statsText != null && statsText.contains("Total bitrate:");
-
-        if (isRetrying || retryCount > 0) {
-            String msg = String.format("🔄 Reconnecting... (attempt %d)",
-                    retryCount > 0 ? retryCount : 1);
-            textTotalBitrate.setText(msg);
-            textTotalBitrate.setVisibility(VISIBLE);
-            connectionsContainer.removeAllViews();
-            textNoConnections.setVisibility(GONE);
-
-        } else if (!isConnected && !hasStats) {
-            textTotalBitrate.setText("Connecting to SRTLA receiver...");
-            textTotalBitrate.setVisibility(VISIBLE);
-            connectionsContainer.removeAllViews();
-            textNoConnections.setVisibility(GONE);
-
-        } else if (hasStats) {
-            parseAndDisplayConnections(statsText);
-
+        // Check if native SRTLA is running and show its stats
+        if (NativeSrtlaJni.isRunningSrtlaNative()) {
+            // First check connection status
+            boolean isConnected = NativeSrtlaJni.isConnected();
+            boolean isRetrying = NativeSrtlaJni.isRetrying();
+            int retryCount = NativeSrtlaJni.getRetryCount();
+            
+            // Get stats - this might return empty string if retrying/connecting
+            String nativeStats = NativeSrtlaJni.getAllStats();
+            boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
+            
+            // Check retry state first - regardless of isConnected (handles server stops)
+            if (isRetrying || retryCount > 0) {
+                // Show retry status
+                String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
+                textTotalBitrate.setText(statusMessage);
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                // Clear connection list
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+            } else if (!isConnected && !hasStats) {
+                // Show initial connecting status (not connected, no stats yet)
+                String statusMessage = "Connecting to SRTLA receiver...";
+                textTotalBitrate.setText(statusMessage);
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                // Clear connection list
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+            } else if (hasStats) {
+                // We have actual stats to display (even if bitrate is 0)
+                parseAndDisplayConnections(nativeStats);
+            } else {
+                // Connected but no stats yet - give it a moment
+                // This can happen briefly when connections are established but stats not ready
+                textTotalBitrate.setText("Waiting for connection stats...");
+                textTotalBitrate.setVisibility(View.VISIBLE);
+                
+                connectionsContainer.removeAllViews();
+                textNoConnections.setVisibility(View.GONE);
+            }
         } else {
-            textTotalBitrate.setText("Waiting for connection stats...");
-            textTotalBitrate.setVisibility(VISIBLE);
+            // Service not running - clear display
             connectionsContainer.removeAllViews();
-            textNoConnections.setVisibility(GONE);
+            textNoConnections.setVisibility(View.VISIBLE);
+            textNoConnections.setText("Service not running");
+            
+            textTotalBitrate.setVisibility(View.GONE);
         }
     }
 
@@ -155,12 +170,12 @@ public class SrtlaStatsView extends LinearLayout {
         
         // Clear existing views
         connectionsContainer.removeAllViews();
-        textNoConnections.setVisibility(View.GONE);
+        textNoConnections.setVisibility(android.view.View.GONE);
         
         // Parse the stats text to extract connection information
         // Format: "Total bitrate: X.X Mbps\n\nWIFI\n  Bitrate: ... \n  Window: ...\n  Packets in-flight: ...\n\n..."
         String[] sections = statsText.split("\n\n");
-        LayoutInflater inflater = LayoutInflater.from(getContext());
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(getContext());
         
         // Extract and display total bitrate from first section
         if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
@@ -267,12 +282,12 @@ public class SrtlaStatsView extends LinearLayout {
     private void clearConnectionsDisplay() {
         // Remove all dynamically added connection views
         connectionsContainer.removeAllViews();
-
-        // Hide total bitrate when no connection
-        textTotalBitrate.setVisibility(GONE);
-
+        
+        // Hide total bitrate when no connections
+        textTotalBitrate.setVisibility(android.view.View.GONE);
+        
         // Show the "no connections" message
-        textNoConnections.setVisibility(VISIBLE);
+        textNoConnections.setVisibility(android.view.View.VISIBLE);
         connectionsContainer.addView(textNoConnections);
     }
 }
