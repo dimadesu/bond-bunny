@@ -14,15 +14,18 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.net.InetAddress;
+
 /**
- * Foreground service shell for native SRTLA.
+ * Android foreground service for native SRTLA implementation.
  * All network management is delegated to {@link SrtlaSender}.
  */
 public class NativeSrtlaService extends Service {
     private static final String TAG = "NativeSrtlaService";
-    private static final int NOTIFICATION_ID = 1;
+    private static final int NOTIFICATION_ID = 1; // Same as startup notification - will update it
     public static final String CHANNEL_ID = "SRTLA_SERVICE_CHANNEL";
 
+    // Service state
     private static boolean isServiceRunning = false;
 
     private SrtlaSender sender;
@@ -34,191 +37,284 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.i(TAG, "NativeSrtlaService created");
+        // Create notification channel
         createNotificationChannel(this);
         sender = new SrtlaSender(this);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) return START_STICKY;
+        Log.i(TAG, "NativeSrtlaService onStartCommand");
 
-        String srtlaHost  = intent.getStringExtra("srtla_host");
-        String srtlaPort  = intent.getStringExtra("srtla_port");
-        String listenPort = intent.getStringExtra("listen_port");
+        if (intent != null) {
+            String srtlaHost = intent.getStringExtra("srtla_host");
+            String srtlaPort = intent.getStringExtra("srtla_port");
+            String listenPort = intent.getStringExtra("listen_port");
 
-        if (srtlaHost == null || srtlaPort == null || listenPort == null) {
-            Log.e(TAG, "Missing parameters; stopping self");
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-
-        startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
-
-        // Validate config (DNS) and start on a background thread
-        final String host  = srtlaHost;
-        final String port  = srtlaPort;
-        final String lPort = listenPort;
-        new Thread(() -> {
-            // Quick DNS / port validation
-            String error = validateConfig(host, port);
-            if (error != null) {
-                Log.e(TAG, "Config error: " + error);
-                broadcastError(error);
-                updateNotification("Error: " + error);
+            if (srtlaHost == null || srtlaPort == null || listenPort == null) {
+                Log.e(TAG, "Missing required parameters");
                 stopSelf();
-                return;
+                return START_NOT_STICKY;
             }
 
-            sender.start(host, port, lPort, new SrtlaSender.Listener() {
-                @Override public void onStatus(String message) { updateNotification(message); }
-                @Override public void onError(String message)  {
-                    Log.e(TAG, "SrtlaSender error: " + message);
-                    broadcastError(message);
-                    updateNotification("Error: " + message);
+            // Start foreground service
+            startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
+
+            // Start native SRTLA in background thread
+            final String host = srtlaHost;
+            final String port = srtlaPort;
+            final String lPort = listenPort;
+            new Thread(() -> {
+                try {
+                    Log.i(TAG, "Starting native SRTLA process...");
+
+                    // Validate inputs before starting
+                    String validationError = validateSrtlaConfig(host, port);
+                    if (validationError != null) {
+                        handleStartupError(validationError);
+                        return;
+                    }
+
+                    sender.start(host, port, lPort, new SrtlaSender.Listener() {
+                        @Override public void onStatus(String message) { updateNotification(message); }
+                        @Override public void onError(String message)  {
+                            Log.e(TAG, "Error starting native SRTLA: " + message);
+                            updateNotification(message);
+                            stopSelf();
+                        }
+                    });
+
+                    if (NativeSrtlaJni.isRunningSrtlaNative()) {
+                        isServiceRunning = true;
+                    } else {
+                        stopSelf();
+                    }
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error starting native SRTLA", e);
+                    updateNotification("Error starting service: " + e.getMessage());
                     stopSelf();
                 }
-            });
+            }).start();
+        }
 
-            if (NativeSrtlaJni.isRunningSrtlaNative()) {
-                isServiceRunning = true;
-            } else {
-                stopSelf();
-            }
-        }).start();
-
-        return START_STICKY;
+        return START_STICKY; // Restart if killed by system
     }
 
     @Override
     public void onDestroy() {
+        Log.i(TAG, "NativeSrtlaService onDestroy");
         if (sender != null) {
             sender.stop();
         }
+
+        // Wait a moment for the native process to actually stop
         new Thread(() -> {
-            try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
-            if (!NativeSrtlaJni.isRunningSrtlaNative()) {
-                postStoppedNotification("Service stopped");
+            try {
+                Thread.sleep(1000); // Wait 1 second
+
+                // Check if native process actually stopped
+                if (!NativeSrtlaJni.isRunningSrtlaNative()) {
+                    Log.i(TAG, "Native SRTLA process confirmed stopped");
+                    // Post a dismissible notification when service stops
+                    postStoppedNotification("Service stopped");
+                } else {
+                    Log.w(TAG, "Native SRTLA process still running after stop signal");
+                }
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Stop monitoring interrupted", e);
             }
         }).start();
+
         isServiceRunning = false;
         super.onDestroy();
     }
 
     @Override
-    public IBinder onBind(Intent intent) { return null; }
+    public IBinder onBind(Intent intent) {
+        return null; // Not a bound service
+    }
 
     // -------------------------------------------------------------------------
     // Notifications
     // -------------------------------------------------------------------------
 
-    private Notification createNotification(String text) {
-        return createNotification(text, true, false);
+    /**
+     * Create a notification with default settings for running service
+     * (non-dismissible, does not auto-cancel)
+     */
+    private Notification createNotification(String contentText) {
+        return createNotification(contentText, true, false);
     }
 
-    private Notification createNotification(String text, boolean ongoing, boolean autoCancel) {
-        Intent tap = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(this, 0, tap,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    /**
+     * Create a notification with customizable dismissibility
+     * @param contentText The text to display in the notification
+     * @param ongoing If true, notification cannot be dismissed by user (for running service)
+     * @param autoCancel If true, notification dismisses when tapped (for stopped service)
+     */
+    private Notification createNotification(String contentText, boolean ongoing, boolean autoCancel) {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            this, 0, notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+        );
+
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Bond Bunny")
-                .setContentText(text)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentIntent(pi)
-                .setOngoing(ongoing)
-                .setAutoCancel(autoCancel)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
+            .setContentTitle("Bond Bunny")
+            .setContentText(contentText)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(pendingIntent)
+            .setOngoing(ongoing)
+            .setAutoCancel(autoCancel)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build();
     }
 
-    private void updateNotification(String text) {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.notify(NOTIFICATION_ID, createNotification(text));
+    private void updateNotification(String contentText) {
+        NotificationManager notificationManager =
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.notify(NOTIFICATION_ID, createNotification(contentText));
     }
 
-    private void postStoppedNotification(String text) {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        nm.notify(NOTIFICATION_ID, createNotification(text, false, true));
-    }
-
-    // -------------------------------------------------------------------------
-    // Error broadcast
-    // -------------------------------------------------------------------------
-
-    private void broadcastError(String message) {
-        Intent i = new Intent("srtla-error");
-        i.putExtra("error_message", message);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(i);
+    private void postStoppedNotification(String contentText) {
+        // Create a dismissible notification when service stops
+        // Using same notification ID updates the existing notification in place
+        NotificationManager notificationManager =
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.notify(NOTIFICATION_ID, createNotification(contentText, false, true));
     }
 
     // -------------------------------------------------------------------------
-    // Config validation (DNS + port sanity)
+    // Error handling
     // -------------------------------------------------------------------------
 
-    private static String validateConfig(String host, String port) {
-        if (host == null || host.trim().isEmpty()) return "Hostname is empty";
-        try {
-            Integer.parseInt(port);
-            java.net.InetAddress.getByName(host);
-        } catch (NumberFormatException e) {
-            return "Invalid port: " + port;
-        } catch (java.net.UnknownHostException e) {
-            return "Cannot resolve hostname: " + host;
+    private void broadcastError(String errorMessage) {
+        Intent intent = new Intent("srtla-error");
+        intent.putExtra("error_message", errorMessage);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+    }
+
+    private void handleStartupError(String errorMessage) {
+        Log.e(TAG, "Cannot start native SRTLA. Settings validation error: " + errorMessage);
+        broadcastError(errorMessage);
+        updateNotification("Settings validation error: " + errorMessage);
+        stopSelf();
+    }
+
+    // -------------------------------------------------------------------------
+    // Config validation
+    // -------------------------------------------------------------------------
+
+    private static String validateSrtlaConfig(String host, String port) {
+        if (host == null || host.trim().isEmpty()) {
+            return "Hostname is empty";
         }
-        return null;
+
+        try {
+            int portNum = Integer.parseInt(port);
+
+            // Actually resolve the hostname to test DNS
+            Log.i(TAG, "Testing DNS resolution for: " + host);
+            InetAddress address = InetAddress.getByName(host);
+            if (address == null) {
+                return "Cannot resolve hostname: " + host;
+            }
+            Log.i(TAG, "DNS resolution successful: " + host + " -> " + address.getHostAddress());
+
+        } catch (NumberFormatException e) {
+            return "Invalid port number: " + port;
+        } catch (java.net.UnknownHostException e) {
+            return "Cannot resolve hostname: " + host + " (DNS lookup failed)";
+        } catch (Exception e) {
+            return "Invalid hostname or port: " + host + ":" + port + " (" + e.getMessage() + ")";
+        }
+
+        return null; // No error
     }
 
     // -------------------------------------------------------------------------
     // Static API (used by MainActivity and SrtlaManager)
     // -------------------------------------------------------------------------
 
+    // Static methods for external access
     public static boolean isServiceRunning() {
+        // Check both service state and native state for accuracy
         try {
             return isServiceRunning && NativeSrtlaJni.isRunningSrtlaNative();
         } catch (Exception e) {
+            Log.w(TAG, "Error checking native SRTLA state", e);
             return isServiceRunning;
         }
     }
 
-    public static void startService(Context ctx, String host, String port, String listenPort) {
-        Intent i = new Intent(ctx, NativeSrtlaService.class);
-        i.putExtra("srtla_host",  host);
-        i.putExtra("srtla_port",  port);
-        i.putExtra("listen_port", listenPort);
+    public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
+        Intent intent = new Intent(context, NativeSrtlaService.class);
+        intent.putExtra("srtla_host", srtlaHost);
+        intent.putExtra("srtla_port", srtlaPort);
+        intent.putExtra("listen_port", listenPort);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.startForegroundService(i);
+            context.startForegroundService(intent);
         } else {
-            ctx.startService(i);
+            context.startService(intent);
         }
     }
 
-    public static void stopService(Context ctx) {
-        ctx.stopService(new Intent(ctx, NativeSrtlaService.class));
+    public static void stopService(Context context) {
+        Intent intent = new Intent(context, NativeSrtlaService.class);
+        context.stopService(intent);
     }
 
+    /**
+     * Sync internal state with actual native state
+     * Call this periodically to ensure consistency
+     */
     public static void syncState() {
-        if (isServiceRunning && !NativeSrtlaJni.isRunningSrtlaNative()) {
-            Log.w(TAG, "State sync: service flag reset (native stopped)");
-            isServiceRunning = false;
-        }
-    }
-
-    public static String getNativeStats() {
-        if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
-            return "No native SRTLA connections";
-        }
         try {
-            return NativeSrtlaJni.getAllStats();
+            boolean nativeRunning = NativeSrtlaJni.isRunningSrtlaNative();
+            if (isServiceRunning && !nativeRunning) {
+                Log.w(TAG, "State sync: Service thinks it's running but native is stopped");
+                isServiceRunning = false;
+            }
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            Log.w(TAG, "Error syncing state", e);
         }
     }
 
+    /**
+     * Get simple statistics from native SRTLA
+     * @return formatted statistics string
+     */
+    public static String getNativeStats() {
+        try {
+            if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
+                return "No native SRTLA connections";
+            }
+
+            String nativeStats = NativeSrtlaJni.getAllStats();
+            return nativeStats;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting native stats", e);
+            return "Error getting native stats: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Create notification channel (API 26+)
+     */
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(
-                    CHANNEL_ID, "SRTLA Service", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Notifications for SRTLA service status");
-            context.getSystemService(NotificationManager.class).createNotificationChannel(ch);
+            CharSequence name = "SRTLA Service";
+            String description = "Notifications for SRTLA service status";
+            int importance = NotificationManager.IMPORTANCE_LOW;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+
+            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
         }
     }
 }
