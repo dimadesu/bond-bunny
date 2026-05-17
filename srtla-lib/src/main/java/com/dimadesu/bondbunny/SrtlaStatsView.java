@@ -62,6 +62,7 @@ public class SrtlaStatsView extends LinearLayout {
         textTotalBitrate    = findViewById(R.id.text_total_bitrate);
         connectionsContainer = findViewById(R.id.connections_container);
         textNoConnections   = findViewById(R.id.text_no_connections);
+        clearConnectionsDisplay();
     }
 
     // -------------------------------------------------------------------------
@@ -76,7 +77,7 @@ public class SrtlaStatsView extends LinearLayout {
         updateRunnable = new Runnable() {
             @Override
             public void run() {
-                updateStats();
+                updateConnectionStats();
                 handler.postDelayed(this, UPDATE_INTERVAL_MS);
             }
         };
@@ -89,16 +90,16 @@ public class SrtlaStatsView extends LinearLayout {
             handler.removeCallbacks(updateRunnable);
             updateRunnable = null;
         }
-        showNoConnections();
+        clearConnectionsDisplay();
     }
 
     // -------------------------------------------------------------------------
     // Stats update
     // -------------------------------------------------------------------------
 
-    private void updateStats() {
+    private void updateConnectionStats() {
         if (!NativeSrtlaJni.isRunningSrtlaNative()) {
-            showNoConnections();
+            clearConnectionsDisplay();
             return;
         }
 
@@ -124,7 +125,7 @@ public class SrtlaStatsView extends LinearLayout {
             textNoConnections.setVisibility(GONE);
 
         } else if (hasStats) {
-            parseAndDisplay(statsText);
+            parseAndDisplayConnections(statsText);
 
         } else {
             textTotalBitrate.setText("Waiting for connection stats...");
@@ -134,9 +135,9 @@ public class SrtlaStatsView extends LinearLayout {
         }
     }
 
-    private void parseAndDisplay(String statsText) {
+    private void parseAndDisplayConnections(String statsText) {
         if (statsText == null || !statsText.contains("Total bitrate:")) {
-            showNoConnections();
+            clearConnectionsDisplay();
             return;
         }
 
@@ -221,11 +222,11 @@ public class SrtlaStatsView extends LinearLayout {
         }
 
         if (connectionsContainer.getChildCount() == 0) {
-            showNoConnections();
+            clearConnectionsDisplay();
         }
     }
 
-    private void showNoConnections() {
+    private void clearConnectionsDisplay() {
         connectionsContainer.removeAllViews();
         textTotalBitrate.setVisibility(GONE);
         textNoConnections.setVisibility(VISIBLE);
