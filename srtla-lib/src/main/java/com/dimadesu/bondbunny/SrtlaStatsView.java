@@ -29,7 +29,6 @@ import com.dimadesu.bondbunny.srtlalib.R;
 public class SrtlaStatsView extends LinearLayout {
 
     private static final String TAG = "SrtlaStatsView";
-    private static final long UPDATE_INTERVAL_MS = 1000L;
 
     private TextView textTotalBitrate;
     private LinearLayout connectionsContainer;
@@ -96,7 +95,7 @@ public class SrtlaStatsView extends LinearLayout {
                 // Log.i(TAG, "Stats update tick - nativeRunning=" + NativeSrtlaJni.isRunningSrtlaNative());
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     updateConnectionStats();
-                    uiHandler.postDelayed(this, UPDATE_INTERVAL_MS); // Update every second
+                    uiHandler.postDelayed(this, 1000); // Update every second
                 } else {
                     Log.i(TAG, "No services running, stopping stats updates");
                     updateConnectionStats(); // One last update to show "Service not running"
