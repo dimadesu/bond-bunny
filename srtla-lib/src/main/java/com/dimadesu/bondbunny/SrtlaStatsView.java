@@ -136,68 +136,100 @@ public class SrtlaStatsView extends LinearLayout {
     }
 
     private void parseAndDisplayConnections(String statsText) {
-        if (statsText == null || !statsText.contains("Total bitrate:")) {
+        // Handle empty or no-connection state
+        if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
+            // Don't clear if we're showing a retry/connecting status
+            if (textTotalBitrate != null && textTotalBitrate.getVisibility() == View.VISIBLE) {
+                String text = textTotalBitrate.getText().toString();
+                if (text.contains("Connecting") || text.contains("Reconnecting")) {
+                    // Keep the status message, just clear the connection list
+                    connectionsContainer.removeAllViews();
+                    textNoConnections.setVisibility(View.GONE);
+                    return;
+                }
+            }
+            
             clearConnectionsDisplay();
             return;
         }
-
+        
+        // Clear existing views
         connectionsContainer.removeAllViews();
-        textNoConnections.setVisibility(GONE);
-
+        textNoConnections.setVisibility(View.GONE);
+        
+        // Parse the stats text to extract connection information
+        // Format: "Total bitrate: X.X Mbps\n\nWIFI\n  Bitrate: ... \n  Window: ...\n  Packets in-flight: ...\n\n..."
         String[] sections = statsText.split("\n\n");
         LayoutInflater inflater = LayoutInflater.from(getContext());
-
-        // First section = "Total bitrate: X.X Mbps"
+        
+        // Extract and display total bitrate from first section
         if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
             textTotalBitrate.setText(sections[0]);
-            textTotalBitrate.setVisibility(VISIBLE);
+            textTotalBitrate.setVisibility(android.view.View.VISIBLE);
         }
-
+        
         for (String section : sections) {
-            if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) continue;
-
+            if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {
+                continue; // Skip empty sections and total bitrate line
+            }
+            
+            // Parse connection section
             try {
                 String[] lines = section.trim().split("\n");
-                if (lines.length < 5) continue;
-
+                if (lines.length < 5) continue; // Need at least 5 lines: type, bitrate, window, in-flight, rtt
+                
+                // First line is network type
                 String networkType = lines[0].trim();
-
+                
+                // Parse bitrate line: "  Bitrate: 45.2 Mbps 45%"
                 String bitrateLine = lines[1].trim();
                 String bitrate = "N/A";
-                String load = "";
+                String load = "N/A";
                 if (bitrateLine.startsWith("Bitrate:")) {
-                    String[] parts = bitrateLine.substring(8).trim().split(" ");
-                    if (parts.length >= 2) bitrate = parts[0] + " " + parts[1];
-                    if (parts.length >= 3) load    = parts[2];
+                    String bitrateData = bitrateLine.substring(8).trim(); // Remove "Bitrate:"
+                    String[] bitrateParts = bitrateData.split(" ");
+                    if (bitrateParts.length >= 2) {
+                        bitrate = bitrateParts[0] + " " + bitrateParts[1]; // e.g., "45.2 Mbps"
+                    }
+                    if (bitrateParts.length >= 3) {
+                        load = bitrateParts[2]; // e.g., "45%"
+                    }
                 }
-
-                int windowSize = 0;
+                
+                // Parse window line: "  Window: 15234"
                 String windowLine = lines[2].trim();
+                int windowSize = 0;
                 if (windowLine.startsWith("Window:")) {
-                    try { windowSize = Integer.parseInt(windowLine.substring(7).trim()); }
-                    catch (NumberFormatException ignored) { }
+                    windowSize = Integer.parseInt(windowLine.substring(7).trim());
                 }
-
-                int inFlight = 0;
+                
+                // Parse in-flight line: "  Packets in-flight: 125"
                 String inFlightLine = lines[3].trim();
+                int inFlight = 0;
                 if (inFlightLine.startsWith("Packets in-flight:")) {
-                    try { inFlight = Integer.parseInt(inFlightLine.substring(18).trim()); }
-                    catch (NumberFormatException ignored) { }
+                    inFlight = Integer.parseInt(inFlightLine.substring(18).trim());
                 }
-
-                String rtt = "N/A";
+                
+                // Parse RTT line: "  RTT: 45 ms" or "  RTT: N/A"
                 String rttLine = lines[4].trim();
-                if (rttLine.startsWith("RTT:")) rtt = rttLine.substring(4).trim();
-
-                boolean isActive = inFlight > 0
-                        || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
-
-                View itemView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
-
-                TextView typeView = itemView.findViewById(R.id.connection_network_type);
-                typeView.setText(networkType.equals("WIFI") ? "WI-FI" : networkType);
-
-                TextView statusView = itemView.findViewById(R.id.connection_status);
+                String rtt = "N/A";
+                if (rttLine.startsWith("RTT:")) {
+                    rtt = rttLine.substring(4).trim(); // e.g., "45 ms" or "N/A"
+                }
+                
+                // Determine if connection is active (has bitrate > 0 or in-flight packets)
+                boolean isActive = inFlight > 0 || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
+                
+                // Create connection item view
+                android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
+                
+                // Set network type with display formatting
+                TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
+                String displayName = networkType.equals("WIFI") ? "WI-FI" : networkType;
+                networkTypeView.setText(displayName);
+                
+                // Set status
+                TextView statusView = connectionView.findViewById(R.id.connection_status);
                 if (isActive) {
                     statusView.setText("ACTIVE");
                     statusView.setTextColor(android.graphics.Color.parseColor("#28a745"));
@@ -205,30 +237,41 @@ public class SrtlaStatsView extends LinearLayout {
                     statusView.setText("INACTIVE");
                     statusView.setTextColor(android.graphics.Color.parseColor("#dc3545"));
                 }
-
-                WindowBarView bar = itemView.findViewById(R.id.window_bar);
-                bar.setWindowData(windowSize, isActive);
-
-                TextView statsTextView = itemView.findViewById(R.id.connection_stats_text);
-                statsTextView.setText(String.format(
-                        "Bitrate: %s  %s\nPackets in-flight: %,d\nRTT: %s\nWindow: %,d / 60,000",
-                        bitrate, load, inFlight, rtt, windowSize));
-
-                connectionsContainer.addView(itemView);
-
+                
+                // Set window bar
+                WindowBarView windowBar = connectionView.findViewById(R.id.window_bar);
+                windowBar.setWindowData(windowSize, isActive);
+                
+                // Set stats text
+                TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
+                String statsDisplay = String.format(
+                    "Bitrate: %s  %s\nPackets in-flight: %,d\nRTT: %s\nWindow: %,d / 60,000",
+                    bitrate, load, inFlight, rtt, windowSize
+                );
+                statsTextView.setText(statsDisplay);
+                
+                // Add view to container
+                connectionsContainer.addView(connectionView);
+                
             } catch (Exception e) {
-                Log.e(TAG, "Error parsing section: " + section, e);
+                Log.e(TAG, "Error parsing connection section: " + section, e);
             }
         }
-
+        
+        // If no connections were added, show the "no connections" message
         if (connectionsContainer.getChildCount() == 0) {
             clearConnectionsDisplay();
         }
     }
 
     private void clearConnectionsDisplay() {
+        // Remove all dynamically added connection views
         connectionsContainer.removeAllViews();
+
+        // Hide total bitrate when no connection
         textTotalBitrate.setVisibility(GONE);
+
+        // Show the "no connections" message
         textNoConnections.setVisibility(VISIBLE);
         connectionsContainer.addView(textNoConnections);
     }
