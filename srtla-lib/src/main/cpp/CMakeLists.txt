@@ -4,7 +4,6 @@ project("srtla_android")
 # Path to bond-bunny root (4 levels up from this CMakeLists.txt: cpp/main/src/srtla-lib)
 set(BOND_BUNNY_ROOT ${CMAKE_SOURCE_DIR}/../../../../)
 set(SRTLA_DIR ${BOND_BUNNY_ROOT}/srtla)
-set(APP_JNI_DIR ${BOND_BUNNY_ROOT}/src/main/cpp)
 
 # Suppress the unused variable warning from the srtla sources
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable -Wno-unused-function")
@@ -15,8 +14,8 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size
 add_library(
     srtla_android
     SHARED
-    # Bond-bunny's main JNI wrapper (stats, start/stop, network socket API)
-    ${APP_JNI_DIR}/srtla_android_jni.cpp
+    # JNI wrapper (stats, start/stop, network socket API)
+    srtla_android_jni.cpp
     # SRTLA C sources
     ${SRTLA_DIR}/srtla_send.c
     ${SRTLA_DIR}/common.c
