@@ -44,24 +44,28 @@ public class SrtlaSender {
     }
 
     private final Context context;
-    private final ConnectivityManager connectivityManager;
 
+    // Network monitoring
+    private ConnectivityManager connectivityManager;
+
+    // Dedicated network callbacks for each transport type
     private ConnectivityManager.NetworkCallback cellularCallback;
     private ConnectivityManager.NetworkCallback wifiCallback;
     private ConnectivityManager.NetworkCallback ethernetCallback;
 
-    /** Virtual-IP → native socket FD, one entry per transport type. */
-    private final Map<String, Integer> virtualConnections = new ConcurrentHashMap<>();
+    // Virtual connection tracking
+    private Map<String, Integer> virtualConnections = new ConcurrentHashMap<>();
 
-    /**
-     * Maps "TYPE:networkHandle" → last-seen real IP.
-     * Used to avoid redundant socket recreation when capabilities change.
-     */
-    private final Map<String, String> networkState = new ConcurrentHashMap<>();
+    // Track network ID + IP to avoid redundant socket recreation
+    private Map<String, String> networkState = new ConcurrentHashMap<>();
 
+    // Synchronization for waiting for first network connection
     private CountDownLatch firstConnectionLatch = new CountDownLatch(1);
 
+    // Wakelock to keep CPU awake during network operations
     private PowerManager.WakeLock wakeLock;
+
+    // Wi-Fi lock to maintain high-performance Wi-Fi
     private WifiManager.WifiLock wifiLock;
 
     public SrtlaSender(Context context) {
@@ -86,50 +90,56 @@ public class SrtlaSender {
     public void start(String srtlaHost, String srtlaPort, String listenPort, Listener listener) {
         acquireLocks();
 
-        // Reset state for a clean start
+        // Reset state for a clean start (Service lifecycle handles this in NativeSrtlaService,
+        // but SrtlaSender objects may be reused across start/stop cycles)
         firstConnectionLatch = new CountDownLatch(1);
         virtualConnections.clear();
         networkState.clear();
 
         setupDedicatedNetworkCallbacks();
 
-        // If callbacks didn't fire yet (networks already connected), recreate sockets manually
+        // Ensure sockets exist (callbacks may not fire again if networks already connected)
+        // Only recreate if we have no sockets yet
         if (virtualConnections.isEmpty()) {
-            Log.i(TAG, "No callbacks fired yet, recreating sockets for existing networks");
+            Log.i(TAG, "No sockets detected, manually recreating for existing networks");
             recreateNetworkSockets();
+        } else {
+            Log.i(TAG, "Sockets already exist (" + virtualConnections.size() + "), skipping recreation");
         }
 
+        // Wait for at least one network to be detected by dedicated callbacks
         if (listener != null) listener.onStatus("Waiting for network connections...");
         waitForNetworkConnections();
 
+        // Create IPs file with virtual IPs from detected networks
         File ipsFile;
         try {
             ipsFile = createVirtualIpsFile();
         } catch (IOException e) {
-            String err = "Failed to create IPs file: " + e.getMessage();
-            Log.e(TAG, err, e);
-            if (listener != null) listener.onError(err);
+            Log.e(TAG, "Error creating virtual IPs file", e);
+            if (listener != null) listener.onError("Error starting service: " + e.getMessage());
             releaseLocks();
             return;
         }
 
-        if (listener != null) listener.onStatus("Starting SRTLA on port " + listenPort + "...");
+        // Start native SRTLA
+        if (listener != null) listener.onStatus("Starting service...");
         int result = NativeSrtlaJni.startSrtlaNative(listenPort, srtlaHost, srtlaPort,
                 ipsFile.getAbsolutePath());
 
         if (result == 0) {
+            Log.i(TAG, "Native SRTLA started successfully");
+
+            // Verify native state before marking as running
             if (NativeSrtlaJni.isRunningSrtlaNative()) {
-                Log.i(TAG, "Native SRTLA started on port " + listenPort);
-                if (listener != null) listener.onStatus("Running on port " + listenPort);
+                if (listener != null) listener.onStatus("Service is running on port " + listenPort);
             } else {
-                String err = "Native SRTLA start returned 0 but process is not running";
-                Log.w(TAG, err);
-                if (listener != null) listener.onError(err);
+                Log.w(TAG, "Native SRTLA start returned 0 but process is not running");
+                if (listener != null) listener.onError("Service failed to start. Native code returned 0");
             }
         } else {
-            String err = "Native SRTLA failed to start (code: " + result + ")";
-            Log.e(TAG, err);
-            if (listener != null) listener.onError(err);
+            Log.e(TAG, "Native SRTLA failed to start with code: " + result);
+            if (listener != null) listener.onError("Service failed to start (code: " + result + ")");
         }
     }
 
@@ -139,9 +149,8 @@ public class SrtlaSender {
      */
     public void stop() {
         NativeSrtlaJni.stopSrtlaNative();
+        cleanupVirtualConnections();
         teardownDedicatedNetworkCallbacks();
-        virtualConnections.clear();
-        networkState.clear();
         releaseLocks();
     }
 
@@ -150,26 +159,31 @@ public class SrtlaSender {
     // -------------------------------------------------------------------------
 
     private void acquireLocks() {
-        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SRTLA::NetworkWakeLock");
+        // Acquire wakelock to keep CPU awake during network operations
+        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SRTLA::NetworkWakeLock");
             wakeLock.acquire();
             Log.i(TAG, "WakeLock acquired");
         }
 
-        WifiManager wm = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
-        if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "SRTLA::WifiLock");
+        // Acquire Wi-Fi lock to maintain high-performance Wi-Fi
+        WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+        if (wifiManager != null) {
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "SRTLA::WifiLock");
             wifiLock.acquire();
             Log.i(TAG, "Wi-Fi lock acquired");
         }
     }
 
     private void releaseLocks() {
+        // Release wakelock
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
             Log.i(TAG, "WakeLock released");
         }
+
+        // Release Wi-Fi lock
         if (wifiLock != null && wifiLock.isHeld()) {
             wifiLock.release();
             Log.i(TAG, "Wi-Fi lock released");
@@ -180,167 +194,240 @@ public class SrtlaSender {
     // Network callbacks
     // -------------------------------------------------------------------------
 
+    /**
+     * Set up dedicated network callbacks for each transport type
+     * This ensures we detect all networks even on Samsung devices where getAllNetworks() might miss some
+     */
     private void setupDedicatedNetworkCallbacks() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            Log.w(TAG, "Network callbacks not available on this Android version");
+            Log.w(TAG, "Dedicated network callbacks not available on this Android version");
             return;
         }
+
+        Log.i(TAG, "Setting up dedicated network callbacks...");
+
+        // Create and register callbacks for each network type
         cellularCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_CELLULAR, "CELLULAR");
-        wifiCallback     = registerNetworkCallback(NetworkCapabilities.TRANSPORT_WIFI,     "WIFI");
+        wifiCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_WIFI, "WIFI");
         ethernetCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_ETHERNET, "ETHERNET");
-        Log.i(TAG, "Network callbacks registered");
+
+        Log.i(TAG, "Dedicated network callbacks setup complete");
     }
 
+    /**
+     * Clean up dedicated network callbacks
+     */
     private void teardownDedicatedNetworkCallbacks() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && connectivityManager != null) {
-            unregisterCallback(cellularCallback, "cellular");
-            unregisterCallback(wifiCallback,     "WiFi");
-            unregisterCallback(ethernetCallback, "ethernet");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                if (cellularCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(cellularCallback);
+                    Log.i(TAG, "Unregistered dedicated cellular callback");
+                }
+                if (wifiCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(wifiCallback);
+                    Log.i(TAG, "Unregistered dedicated WiFi callback");
+                }
+                if (ethernetCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(ethernetCallback);
+                    Log.i(TAG, "Unregistered dedicated ethernet callback");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error unregistering dedicated network callbacks", e);
+            }
+
+            cellularCallback = null;
+            wifiCallback = null;
+            ethernetCallback = null;
         }
-        cellularCallback = null;
-        wifiCallback     = null;
-        ethernetCallback = null;
     }
 
-    private void unregisterCallback(ConnectivityManager.NetworkCallback cb, String name) {
-        if (cb == null) return;
-        try {
-            connectivityManager.unregisterNetworkCallback(cb);
-        } catch (Exception e) {
-            Log.w(TAG, "Error unregistering " + name + " callback: " + e.getMessage());
-        }
-    }
-
-    private ConnectivityManager.NetworkCallback registerNetworkCallback(int transport, String typeName) {
+    /**
+     * Create and register a network callback for a specific transport type
+     */
+    private ConnectivityManager.NetworkCallback registerNetworkCallback(int transportType, String networkTypeName) {
         ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
             @Override
             public void onAvailable(Network network) {
                 try {
-                    handleNetworkAvailable(network, typeName);
+                    Log.i(TAG, "DEDICATED: Got " + networkTypeName.toLowerCase() + " network available: " + network);
+                    handleDedicatedNetworkAvailable(network, networkTypeName, "");
                 } catch (Exception e) {
-                    Log.e(TAG, "Error in " + typeName + " onAvailable", e);
+                    Log.e(TAG, "Error in dedicated " + networkTypeName.toLowerCase() + " callback", e);
                 }
             }
 
             @Override
             public void onLost(Network network) {
-                handleNetworkLost(network, typeName);
+                Log.i(TAG, "DEDICATED: Lost " + networkTypeName.toLowerCase() + " network: " + network);
+                handleDedicatedNetworkLost(network, networkTypeName);
             }
 
             @Override
-            public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+            public void onCapabilitiesChanged(Network network, NetworkCapabilities networkCapabilities) {
                 try {
-                    String stateKey  = typeName + ":" + network;
+                    // This fires when network capabilities change (e.g., mobile data toggled back on)
+                    Log.i(TAG, "DEDICATED: " + networkTypeName + " network capabilities changed: " + network);
+
+                    // Only recreate socket if network state actually changed (different IP or first time)
+                    String stateKey = networkTypeName + ":" + network.toString();
                     String currentIP = getNetworkIP(network);
-                    String prevIP    = networkState.get(stateKey);
-                    if (currentIP != null && !currentIP.equals(prevIP)) {
-                        Log.i(TAG, typeName + " IP changed: " + prevIP + " -> " + currentIP);
-                        handleNetworkAvailable(network, typeName);
+                    String previousIP = networkState.get(stateKey);
+
+                    if (currentIP != null && !currentIP.equals(previousIP)) {
+                        Log.i(TAG, "DEDICATED: " + networkTypeName + " IP changed: " + previousIP + " -> " + currentIP);
+                        handleDedicatedNetworkAvailable(network, networkTypeName, "");
+                    } else {
+                        Log.d(TAG, "DEDICATED: " + networkTypeName + " capabilities changed but IP unchanged, skipping recreation");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error in " + typeName + " onCapabilitiesChanged", e);
+                    Log.e(TAG, "Error in " + networkTypeName.toLowerCase() + " capabilities changed callback", e);
                 }
             }
         };
 
         try {
-            NetworkRequest req = new NetworkRequest.Builder()
-                    .addTransportType(transport)
+            NetworkRequest request = new NetworkRequest.Builder()
+                    .addTransportType(transportType)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                     .build();
-            connectivityManager.requestNetwork(req, callback);
+            connectivityManager.requestNetwork(request, callback);
+            Log.i(TAG, "Registered dedicated " + networkTypeName + " network callback");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to register " + typeName + " callback", e);
+            Log.e(TAG, "Failed to register " + networkTypeName.toLowerCase() + " callback", e);
         }
+
         return callback;
     }
 
+    /**
+     * Manually recreate sockets for all currently available networks
+     * This is needed when service restarts but callbacks don't fire (networks already connected)
+     */
     private void recreateNetworkSockets() {
-        if (connectivityManager == null) return;
+        Log.i(TAG, "Recreating network sockets for currently available networks");
+        if (connectivityManager == null) {
+            Log.e(TAG, "ConnectivityManager not available");
+            return;
+        }
+
+        // Get all currently active networks
         Network[] networks = connectivityManager.getAllNetworks();
         for (Network network : networks) {
             NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
             if (caps == null) continue;
+
+            // Skip VPN networks
             if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) continue;
 
+            // Check each transport type and recreate socket
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                handleNetworkAvailable(network, "CELLULAR");
+                Log.i(TAG, "Found existing CELLULAR network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "CELLULAR", "");
             } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                handleNetworkAvailable(network, "WIFI");
+                Log.i(TAG, "Found existing WIFI network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "WIFI", "");
             } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                handleNetworkAvailable(network, "ETHERNET");
+                Log.i(TAG, "Found existing ETHERNET network, recreating socket");
+                handleDedicatedNetworkAvailable(network, "ETHERNET", "");
             }
         }
     }
 
-    private synchronized void handleNetworkAvailable(Network network, String networkType) {
+    /**
+     * Handle when a dedicated network callback detects an available network
+     */
+    private synchronized void handleDedicatedNetworkAvailable(Network network, String networkType, String operatorName) {
         try {
+            Log.i(TAG, "DEDICATED: Handling " + networkType + " network: " + network);
             String realIP = getNetworkIP(network);
-            if (realIP == null) return;
+            Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
 
-            String virtualIP   = virtualIPForType(networkType);
-            int    networkTypeId = networkTypeId(networkType);
-            if (virtualIP == null) return;
+            if (realIP != null) {
+                String virtualIP = getVirtualIPForNetworkType(networkType);
+                int networkTypeId = getNetworkTypeId(networkType);
 
-            String stateKey   = networkType + ":" + network;
-            String prevState  = networkState.get(stateKey);
+                Log.i(TAG, "DEDICATED: Virtual IP: " + virtualIP + ", already registered: " + virtualConnections.containsKey(virtualIP));
 
-            // Skip if same network+IP already set up
-            if (realIP.equals(prevState) && virtualConnections.containsKey(virtualIP)) {
-                Log.d(TAG, networkType + " socket already current, skipping");
-                return;
-            }
+                if (virtualIP != null) {
+                    // Track network state to prevent duplicate creations
+                    String stateKey = networkType + ":" + network.toString();
+                    String previousState = networkState.get(stateKey);
+                    String currentState = realIP;
 
-            // If a stale socket exists, just remove it (native owns the FD)
-            if (virtualConnections.containsKey(virtualIP)) {
-                Log.i(TAG, "Replacing stale " + networkType + " socket");
-                virtualConnections.remove(virtualIP);
-            }
+                    // Skip if this exact network+IP combination already exists
+                    if (currentState.equals(previousState) && virtualConnections.containsKey(virtualIP)) {
+                        Log.d(TAG, "DEDICATED: Socket already exists for " + networkType + " with same IP, skipping");
+                        return;
+                    }
 
-            networkState.put(stateKey, realIP);
-            int socketFD = createNetworkSocket(network);
-            if (socketFD >= 0) {
-                virtualConnections.put(virtualIP, socketFD);
-                NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socketFD);
-                Log.i(TAG, networkType + " socket set up: " + virtualIP + " -> " + realIP + " (FD " + socketFD + ")");
-                firstConnectionLatch.countDown();
+                    // If already registered, remove old socket first (network may have changed)
+                    if (virtualConnections.containsKey(virtualIP)) {
+                        Log.i(TAG, "DEDICATED: Re-creating socket for " + networkType + " (network reconnected/changed)");
+                        virtualConnections.remove(virtualIP);
+                    }
 
-                if (NativeSrtlaJni.isRunningSrtlaNative()) {
-                    try {
-                        createVirtualIpsFile();
-                        NativeSrtlaJni.notifyNetworkChange();
-                    } catch (IOException e) {
-                        Log.w(TAG, "Failed to update IPs file after network change", e);
+                    Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
+                    networkState.put(stateKey, currentState);
+                    int socket = createNetworkSocket(network);
+                    if (socket >= 0) {
+                        virtualConnections.put(virtualIP, socket);
+                        NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
+                        Log.i(TAG, "DEDICATED: Successfully setup " + networkType + " connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
+
+                        // Signal that we have our first connection
+                        firstConnectionLatch.countDown();
+
+                        // Update virtual IPs file if service is running
+                        if (NativeSrtlaJni.isRunningSrtlaNative()) {
+                            try {
+                                createVirtualIpsFile();
+                                NativeSrtlaJni.notifyNetworkChange();
+                                Log.i(TAG, "DEDICATED: Updated virtual IPs file and notified native code of " + networkType + " network change");
+                            } catch (Exception e) {
+                                Log.w(TAG, "Error updating virtual IPs file after dedicated network change", e);
+                            }
+                        }
+                    } else {
+                        Log.e(TAG, "DEDICATED: Failed to create socket for " + networkType + " (returned " + socket + ")");
                     }
                 }
-            } else {
-                Log.e(TAG, "Failed to create socket for " + networkType);
             }
         } catch (Exception e) {
-            Log.e(TAG, "handleNetworkAvailable error for " + networkType, e);
+            Log.e(TAG, "Error handling dedicated " + networkType + " network available", e);
         }
     }
 
-    private void handleNetworkLost(Network network, String networkType) {
+    /**
+     * Handle when a dedicated network callback detects a lost network
+     */
+    private void handleDedicatedNetworkLost(Network network, String networkType) {
         try {
-            String virtualIP = virtualIPForType(networkType);
-            if (virtualIP != null && virtualConnections.containsKey(virtualIP)) {
-                virtualConnections.remove(virtualIP);
-                networkState.remove(networkType + ":" + network);
-                Log.i(TAG, networkType + " connection removed: " + virtualIP);
+            String virtualIP = getVirtualIPForNetworkType(networkType);
 
+            if (virtualIP != null && virtualConnections.containsKey(virtualIP)) {
+                Log.i(TAG, "DEDICATED: Removing " + networkType + " connection: " + virtualIP);
+                // Note: Don't close socket here - native code owns it
+                virtualConnections.remove(virtualIP);
+
+                // Clean up network state tracking
+                String stateKey = networkType + ":" + network.toString();
+                networkState.remove(stateKey);
+
+                // Update virtual IPs file if service is running
                 if (NativeSrtlaJni.isRunningSrtlaNative()) {
                     try {
                         createVirtualIpsFile();
                         NativeSrtlaJni.notifyNetworkChange();
-                    } catch (IOException e) {
-                        Log.w(TAG, "Failed to update IPs file after network loss", e);
+                        Log.i(TAG, "DEDICATED: Updated virtual IPs file and notified native code of " + networkType + " network loss");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error updating virtual IPs file after dedicated network loss", e);
                     }
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "handleNetworkLost error for " + networkType, e);
+            Log.e(TAG, "Error handling dedicated " + networkType + " network lost", e);
         }
     }
 
@@ -349,34 +436,54 @@ public class SrtlaSender {
     // -------------------------------------------------------------------------
 
     private int createNetworkSocket(Network network) {
-        int socketFD = NativeSrtlaJni.createUdpSocketNative();
-        if (socketFD < 0) {
-            Log.e(TAG, "createUdpSocketNative returned " + socketFD);
-            return -1;
-        }
-
         try {
-            java.io.FileDescriptor fd = new java.io.FileDescriptor();
-            java.lang.reflect.Field fdField = java.io.FileDescriptor.class.getDeclaredField("descriptor");
-            fdField.setAccessible(true);
-            fdField.setInt(fd, socketFD);
-
-            network.bindSocket(fd);
-
-            // Detach from fdsan so native code can close the socket without triggering fdsan
-            try {
-                java.lang.reflect.Method setInt = java.io.FileDescriptor.class
-                        .getDeclaredMethod("setInt$", int.class);
-                setInt.setAccessible(true);
-                setInt.invoke(fd, -1);
-            } catch (Exception e) {
-                Log.w(TAG, "Could not detach FD " + socketFD + " from fdsan: " + e.getMessage());
+            // Create a native UDP socket using JNI
+            int socketFD = NativeSrtlaJni.createUdpSocketNative();
+            if (socketFD < 0) {
+                Log.e(TAG, "Failed to create native UDP socket");
+                return -1;
             }
-            return socketFD;
+
+            // Bind the socket to the specific network using FileDescriptor
+            java.io.FileDescriptor fd = new java.io.FileDescriptor();
+
+            // Use reflection to set the file descriptor value
+            try {
+                java.lang.reflect.Field fdField = java.io.FileDescriptor.class.getDeclaredField("descriptor");
+                fdField.setAccessible(true);
+                fdField.setInt(fd, socketFD);
+
+                // Now bind the FileDescriptor to the network
+                network.bindSocket(fd);
+
+                // Detach the FileDescriptor from fdsan tracking since we're transferring ownership
+                // to native code. This prevents fdsan crashes when native code closes the socket.
+                try {
+                    // Use reflection to call FileDescriptor.setInt$(-1) to detach from fdsan
+                    java.lang.reflect.Method setIntMethod = java.io.FileDescriptor.class.getDeclaredMethod("setInt$", int.class);
+                    setIntMethod.setAccessible(true);
+                    setIntMethod.invoke(fd, -1);
+                    Log.i(TAG, "Detached FD " + socketFD + " from fdsan tracking for native ownership");
+                } catch (Exception fdDetachEx) {
+                    Log.w(TAG, "Could not detach FD from fdsan (may cause crashes): " + fdDetachEx.getMessage());
+                }
+
+                Log.i(TAG, "Successfully bound and transferred socket FD " + socketFD + " to native code");
+                return socketFD;
+
+            } catch (Exception reflectionEx) {
+                Log.w(TAG, "Reflection approach failed, cleaning up native socket", reflectionEx);
+
+                // If reflection failed, we can't properly bind the native socket
+                // Close the native socket to prevent FD leaks
+                NativeSrtlaJni.closeSocketNative(socketFD);
+
+                Log.e(TAG, "Failed to bind native socket to network - socket closed");
+                return -1;
+            }
 
         } catch (Exception e) {
-            Log.w(TAG, "bindSocket failed for FD " + socketFD + ": " + e.getMessage());
-            NativeSrtlaJni.closeSocketNative(socketFD);
+            Log.e(TAG, "Failed to create and bind network socket: " + e.getMessage(), e);
             return -1;
         }
     }
@@ -385,13 +492,20 @@ public class SrtlaSender {
     // Network wait / IPs file
     // -------------------------------------------------------------------------
 
+    /**
+     * Wait for network connections to be detected by dedicated callbacks
+     * This ensures we have at least one network before starting native SRTLA
+     * Simple polling loop until at least 1 connection available
+     */
     private void waitForNetworkConnections() {
+        Log.i(TAG, "Waiting for connections before starting");
+
         try {
+            // Wait up to 2 seconds for first connection
             if (firstConnectionLatch.await(2, TimeUnit.SECONDS)) {
-                Log.i(TAG, "Ready: " + virtualConnections.size() + " connection(s)");
+                Log.i(TAG, "Ready to start. " + virtualConnections.size() + " connections available");
             } else {
-                Log.w(TAG, "Timeout waiting for connections; proceeding with "
-                        + virtualConnections.size() + " connection(s)");
+                Log.w(TAG, "Timeout waiting for connections, starting anyway with " + virtualConnections.size() + " connections");
             }
         } catch (InterruptedException e) {
             Log.w(TAG, "Network wait interrupted", e);
@@ -400,18 +514,44 @@ public class SrtlaSender {
 
     private File createVirtualIpsFile() throws IOException {
         File ipsFile = new File(context.getFilesDir(), "native_srtla_virtual_ips.txt");
-        if (ipsFile.exists()) ipsFile.delete();
+
+        // Delete existing file
+        if (ipsFile.exists()) {
+            ipsFile.delete();
+            Log.i(TAG, "Deleted existing virtual IPs file");
+        }
 
         try (FileWriter writer = new FileWriter(ipsFile, false)) {
+            // Write only virtual IPs that have active connections
             for (String virtualIP : virtualConnections.keySet()) {
                 writer.write(virtualIP + "\n");
+                Log.i(TAG, "Writing active virtual IP to file: " + virtualIP);
             }
             writer.flush();
         }
 
-        Log.i(TAG, "IPs file: " + ipsFile.getAbsolutePath()
-                + " (" + virtualConnections.size() + " entries)");
+        Log.i(TAG, "Created virtual IPs file: " + ipsFile.getAbsolutePath() +
+              " (size: " + ipsFile.length() + " bytes, " + virtualConnections.size() + " virtual IPs)");
+
         return ipsFile;
+    }
+
+    private void cleanupVirtualConnections() {
+        Log.i(TAG, "Cleaning up virtual connections...");
+
+        for (Map.Entry<String, Integer> entry : virtualConnections.entrySet()) {
+            int socketFD = entry.getValue();
+            if (socketFD >= 0) {
+                // Note: We don't close these sockets here because they were transferred
+                // to native code ownership. The native code is responsible for closing them.
+                // Attempting to close them here would cause fdsan crashes.
+                Log.i(TAG, "Virtual connection " + entry.getKey() + " (FD: " + socketFD + ") - ownership transferred to native code");
+            }
+        }
+
+        virtualConnections.clear();
+        networkState.clear();
+        Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
 
     // -------------------------------------------------------------------------
@@ -419,69 +559,102 @@ public class SrtlaSender {
     // -------------------------------------------------------------------------
 
     private String getNetworkIP(Network network) {
-        // 1. Try LinkProperties (fast, works for Wi-Fi)
         try {
-            LinkProperties lp = connectivityManager.getLinkProperties(network);
-            if (lp != null) {
-                for (LinkAddress la : lp.getLinkAddresses()) {
-                    InetAddress addr = la.getAddress();
-                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
-                        return addr.getHostAddress();
+            // First try getting IP from LinkProperties (works for WiFi and some cellular)
+            LinkProperties linkProperties = connectivityManager.getLinkProperties(network);
+            if (linkProperties != null) {
+                for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                    InetAddress address = linkAddress.getAddress();
+                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        return address.getHostAddress();
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.w(TAG, "LinkProperties IP lookup failed", e);
-        }
 
-        // 2. Fallback: bind a DatagramSocket to get source address (works for Samsung cellular)
-        return getNetworkIPFromSocket(network);
+            // Fallback: Try socket binding method (works for Samsung cellular)
+            Log.i(TAG, "LinkProperties didn't provide IPv4, trying socket binding method");
+            String ipFromSocket = getNetworkIPFromSocket(network);
+            if (ipFromSocket != null) {
+                Log.i(TAG, "Got IP via socket binding: " + ipFromSocket);
+                return ipFromSocket;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting network IP", e);
+        }
+        return null;
     }
 
+    /**
+     * Get IP address from a network by creating a test socket
+     * This works even for cellular networks on Samsung devices
+     */
     private String getNetworkIPFromSocket(Network network) {
         DatagramSocket socket = null;
         try {
             socket = new DatagramSocket();
+            // Samsung requires CHANGE_NETWORK_STATE for bindSocket on DatagramSocket
+            // But we CAN bind FileDescriptor sockets (native sockets) successfully
+            // So as a workaround, use a placeholder IP for cellular networks
             network.bindSocket(socket);
+            // Connect to a public server to force socket to select a source address
             socket.connect(InetAddress.getByName("8.8.8.8"), 53);
-            InetAddress local = socket.getLocalAddress();
-            if (local instanceof Inet4Address
-                    && !local.isLoopbackAddress()
-                    && !local.isAnyLocalAddress()) {
-                return local.getHostAddress();
+            InetAddress localAddress = socket.getLocalAddress();
+
+            if (localAddress != null && localAddress instanceof Inet4Address &&
+                    !localAddress.isLoopbackAddress() && !localAddress.isAnyLocalAddress()) {
+                return localAddress.getHostAddress();
             }
         } catch (Exception e) {
-            String msg = e.getMessage();
-            if (msg != null && msg.contains("EPERM")) {
-                // Samsung blocks DatagramSocket.bindSocket for cellular; use placeholder
-                return "10.64.64.64";
+            // Check if it's a permission error (EPERM from Samsung devices)
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && errorMsg.contains("EPERM")) {
+                // Samsung doesn't allow bindSocket for cellular networks
+                // Use a placeholder IP - the native socket binding works fine
+                Log.i(TAG, "Using placeholder IP for network (bindSocket EPERM blocked by Samsung)");
+                return "10.64.64.64"; // Placeholder that indicates "cellular with unknown IP"
             }
-            Log.w(TAG, "getNetworkIPFromSocket failed: " + msg);
+            Log.w(TAG, "getNetworkIPFromSocket failed: " + e.getMessage());
         } finally {
-            if (socket != null && !socket.isClosed()) socket.close();
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
         }
         return null;
     }
 
     // -------------------------------------------------------------------------
-    // Static helpers
+    // Helpers
     // -------------------------------------------------------------------------
 
-    private static String virtualIPForType(String networkType) {
+    /**
+     * Get virtual IP for a given network type
+     */
+    private String getVirtualIPForNetworkType(String networkType) {
         switch (networkType) {
-            case "WIFI":     return "10.0.1.1";
-            case "CELLULAR": return "10.0.2.1";
-            case "ETHERNET": return "10.0.3.1";
-            default:         return null;
+            case "WIFI":
+                return "10.0.1.1";
+            case "CELLULAR":
+                return "10.0.2.1";
+            case "ETHERNET":
+                return "10.0.3.1";
+            default:
+                return null;
         }
     }
 
-    private static int networkTypeId(String networkType) {
+    /**
+     * Get network type ID for a given network type
+     */
+    private int getNetworkTypeId(String networkType) {
         switch (networkType) {
-            case "WIFI":     return 1;
-            case "CELLULAR": return 2;
-            case "ETHERNET": return 3;
-            default:         return 0;
+            case "WIFI":
+                return 1;
+            case "CELLULAR":
+                return 2;
+            case "ETHERNET":
+                return 3;
+            default:
+                return 0;
         }
     }
 }
