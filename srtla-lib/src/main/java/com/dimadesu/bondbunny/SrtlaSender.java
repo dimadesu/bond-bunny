@@ -148,7 +148,19 @@ public class SrtlaSender {
      * Safe to call multiple times.
      */
     public void stop() {
-        NativeSrtlaJni.stopSrtlaNative();
+        try {
+            Log.i(TAG, "Stopping native SRTLA process...");
+
+            int result = NativeSrtlaJni.stopSrtlaNative();
+            if (result == 0) {
+                Log.i(TAG, "Native SRTLA stop signal sent successfully");
+            } else {
+                Log.w(TAG, "Native SRTLA stop returned code: " + result);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping native SRTLA", e);
+        }
+
         cleanupVirtualConnections();
         teardownDedicatedNetworkCallbacks();
         releaseLocks();
