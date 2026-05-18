@@ -207,28 +207,28 @@ public class NativeSrtlaService extends Service {
     // Config validation
     // -------------------------------------------------------------------------
 
-    private static String validateSrtlaConfig(String host, String port) {
-        if (host == null || host.trim().isEmpty()) {
+    private static String validateSrtlaConfig(String srtlaHost, String srtlaPort) {
+        if (srtlaHost == null || srtlaHost.trim().isEmpty()) {
             return "Hostname is empty";
         }
 
         try {
-            int portNum = Integer.parseInt(port);
+            int port = Integer.parseInt(srtlaPort);
 
             // Actually resolve the hostname to test DNS
-            Log.i(TAG, "Testing DNS resolution for: " + host);
-            InetAddress address = InetAddress.getByName(host);
+            Log.i(TAG, "Testing DNS resolution for: " + srtlaHost);
+            InetAddress address = InetAddress.getByName(srtlaHost);
             if (address == null) {
-                return "Cannot resolve hostname: " + host;
+                return "Cannot resolve hostname: " + srtlaHost;
             }
-            Log.i(TAG, "DNS resolution successful: " + host + " -> " + address.getHostAddress());
+            Log.i(TAG, "DNS resolution successful: " + srtlaHost + " -> " + address.getHostAddress());
 
         } catch (NumberFormatException e) {
-            return "Invalid port number: " + port;
+            return "Invalid port number: " + srtlaPort;
         } catch (java.net.UnknownHostException e) {
-            return "Cannot resolve hostname: " + host + " (DNS lookup failed)";
+            return "Cannot resolve hostname: " + srtlaHost + " (DNS lookup failed)";
         } catch (Exception e) {
-            return "Invalid hostname or port: " + host + ":" + port + " (" + e.getMessage() + ")";
+            return "Invalid hostname or port: " + srtlaHost + ":" + srtlaPort + " (" + e.getMessage() + ")";
         }
 
         return null; // No error
