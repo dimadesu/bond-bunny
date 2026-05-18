@@ -289,11 +289,21 @@ public class NativeSrtlaService extends Service {
      */
     public static String getNativeStats() {
         try {
+            // Log.i(TAG, "getNativeStats called, isServiceRunning=" + isServiceRunning);
+
             if (!isServiceRunning || !NativeSrtlaJni.isRunningSrtlaNative()) {
+                // Log.i(TAG, "Native SRTLA not running, returning default message");
                 return "No native SRTLA connections";
             }
 
+            // Log.i(TAG, "Calling optimized native stats function...");
+            // Single JNI call instead of 4 separate calls - much more efficient!
             String nativeStats = NativeSrtlaJni.getAllStats();
+
+            // Add timestamp to see if values change over time
+            // Log.i(TAG, "Stats timestamp: " + System.currentTimeMillis());
+            // Log.i(TAG, "Native stats result: " + nativeStats);
+
             return nativeStats;
 
         } catch (Exception e) {
