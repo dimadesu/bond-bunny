@@ -187,11 +187,7 @@ public class SrtlaStatsView extends LinearLayout {
             }
         } else {
             // Service not running - clear display
-            connectionsContainer.removeAllViews();
-            textNoConnections.setVisibility(View.VISIBLE);
-            textNoConnections.setText("Service not running");
-            
-            textTotalBitrate.setVisibility(View.GONE);
+            clearConnectionsDisplay();
         }
     }
 
