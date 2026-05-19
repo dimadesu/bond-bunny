@@ -8,7 +8,7 @@
   android:paddingRight="12dp"
   android:paddingBottom="16dp"
   android:background="#F0F0F0"
-  android:layout_marginBottom="4dp">
+  android:layout_marginTop="4dp">
 
   <!-- Connection header with network type and status -->
   <LinearLayout
