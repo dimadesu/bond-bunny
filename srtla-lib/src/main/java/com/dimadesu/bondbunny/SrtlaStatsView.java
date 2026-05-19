@@ -90,19 +90,30 @@ public class SrtlaStatsView extends LinearLayout {
         }
         
         statsUpdateRunnable = new Runnable() {
+            private boolean wasRunning = false;
+
             @Override
             public void run() {
-                // Log.i(TAG, "Stats update tick - nativeRunning=" + NativeSrtlaJni.isRunningSrtlaNative());
-                if (NativeSrtlaJni.isRunningSrtlaNative()) {
-                    updateConnectionStats();
-                    uiHandler.postDelayed(this, 1000); // Update every second
-                } else {
-                    Log.i(TAG, "No services running, stopping stats updates");
-                    updateConnectionStats(); // One last update to show "Service not running"
-                    if (onServiceStoppedListener != null) {
-                        onServiceStoppedListener.onServiceStopped();
+                try {
+                    boolean isRunning = NativeSrtlaJni.isRunningSrtlaNative();
+                    if (isRunning) {
+                        wasRunning = true;
+                        updateConnectionStats();
+                    } else {
+                        updateConnectionStats();
+                        if (wasRunning) {
+                            wasRunning = false;
+                            Log.i(TAG, "Service stopped, firing onServiceStopped");
+                            if (onServiceStoppedListener != null) {
+                                onServiceStoppedListener.onServiceStopped();
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in stats update loop", e);
+                    clearConnectionsDisplay();
                 }
+                uiHandler.postDelayed(this, 1000); // Keep polling
             }
         };
         uiHandler.post(statsUpdateRunnable);
@@ -123,8 +134,6 @@ public class SrtlaStatsView extends LinearLayout {
     // -------------------------------------------------------------------------
 
     private void updateConnectionStats() {
-        long currentTime = System.currentTimeMillis();
-        
         // Check if native SRTLA is running and show its stats instead
         if (NativeSrtlaJni.isRunningSrtlaNative()) {
             // First check connection status
