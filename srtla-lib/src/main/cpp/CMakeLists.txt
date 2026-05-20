@@ -5,11 +5,11 @@ project("srtla_android")
 find_library(log-lib log)
 
 # Set path to SRTLA source (fork with Android patches)
-set(SRTLA_DIR ${CMAKE_SOURCE_DIR}/../../../srtla)
+set(SRTLA_DIR ${CMAKE_SOURCE_DIR}/../../../../srtla)
 
 # Build SRTLA with Android patches - minimal JNI wrapper + original code
 add_library(srtla_android SHARED
-    srtla_android_jni.cpp      # Minimal JNI wrapper (new)
+    srtla_android_jni.cpp      # Minimal JNI wrapper
     ${SRTLA_DIR}/srtla_send.c  # Original SRTLA with Android patches
     ${SRTLA_DIR}/common.c      # Original SRTLA common functions
 )
@@ -21,11 +21,11 @@ target_compile_definitions(srtla_android PRIVATE
 )
 
 # Original SRTLA compiler flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wall -Wno-unused-variable -Wno-unused-function")
 
 # 16KB page size alignment for Android 15+ compatibility
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 
-target_include_directories(srtla_android PUBLIC ${SRTLA_DIR})
+target_include_directories(srtla_android PRIVATE ${SRTLA_DIR})
 
 target_link_libraries(srtla_android ${log-lib})

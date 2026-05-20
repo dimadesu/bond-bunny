@@ -507,9 +507,9 @@ Java_com_dimadesu_bondbunny_NativeSrtlaJni_isConnected(JNIEnv *env, jclass clazz
     return srtla_connected.load();
 }
 
-// Native UDP socket creation for NativeSrtlaService
+// Native UDP socket creation (used by SrtlaSender)
 extern "C" JNIEXPORT jint JNICALL
-Java_com_dimadesu_bondbunny_NativeSrtlaService_createUdpSocketNative(JNIEnv *env, jobject thiz) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_createUdpSocketNative(JNIEnv *env, jclass clazz) {
     int sockfd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
     if (sockfd < 0) {
         __android_log_print(ANDROID_LOG_ERROR, "SRTLA-JNI", "Failed to create UDP socket: %s", strerror(errno));
@@ -529,9 +529,9 @@ Java_com_dimadesu_bondbunny_NativeSrtlaService_createUdpSocketNative(JNIEnv *env
     return sockfd;
 }
 
-// Native socket close for NativeSrtlaService
+// Native socket close (used by SrtlaSender)
 extern "C" JNIEXPORT void JNICALL
-Java_com_dimadesu_bondbunny_NativeSrtlaService_closeSocketNative(JNIEnv *env, jobject thiz, jint sockfd) {
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_closeSocketNative(JNIEnv *env, jclass clazz, jint sockfd) {
     if (sockfd >= 0) {
         if (close(sockfd) == 0) {
             __android_log_print(ANDROID_LOG_INFO, "SRTLA-JNI", "Successfully closed socket FD: %d", sockfd);

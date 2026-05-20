@@ -90,4 +90,8 @@ public class NativeSrtlaJni {
     // Virtual IP support for Application-Level Virtual IPs
     public static native void setNetworkSocket(String virtualIP, String realIP, 
                                              int networkType, int socketFD);
+    
+    // Socket helpers (used by SrtlaSender)
+    public static native int createUdpSocketNative();
+    public static native void closeSocketNative(int socketFD);
 }

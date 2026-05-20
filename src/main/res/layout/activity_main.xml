@@ -99,41 +99,11 @@
       android:textStyle="bold"
       android:layout_marginBottom="8dp" />
 
-    <!-- Total Bitrate Display -->
-    <TextView
-      android:id="@+id/text_total_bitrate"
+    <com.dimadesu.bondbunny.SrtlaStatsView
+      android:id="@+id/srtla_stats_view"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="Total: 0.00 Mbps"
-      android:textSize="16sp"
-      android:textColor="#495057"
-      android:paddingTop="8dp"
-      android:paddingLeft="12dp"
-      android:paddingRight="12dp"
-      android:paddingBottom="8dp"
-      android:background="#F0F0F0"
-      android:layout_marginBottom="4dp" />
-
-    <!-- Container for dynamically added connection items -->
-    <LinearLayout
-      android:id="@+id/connections_container"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:orientation="vertical"
-      android:layout_marginBottom="16dp">
-
-      <!-- Default "no connections" message -->
-      <TextView
-        android:id="@+id/text_no_connections"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="No active connections"
-        android:textSize="16sp"
-        android:textColor="#495057"
-        android:padding="12dp"
-        android:background="#F0F0F0"
-        android:gravity="center" />
-    </LinearLayout>
+      android:layout_marginBottom="16dp" />
 
   </LinearLayout>
 

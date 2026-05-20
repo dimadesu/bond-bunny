@@ -16,7 +16,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 import java.util.List;
 import java.util.ArrayList;
@@ -25,7 +24,6 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
-import android.view.View;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.app.NotificationCompat;
@@ -49,9 +47,7 @@ public class MainActivity extends Activity {
     
     private TextView textStatus;
     private TextView textError;
-    private TextView textTotalBitrate;
-    private LinearLayout connectionsContainer;
-    private TextView textNoConnections;
+    private SrtlaStatsView srtlaStatsView;
     private Button buttonAbout;
     private Button buttonSettings;
     private Button buttonUrlBuilder;
@@ -66,8 +62,6 @@ public class MainActivity extends Activity {
     
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
-
-    private Runnable statsUpdateRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,7 +95,7 @@ public class MainActivity extends Activity {
         
         if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
             Log.i("MainActivity", "checkServiceState: Service running, starting stats updates");
-            startStatsUpdates();
+            srtlaStatsView.startStatsUpdates();
         } else {
             Log.i("MainActivity", "checkServiceState: No services running");
         }
@@ -110,9 +104,11 @@ public class MainActivity extends Activity {
     private void initViews() {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
-        textTotalBitrate = findViewById(R.id.text_total_bitrate);
-        connectionsContainer = findViewById(R.id.connections_container);
-        textNoConnections = findViewById(R.id.text_no_connections);
+        srtlaStatsView = findViewById(R.id.srtla_stats_view);
+        srtlaStatsView.setOnServiceStoppedListener(() -> {
+            // Periodically refresh native SRTLA UI state (handles crashes)
+            updateNativeSrtlaUI();
+        });
         buttonAbout = findViewById(R.id.button_about);
         buttonSettings = findViewById(R.id.button_settings);
         buttonUrlBuilder = findViewById(R.id.button_url_builder);
@@ -160,273 +156,14 @@ public class MainActivity extends Activity {
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
-                clearConnectionsDisplay();
+                srtlaStatsView.stopStatsUpdates();
             } else {
                 Log.i("MainActivity", "updateUI: Not clearing connection stats - native SRTLA still running");
             }
         }
     }
     
-    private void clearConnectionsDisplay() {
-        // Remove all dynamically added connection views
-        connectionsContainer.removeAllViews();
-        
-        // Hide total bitrate when no connections
-        textTotalBitrate.setVisibility(android.view.View.GONE);
-        
-        // Show the "no connections" message
-        textNoConnections.setVisibility(android.view.View.VISIBLE);
-        connectionsContainer.addView(textNoConnections);
-    }
-    
-    private void startStatsUpdates() {
-        Log.i("MainActivity", "Starting stats updates");
-        
-        // Stop any existing stats updates first to avoid multiple concurrent loops
-        if (statsUpdateRunnable != null) {
-            uiHandler.removeCallbacks(statsUpdateRunnable);
-        }
-        
-        statsUpdateRunnable = new Runnable() {
-            @Override
-            public void run() {
-                // Log.i("MainActivity", "Stats update tick - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
-                if (serviceRunning || NativeSrtlaService.isServiceRunning()) {
-                    updateConnectionStats();
-                    uiHandler.postDelayed(this, 1000); // Update every second
-                } else {
-                    Log.i("MainActivity", "No services running, stopping stats updates");
-                }
-            }
-        };
-        uiHandler.post(statsUpdateRunnable);
-    }
-    
-    private void stopStatsUpdates() {
-        Log.i("MainActivity", "stopStatsUpdates called - serviceRunning=" + serviceRunning + ", nativeRunning=" + NativeSrtlaService.isServiceRunning());
-        if (statsUpdateRunnable != null) {
-            uiHandler.removeCallbacks(statsUpdateRunnable);
-        }
-        // Always clear stats when explicitly stopping updates
-        Log.i("MainActivity", "Clearing stats display");
-        clearConnectionsDisplay();
-    }
-    
-    private void updateConnectionStats() {
-        long currentTime = System.currentTimeMillis();
-        
-        // Check if native SRTLA is running and show its stats instead
-        if (NativeSrtlaService.isServiceRunning()) {
-            // First check connection status
-            boolean isConnected = NativeSrtlaJni.isConnected();
-            boolean isRetrying = NativeSrtlaJni.isRetrying();
-            int retryCount = NativeSrtlaJni.getRetryCount();
-            
-            // Log the current state for debugging
-            Log.i("MainActivity", String.format("updateConnectionStats: connected=%b, retrying=%b, retryCount=%d", 
-                  isConnected, isRetrying, retryCount));
-            
-            // Get stats - this might return empty string if retrying/connecting
-            String nativeStats = NativeSrtlaService.getNativeStats();
-            boolean hasStats = nativeStats != null && !nativeStats.isEmpty() && nativeStats.contains("Total bitrate:");
-            
-            // Log stats state for debugging
-            Log.i("MainActivity", String.format("Stats check: hasStats=%b, statsLen=%d, isEmpty=%b, hasTotalBitrate=%b",
-                  hasStats, 
-                  nativeStats != null ? nativeStats.length() : -1,
-                  nativeStats == null || nativeStats.isEmpty(),
-                  nativeStats != null && nativeStats.contains("Total bitrate:")));
-            
-            TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
-            TextView textStatus = findViewById(R.id.text_status);
-            
-            // Service is running - just show that
-            textStatus.setText("✅ Service is running");
-            
-            // Check retry state first - regardless of isConnected (handles server stops)
-            if (isRetrying || retryCount > 0) {
-                // Show retry status
-                String statusMessage = String.format("🔄 Reconnecting... (attempt %d)", retryCount > 0 ? retryCount : 1);
-                textTotalBitrate.setText(statusMessage);
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                // Clear connection list
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                Log.i("MainActivity", "Showing retry UI: " + statusMessage);
-            } else if (!isConnected && !hasStats) {
-                // Show initial connecting status (not connected, no stats yet)
-                String statusMessage = "Connecting to SRTLA receiver...";
-                textTotalBitrate.setText(statusMessage);
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                // Clear connection list
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                Log.i("MainActivity", "Showing connecting UI");
-            } else if (hasStats) {
-                // We have actual stats to display (even if bitrate is 0)
-                parseAndDisplayConnections(nativeStats);
-                Log.i("MainActivity", "Displaying stats");
-            } else {
-                // Connected but no stats yet - give it a moment
-                // This can happen briefly when connections are established but stats not ready
-                textTotalBitrate.setText("Waiting for connection stats...");
-                textTotalBitrate.setVisibility(View.VISIBLE);
-                
-                connectionsContainer.removeAllViews();
-                textNoConnections.setVisibility(View.GONE);
-                
-                Log.i("MainActivity", "Waiting for stats (connected=" + isConnected + ", hasStats=" + hasStats + ")");
-            }
-        } else {
-            // Service not running - clear display
-            connectionsContainer.removeAllViews();
-            textNoConnections.setVisibility(View.VISIBLE);
-            textNoConnections.setText("Service not running");
-            
-            TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
-            textTotalBitrate.setVisibility(View.GONE);
-        }
-        
-        // Periodically refresh native SRTLA UI state (handles crashes)
-        updateNativeSrtlaUI();
-    }
-    
-    private void parseAndDisplayConnections(String statsText) {
-        TextView textTotalBitrate = findViewById(R.id.text_total_bitrate);
-        TextView textStatus = findViewById(R.id.text_status);
-        
-        // Handle empty or no-connection state
-        if (statsText == null || statsText.isEmpty() || !statsText.contains("Total bitrate:")) {
-            // Don't clear if we're showing a retry/connecting status
-            if (textTotalBitrate != null && textTotalBitrate.getVisibility() == View.VISIBLE) {
-                String text = textTotalBitrate.getText().toString();
-                if (text.contains("Connecting") || text.contains("Reconnecting")) {
-                    // Keep the status message, just clear the connection list
-                    connectionsContainer.removeAllViews();
-                    textNoConnections.setVisibility(View.GONE);
-                    return;
-                }
-            }
-            
-            clearConnectionsDisplay();
-            return;
-        }
-        
-        // Clear existing views
-        connectionsContainer.removeAllViews();
-        textNoConnections.setVisibility(android.view.View.GONE);
-        
-        // Parse the stats text to extract connection information
-        // Format: "Total bitrate: X.X Mbps\n\nWIFI\n  Bitrate: ... \n  Window: ...\n  Packets in-flight: ...\n\n..."
-        String[] sections = statsText.split("\n\n");
-        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
-        
-        // Extract and display total bitrate from first section
-        if (sections.length > 0 && sections[0].startsWith("Total bitrate:")) {
-            textTotalBitrate.setText(sections[0]);
-            textTotalBitrate.setVisibility(android.view.View.VISIBLE);
-        }
-        
-        for (String section : sections) {
-            if (section.trim().isEmpty() || section.startsWith("Total bitrate:")) {
-                continue; // Skip empty sections and total bitrate line
-            }
-            
-            // Parse connection section
-            try {
-                String[] lines = section.trim().split("\n");
-                if (lines.length < 5) continue; // Need at least 5 lines: type, bitrate, window, in-flight, rtt
-                
-                // First line is network type
-                String networkType = lines[0].trim();
-                
-                // Parse bitrate line: "  Bitrate: 45.2 Mbps 45%"
-                String bitrateLine = lines[1].trim();
-                String bitrate = "N/A";
-                String load = "N/A";
-                if (bitrateLine.startsWith("Bitrate:")) {
-                    String bitrateData = bitrateLine.substring(8).trim(); // Remove "Bitrate:"
-                    String[] bitrateParts = bitrateData.split(" ");
-                    if (bitrateParts.length >= 2) {
-                        bitrate = bitrateParts[0] + " " + bitrateParts[1]; // e.g., "45.2 Mbps"
-                    }
-                    if (bitrateParts.length >= 3) {
-                        load = bitrateParts[2]; // e.g., "45%"
-                    }
-                }
-                
-                // Parse window line: "  Window: 15234"
-                String windowLine = lines[2].trim();
-                int windowSize = 0;
-                if (windowLine.startsWith("Window:")) {
-                    windowSize = Integer.parseInt(windowLine.substring(7).trim());
-                }
-                
-                // Parse in-flight line: "  Packets in-flight: 125"
-                String inFlightLine = lines[3].trim();
-                int inFlight = 0;
-                if (inFlightLine.startsWith("Packets in-flight:")) {
-                    inFlight = Integer.parseInt(inFlightLine.substring(18).trim());
-                }
-                
-                // Parse RTT line: "  RTT: 45 ms" or "  RTT: N/A"
-                String rttLine = lines[4].trim();
-                String rtt = "N/A";
-                if (rttLine.startsWith("RTT:")) {
-                    rtt = rttLine.substring(4).trim(); // e.g., "45 ms" or "N/A"
-                }
-                
-                // Determine if connection is active (has bitrate > 0 or in-flight packets)
-                boolean isActive = inFlight > 0 || (bitrate != null && !bitrate.equals("0.00 Mbps") && !bitrate.equals("N/A"));
-                
-                // Create connection item view
-                android.view.View connectionView = inflater.inflate(R.layout.connection_item, connectionsContainer, false);
-                
-                // Set network type with display formatting
-                TextView networkTypeView = connectionView.findViewById(R.id.connection_network_type);
-                String displayName = networkType.equals("WIFI") ? "WI-FI" : networkType;
-                networkTypeView.setText(displayName);
-                
-                // Set status
-                TextView statusView = connectionView.findViewById(R.id.connection_status);
-                if (isActive) {
-                    statusView.setText("ACTIVE");
-                    statusView.setTextColor(android.graphics.Color.parseColor("#28a745"));
-                } else {
-                    statusView.setText("INACTIVE");
-                    statusView.setTextColor(android.graphics.Color.parseColor("#dc3545"));
-                }
-                
-                // Set window bar
-                WindowBarView windowBar = connectionView.findViewById(R.id.window_bar);
-                windowBar.setWindowData(windowSize, isActive);
-                
-                // Set stats text
-                TextView statsTextView = connectionView.findViewById(R.id.connection_stats_text);
-                String statsDisplay = String.format(
-                    "Bitrate: %s  %s\nPackets in-flight: %,d\nRTT: %s\nWindow: %,d / 60,000",
-                    bitrate, load, inFlight, rtt, windowSize
-                );
-                statsTextView.setText(statsDisplay);
-                
-                // Add view to container
-                connectionsContainer.addView(connectionView);
-                
-            } catch (Exception e) {
-                Log.e("MainActivity", "Error parsing connection section: " + section, e);
-            }
-        }
-        
-        // If no connections were added, show the "no connections" message
-        if (connectionsContainer.getChildCount() == 0) {
-            clearConnectionsDisplay();
-        }
-    }
-    
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -447,7 +184,7 @@ public class MainActivity extends Activity {
         // Don't stop stats updates if services are still running
         if (!serviceRunning && !NativeSrtlaService.isServiceRunning()) {
             Log.i("MainActivity", "onPause: No services running, stopping stats updates");
-            stopStatsUpdates();
+            srtlaStatsView.stopStatsUpdates();
         } else {
             Log.i("MainActivity", "onPause: Services still running, keeping stats updates active");
         }
@@ -671,7 +408,7 @@ public class MainActivity extends Activity {
             Log.i("MainActivity", "Service started successfully after " + attemptCount + " polling attempts");
             textStatus.setText("✅ Service is running");
             updateNativeSrtlaUI();
-            startStatsUpdates();
+            srtlaStatsView.startStatsUpdates();
             return;
         }
         
@@ -699,7 +436,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Native SRTLA service stopping", Toast.LENGTH_SHORT).show();
             
             // Stop stats updates and clear display immediately
-            stopStatsUpdates();
+            srtlaStatsView.stopStatsUpdates();
             
             // Update UI after a short delay to allow service to stop
             uiHandler.postDelayed(() -> {
@@ -747,7 +484,7 @@ public class MainActivity extends Activity {
             buttonSettings.setEnabled(true); // Enable settings when service is stopped
             
             // Clear connections display when not running
-            clearConnectionsDisplay();
+            srtlaStatsView.stopStatsUpdates();
         }
     }
 }

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical">
+
+  <!-- Total Bitrate Display -->
+  <TextView
+    android:id="@+id/text_total_bitrate"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Total: 0.00 Mbps"
+    android:textSize="16sp"
+    android:textColor="#495057"
+    android:paddingTop="8dp"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="8dp"
+    android:background="#F0F0F0" />
+
+  <!-- Container for dynamically added connection items -->
+  <LinearLayout
+    android:id="@+id/connections_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Default "no connections" message -->
+    <TextView
+      android:id="@+id/text_no_connections"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="No active connections"
+      android:textSize="16sp"
+      android:textColor="#495057"
+      android:padding="12dp"
+      android:background="#F0F0F0"
+      android:gravity="center" />
+  </LinearLayout>
+
+</LinearLayout>
