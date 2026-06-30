@@ -1,5 +1,7 @@
 plugins {
     id 'com.android.library'
+    id 'org.jetbrains.kotlin.android' version '2.0.21'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '2.0.21'
 }
 
 group = 'com.dimadesu.bondbunny'
@@ -26,6 +28,10 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
@@ -45,4 +51,8 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.10.0'
+
+    // Moblink streamer: WebSocket server + JSON protocol
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
 }
