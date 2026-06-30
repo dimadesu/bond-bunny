@@ -47,6 +47,8 @@ public class MainActivity extends Activity {
     
     private TextView textStatus;
     private TextView textError;
+    private TextView textMoblinkTitle;
+    private TextView textMoblinkStatus;
     private SrtlaStatsView srtlaStatsView;
     private Button buttonAbout;
     private Button buttonSettings;
@@ -62,6 +64,8 @@ public class MainActivity extends Activity {
     
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
+    // Receiver for live Moblink relay status
+    private BroadcastReceiver moblinkReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +108,8 @@ public class MainActivity extends Activity {
     private void initViews() {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
+        textMoblinkTitle = findViewById(R.id.text_moblink_title);
+        textMoblinkStatus = findViewById(R.id.text_moblink_status);
         srtlaStatsView = findViewById(R.id.srtla_stats_view);
         srtlaStatsView.setOnServiceStoppedListener(() -> {
             // Periodically refresh native SRTLA UI state (handles crashes)
@@ -152,8 +158,8 @@ public class MainActivity extends Activity {
         if (serviceRunning) {
             textStatus.setText("✅ Service is running");
         } else {
-            textStatus.setText("❌ Service is stopped");
-            // Only clear connection stats if native SRTLA is also not running
+            textStatus.setText("❌ Service is stopped");            // Moblink relays are gone when the service stops
+            updateMoblinkStatus(0, null);            // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
                 srtlaStatsView.stopStatsUpdates();
@@ -171,6 +177,8 @@ public class MainActivity extends Activity {
         // Register error receiver
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(moblinkReceiver,
+            new IntentFilter("moblink-status"));
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
@@ -200,6 +208,13 @@ public class MainActivity extends Activity {
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Error receiver was not registered");
         }
+        try {
+            if (moblinkReceiver != null) {
+                LocalBroadcastManager.getInstance(this).unregisterReceiver(moblinkReceiver);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.w("MainActivity", "Moblink receiver was not registered");
+        }
     }
     
     private void loadPreferences() {
@@ -224,6 +239,30 @@ public class MainActivity extends Activity {
             }
         };
         Log.i("MainActivity", "Initialized error receiver");
+
+        // Live Moblink relay status
+        moblinkReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                int count = intent.getIntExtra("count", 0);
+                String summary = intent.getStringExtra("summary");
+                updateMoblinkStatus(count, summary);
+            }
+        };
+    }
+
+    private void updateMoblinkStatus(int count, String summary) {
+        runOnUiThread(() -> {
+            if (count > 0 && summary != null && !summary.isEmpty()) {
+                textMoblinkTitle.setText("Moblink Relays (" + count + "):");
+                textMoblinkTitle.setVisibility(TextView.VISIBLE);
+                textMoblinkStatus.setText(summary);
+                textMoblinkStatus.setVisibility(TextView.VISIBLE);
+            } else {
+                textMoblinkTitle.setVisibility(TextView.GONE);
+                textMoblinkStatus.setVisibility(TextView.GONE);
+            }
+        });
     }
     
     private void showError(String errorMessage) {

@@ -19,6 +19,7 @@ import com.dimadesu.bondbunny.moblink.MoblinkStreamerListener;
 import com.dimadesu.bondbunny.moblink.ThermalState;
 
 import java.net.InetAddress;
+import java.util.LinkedHashMap;
 
 /**
  * Android foreground service for native SRTLA implementation.
@@ -36,6 +37,16 @@ public class NativeSrtlaService extends Service {
 
     // Optional Moblink streamer: lets spare devices act as extra SRTLA bonding links.
     private MoblinkStreamer moblinkStreamer;
+
+    // Live state of connected Moblink relays, keyed by relay id (for UI display).
+    private final LinkedHashMap<String, RelayUi> moblinkRelays = new LinkedHashMap<>();
+
+    private static class RelayUi {
+        String name;
+        String endpoint;
+        Integer battery;
+        String thermal;
+    }
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -125,6 +136,10 @@ public class NativeSrtlaService extends Service {
             moblinkStreamer.stop();
             moblinkStreamer = null;
         }
+        synchronized (moblinkRelays) {
+            moblinkRelays.clear();
+        }
+        broadcastMoblinkStatus();
         if (sender != null) {
             sender.stop();
         }
@@ -177,6 +192,16 @@ public class NativeSrtlaService extends Service {
                     if (sender != null) {
                         sender.addMoblinkRelay(relayId, relayHost, relayPort);
                     }
+                    synchronized (moblinkRelays) {
+                        RelayUi r = moblinkRelays.get(relayId);
+                        if (r == null) {
+                            r = new RelayUi();
+                            moblinkRelays.put(relayId, r);
+                        }
+                        r.name = relayName;
+                        r.endpoint = relayHost + ":" + relayPort;
+                    }
+                    broadcastMoblinkStatus();
                 }
 
                 @Override
@@ -184,6 +209,10 @@ public class NativeSrtlaService extends Service {
                     if (sender != null) {
                         sender.removeMoblinkRelay(relayId);
                     }
+                    synchronized (moblinkRelays) {
+                        moblinkRelays.remove(relayId);
+                    }
+                    broadcastMoblinkStatus();
                 }
 
                 @Override
@@ -191,6 +220,17 @@ public class NativeSrtlaService extends Service {
                                           Integer batteryPercentage, ThermalState thermalState) {
                     Log.i(TAG, "Moblink relay '" + relayName + "' battery=" + batteryPercentage
                             + " thermal=" + thermalState);
+                    synchronized (moblinkRelays) {
+                        RelayUi r = moblinkRelays.get(relayId);
+                        if (r == null) {
+                            r = new RelayUi();
+                            r.name = relayName;
+                            moblinkRelays.put(relayId, r);
+                        }
+                        r.battery = batteryPercentage;
+                        r.thermal = thermalLabel(thermalState);
+                    }
+                    broadcastMoblinkStatus();
                 }
 
                 @Override
@@ -203,6 +243,46 @@ public class NativeSrtlaService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Failed to start Moblink streamer", e);
         }
+    }
+
+    private static String thermalLabel(ThermalState t) {
+        if (t == null) {
+            return null;
+        }
+        switch (t) {
+            case WHITE: return "\uD83D\uDFE2"; // green circle
+            case YELLOW: return "\uD83D\uDFE1"; // yellow circle
+            case RED: return "\uD83D\uDD34"; // red circle
+            default: return null;
+        }
+    }
+
+    /** Broadcast the current Moblink relay summary for the UI. */
+    private void broadcastMoblinkStatus() {
+        StringBuilder sb = new StringBuilder();
+        int count;
+        synchronized (moblinkRelays) {
+            count = moblinkRelays.size();
+            for (RelayUi r : moblinkRelays.values()) {
+                if (sb.length() > 0) {
+                    sb.append("\n");
+                }
+                sb.append("\u2022 ").append(r.name == null || r.name.isEmpty() ? "Relay" : r.name);
+                if (r.endpoint != null) {
+                    sb.append(" (").append(r.endpoint).append(")");
+                }
+                if (r.battery != null) {
+                    sb.append(" \u2014 ").append(r.battery).append("%");
+                }
+                if (r.thermal != null) {
+                    sb.append(" ").append(r.thermal);
+                }
+            }
+        }
+        Intent intent = new Intent("moblink-status");
+        intent.putExtra("count", count);
+        intent.putExtra("summary", sb.toString());
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
     // -------------------------------------------------------------------------
