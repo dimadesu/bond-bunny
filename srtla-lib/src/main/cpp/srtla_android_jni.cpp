@@ -37,6 +37,10 @@ extern "C" {
     // Virtual IP functions
     void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
                                   int network_type, int socket_fd);
+
+    // Moblink relay function: pre-bound socket with a custom (relay) destination
+    void srtla_set_relay_socket(const char* virtual_ip, const char* relay_ip,
+                                int relay_port, int socket_fd);
     
     // Per-connection bitrate functions
     int srtla_get_connection_bitrates(double* bitrates_mbps, char connection_types[][16], 
@@ -499,6 +503,30 @@ Java_com_dimadesu_bondbunny_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass 
     
     env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
     env->ReleaseStringUTFChars(real_ip, real_ip_str);
+}
+
+// Moblink relay JNI function: register a pre-bound socket whose destination is the
+// relay's tunnel endpoint instead of the global SRTLA receiver.
+extern "C" JNIEXPORT void JNICALL
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_setRelaySocket(JNIEnv *env, jclass clazz,
+                                                    jstring virtual_ip, jstring relay_ip,
+                                                    jint relay_port, jint socket_fd) {
+    const char *virtual_ip_str = env->GetStringUTFChars(virtual_ip, nullptr);
+    const char *relay_ip_str = env->GetStringUTFChars(relay_ip, nullptr);
+
+    // Track this as a Java-owned FD so native code never closes it.
+    {
+        std::lock_guard<std::mutex> lock(java_fds_mutex);
+        java_owned_fds.insert(socket_fd);
+        __android_log_print(ANDROID_LOG_DEBUG, "SRTLA-JNI",
+                          "Tracking Java-owned relay FD %d for %s->%s:%d",
+                          socket_fd, virtual_ip_str, relay_ip_str, relay_port);
+    }
+
+    srtla_set_relay_socket(virtual_ip_str, relay_ip_str, relay_port, socket_fd);
+
+    env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
+    env->ReleaseStringUTFChars(relay_ip, relay_ip_str);
 }
 
 // Add a new JNI method to check if connected
