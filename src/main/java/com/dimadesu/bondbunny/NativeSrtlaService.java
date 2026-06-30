@@ -14,6 +14,10 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.dimadesu.bondbunny.moblink.MoblinkStreamer;
+import com.dimadesu.bondbunny.moblink.MoblinkStreamerListener;
+import com.dimadesu.bondbunny.moblink.ThermalState;
+
 import java.net.InetAddress;
 
 /**
@@ -29,6 +33,9 @@ public class NativeSrtlaService extends Service {
     private static boolean isServiceRunning = false;
 
     private SrtlaSender sender;
+
+    // Optional Moblink streamer: lets spare devices act as extra SRTLA bonding links.
+    private MoblinkStreamer moblinkStreamer;
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -57,6 +64,11 @@ public class NativeSrtlaService extends Service {
                 stopSelf();
                 return START_NOT_STICKY;
             }
+
+            final boolean moblinkEnabled = intent.getBooleanExtra("moblink_enabled", false);
+            final String moblinkName = intent.getStringExtra("moblink_name");
+            final String moblinkPassword = intent.getStringExtra("moblink_password");
+            final int moblinkPort = intent.getIntExtra("moblink_port", MoblinkStreamer.DEFAULT_PORT);
 
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
@@ -87,6 +99,10 @@ public class NativeSrtlaService extends Service {
 
                     if (NativeSrtlaJni.isRunningSrtlaNative()) {
                         isServiceRunning = true;
+                        if (moblinkEnabled && moblinkPassword != null && !moblinkPassword.isEmpty()) {
+                            startMoblinkStreamer(host, Integer.parseInt(port),
+                                    moblinkName, moblinkPassword, moblinkPort);
+                        }
                     } else {
                         stopSelf();
                     }
@@ -105,6 +121,10 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
+        if (moblinkStreamer != null) {
+            moblinkStreamer.stop();
+            moblinkStreamer = null;
+        }
         if (sender != null) {
             sender.stop();
         }
@@ -134,6 +154,55 @@ public class NativeSrtlaService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null; // Not a bound service
+    }
+
+    // -------------------------------------------------------------------------
+    // Moblink streamer
+    // -------------------------------------------------------------------------
+
+    /**
+     * Start the Moblink streamer so spare devices can join as extra SRTLA bonding links.
+     * Each relay tunnels to the SRTLA receiver ({@code destHost}:{@code destPort}); ready relays
+     * are registered with {@link SrtlaSender} as additional connections.
+     */
+    private void startMoblinkStreamer(String destHost, int destPort, String name,
+                                      String password, int port) {
+        try {
+            String streamerName = (name != null && !name.isEmpty()) ? name : "Bond Bunny";
+            moblinkStreamer = new MoblinkStreamer(this, streamerName, password, port);
+            moblinkStreamer.start(destHost, destPort, new MoblinkStreamerListener() {
+                @Override
+                public void onRelayTunnelReady(String relayId, String relayName,
+                                               String relayHost, int relayPort) {
+                    if (sender != null) {
+                        sender.addMoblinkRelay(relayId, relayHost, relayPort);
+                    }
+                }
+
+                @Override
+                public void onRelayTunnelClosed(String relayId, String relayHost, int relayPort) {
+                    if (sender != null) {
+                        sender.removeMoblinkRelay(relayId);
+                    }
+                }
+
+                @Override
+                public void onRelayStatus(String relayId, String relayName,
+                                          Integer batteryPercentage, ThermalState thermalState) {
+                    Log.i(TAG, "Moblink relay '" + relayName + "' battery=" + batteryPercentage
+                            + " thermal=" + thermalState);
+                }
+
+                @Override
+                public void onLog(String message) {
+                    Log.i(TAG, "Moblink: " + message);
+                }
+            });
+            Log.i(TAG, "Moblink streamer started on port " + port + " (destination "
+                    + destHost + ":" + destPort + ")");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start Moblink streamer", e);
+        }
     }
 
     // -------------------------------------------------------------------------
