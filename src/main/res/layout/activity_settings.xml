@@ -61,6 +61,84 @@
       android:inputType="number"
       android:layout_marginBottom="12dp" />
 
+    <!-- Moblink -->
+    <View
+      android:layout_width="match_parent"
+      android:layout_height="1dp"
+      android:background="#33000000"
+      android:layout_marginBottom="12dp" />
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:layout_marginBottom="4dp">
+
+      <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Moblink"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+      <Switch
+        android:id="@+id/switch_moblink_enabled"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    </LinearLayout>
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Use spare devices (running the Moblink relay app) as extra SRTLA bonding connections on the same Wi-Fi."
+      android:textSize="12sp"
+      android:layout_marginBottom="8dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Streamer Name:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_moblink_name"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="Bond Bunny"
+      android:inputType="text"
+      android:layout_marginBottom="12dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Password:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_moblink_password"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="Shared with relays"
+      android:inputType="textPassword"
+      android:layout_marginBottom="12dp" />
+
+    <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Moblink Port:"
+      android:layout_marginBottom="4dp" />
+
+    <EditText
+      android:id="@+id/edit_moblink_port"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="7777"
+      android:inputType="number"
+      android:layout_marginBottom="12dp" />
+
     <!-- Classic SRTLA Algorithm Toggle -->
     <LinearLayout
       android:layout_width="match_parent"

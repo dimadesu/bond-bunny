@@ -321,10 +321,21 @@ public class NativeSrtlaService extends Service {
     }
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
+        startService(context, srtlaHost, srtlaPort, listenPort,
+                false, null, null, MoblinkStreamer.DEFAULT_PORT);
+    }
+
+    public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
+                                    boolean moblinkEnabled, String moblinkName, String moblinkPassword,
+                                    int moblinkPort) {
         Intent intent = new Intent(context, NativeSrtlaService.class);
         intent.putExtra("srtla_host", srtlaHost);
         intent.putExtra("srtla_port", srtlaPort);
         intent.putExtra("listen_port", listenPort);
+        intent.putExtra("moblink_enabled", moblinkEnabled);
+        intent.putExtra("moblink_name", moblinkName);
+        intent.putExtra("moblink_password", moblinkPassword);
+        intent.putExtra("moblink_port", moblinkPort);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent);

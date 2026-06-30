@@ -375,8 +375,25 @@ public class MainActivity extends Activity {
                 return;
             }
             
+            // Read optional Moblink settings
+            boolean moblinkEnabled = prefs.getBoolean("moblink_enabled", false);
+            String moblinkName = prefs.getString("moblink_name", "Bond Bunny").trim();
+            String moblinkPassword = prefs.getString("moblink_password", "");
+            int moblinkPort = 7777;
+            try {
+                moblinkPort = Integer.parseInt(prefs.getString("moblink_port", "7777").trim());
+            } catch (NumberFormatException ignored) {
+                // keep default 7777
+            }
+            if (moblinkEnabled && moblinkPassword.isEmpty()) {
+                showError("Set a Moblink password in settings or disable Moblink");
+                textStatus.setText("❌ Moblink enabled but no password set");
+                return;
+            }
+
             // Start the native SRTLA service
-            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
+            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort,
+                    moblinkEnabled, moblinkName, moblinkPassword, moblinkPort);
             
             textStatus.setText("⏳ Service is starting...");
             Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();
