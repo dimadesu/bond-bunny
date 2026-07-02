@@ -20,6 +20,13 @@ import org.java_websocket.server.WebSocketServer
  * Callbacks are invoked on Java-WebSocket worker threads; implementations must be thread-safe.
  */
 interface MoblinkStreamerListener {
+    /**
+     * Called after a relay successfully authenticates, but *before* a StartTunnel request
+     * is sent. If [setDestination] has not been called yet, no tunnel will be started yet —
+     * the session waits in the "identified" pool until [setDestination] is called.
+     */
+    fun onRelayIdentified(relayId: String, name: String) {}
+
     fun onRelayTunnelReady(relayId: String, name: String, relayHost: String, relayPort: Int)
     fun onRelayTunnelClosed(relayId: String, relayHost: String, relayPort: Int)
     fun onRelayStatus(
@@ -38,6 +45,12 @@ interface MoblinkStreamerListener {
  * itself via mDNS (`_moblink._tcp`) so relays in automatic mode can discover it.
  *
  * Bond Bunny is the streamer; relays forward bonded traffic out over their own uplinks.
+ *
+ * ### Two-phase tunnel activation
+ * If [setDestination] has not been called (or was called with port 0) when a relay authenticates,
+ * the session is parked in the "identified" pool. Once [setDestination] is called with a valid
+ * destination, all parked sessions immediately receive a StartTunnel request, and future relays
+ * will receive it as soon as they authenticate.
  */
 class MoblinkStreamer(
     private val context: Context,
@@ -64,13 +77,14 @@ class MoblinkStreamer(
     private var registrationListener: NsdManager.RegistrationListener? = null
 
     /**
-     * Start the streamer. [destinationAddress]/[destinationPort] is the SRTLA receiver each relay
-     * will tunnel to. Returns immediately; relays connect asynchronously.
+     * Start the streamer WebSocket server and mDNS advertisement. Returns immediately;
+     * relays connect asynchronously.
+     *
+     * The SRTLA destination is **not** required at this point. Call [setDestination] once the
+     * SRTLA stack is running to activate tunnels for all waiting relays.
      */
-    fun start(destinationAddress: String, destinationPort: Int, listener: MoblinkStreamerListener) {
+    fun start(listener: MoblinkStreamerListener) {
         stop()
-        this.destinationAddress = destinationAddress
-        this.destinationPort = destinationPort
         this.listener = listener
 
         val server = object : WebSocketServer(InetSocketAddress(port)) {
@@ -105,6 +119,40 @@ class MoblinkStreamer(
         this.server = server
     }
 
+    /**
+     * Legacy overload kept for backward compatibility. Immediately sets the destination and
+     * starts tunnels for all subsequently-connecting relays.
+     */
+    fun start(destinationAddress: String, destinationPort: Int, listener: MoblinkStreamerListener) {
+        start(listener)
+        if (destinationPort != 0) {
+            setDestination(destinationAddress, destinationPort)
+        }
+    }
+
+    /**
+     * Set (or update) the SRTLA receiver address that relays should tunnel to.
+     *
+     * - If called with a non-zero port, all currently-identified-but-not-yet-tunneled sessions
+     *   immediately receive a StartTunnel request. Future relays will tunnel as soon as they
+     *   authenticate.
+     * - If called with port == 0 (stream stopped), the destination is cleared so that future
+     *   relays are parked again. Existing tunnels are **not** torn down here; the WebSocket
+     *   keep-alive will detect dead tunnels naturally.
+     */
+    fun setDestination(address: String, port: Int) {
+        destinationAddress = address
+        destinationPort = port
+        if (port != 0) {
+            Log.i(TAG, "Destination set to $address:$port — activating waiting relay sessions")
+            for (session in sessions.values) {
+                session.startTunnelIfNeeded()
+            }
+        } else {
+            Log.i(TAG, "Destination cleared — relays will wait for next stream")
+        }
+    }
+
     /** Stop the streamer, disconnect all relays, and withdraw the mDNS advertisement. */
     fun stop() {
         unregisterMdns()
@@ -119,6 +167,8 @@ class MoblinkStreamer(
         }
         sessions.clear()
         listener = null
+        destinationAddress = ""
+        destinationPort = 0
     }
 
     /** Ask every connected relay to report its current status (battery / thermal). */
@@ -232,8 +282,8 @@ class MoblinkStreamer(
         private var thermalState: ThermalState? = null
 
         // Tunnel endpoint, set once the relay returns its local UDP port.
-        private var tunnelHost: String? = null
-        private var tunnelPort: Int? = null
+        @Volatile private var tunnelHost: String? = null
+        @Volatile private var tunnelPort: Int? = null
 
         fun start() {
             challenge = randomString()
@@ -268,7 +318,8 @@ class MoblinkStreamer(
             relayId = identify.id
             relayName = identify.name.substringBefore('\n').trim().take(30)
             send(MessageToRelay(identified = Identified(result = Result(ok = Present()))))
-            startTunnel()
+            listener?.onRelayIdentified(relayId, relayName)
+            startTunnelIfNeeded()
             requestStatus()
         }
 
@@ -277,14 +328,25 @@ class MoblinkStreamer(
             handler(response)
         }
 
-        private fun startTunnel() {
+        /**
+         * Start the tunnel if this session is identified and a valid destination is known.
+         * Safe to call multiple times — it will only send a StartTunnel request once per
+         * destination (tracked by [tunnelPort]).
+         */
+        fun startTunnelIfNeeded() {
             if (!identified) return
             val address = destinationAddress
             val dstPort = destinationPort
             if (address.isEmpty() || dstPort == 0) {
-                Log.w(TAG, "Cannot start tunnel: destination not set")
+                Log.d(TAG, "Relay '$relayName' waiting for destination to be set")
                 return
             }
+            // Already tunneled to this destination — skip.
+            if (tunnelPort != null) {
+                Log.d(TAG, "Relay '$relayName' already has an active tunnel")
+                return
+            }
+            Log.i(TAG, "Starting tunnel for relay '$relayName' → $address:$dstPort")
             performRequest(RequestData(startTunnel = StartTunnelRequest(address, dstPort))) { response ->
                 val tunnel = response.data?.startTunnel ?: return@performRequest
                 val host = (conn.remoteSocketAddress as? InetSocketAddress)

@@ -14,8 +14,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.dimadesu.bondbunny.moblink.MoblinkStreamer;
-import com.dimadesu.bondbunny.moblink.MoblinkStreamerListener;
+import com.dimadesu.bondbunny.moblink.MoblinkManager;
 import com.dimadesu.bondbunny.moblink.ThermalState;
 
 import java.net.InetAddress;
@@ -35,8 +34,8 @@ public class NativeSrtlaService extends Service {
 
     private SrtlaSender sender;
 
-    // Optional Moblink streamer: lets spare devices act as extra SRTLA bonding links.
-    private MoblinkStreamer moblinkStreamer;
+    // Optional Moblink manager: lets spare devices act as extra SRTLA bonding links.
+    private MoblinkManager moblinkManager;
 
     // Live state of connected Moblink relays, keyed by relay id (for UI display).
     private final LinkedHashMap<String, RelayUi> moblinkRelays = new LinkedHashMap<>();
@@ -79,7 +78,7 @@ public class NativeSrtlaService extends Service {
             final boolean moblinkEnabled = intent.getBooleanExtra("moblink_enabled", false);
             final String moblinkName = intent.getStringExtra("moblink_name");
             final String moblinkPassword = intent.getStringExtra("moblink_password");
-            final int moblinkPort = intent.getIntExtra("moblink_port", MoblinkStreamer.DEFAULT_PORT);
+            final int moblinkPort = intent.getIntExtra("moblink_port", MoblinkManager.DEFAULT_PORT);
 
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
@@ -132,9 +131,9 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
-        if (moblinkStreamer != null) {
-            moblinkStreamer.stop();
-            moblinkStreamer = null;
+        if (moblinkManager != null) {
+            moblinkManager.stop();
+            moblinkManager = null;
         }
         synchronized (moblinkRelays) {
             moblinkRelays.clear();
@@ -184,8 +183,8 @@ public class NativeSrtlaService extends Service {
                                       String password, int port) {
         try {
             String streamerName = (name != null && !name.isEmpty()) ? name : "Bond Bunny";
-            moblinkStreamer = new MoblinkStreamer(this, streamerName, password, port);
-            moblinkStreamer.start(destHost, destPort, new MoblinkStreamerListener() {
+            moblinkManager = new MoblinkManager(this, streamerName, password, port);
+            moblinkManager.start(new MoblinkManager.Listener() {
                 @Override
                 public void onRelayTunnelReady(String relayId, String relayName,
                                                String relayHost, int relayPort) {
@@ -234,14 +233,21 @@ public class NativeSrtlaService extends Service {
                 }
 
                 @Override
+                public void onRelayDisconnected(String relayId) {
+                    // Relay tracking is handled by onRelayTunnelClosed.
+                }
+
+                @Override
                 public void onLog(String message) {
                     Log.i(TAG, "Moblink: " + message);
                 }
             });
-            Log.i(TAG, "Moblink streamer started on port " + port + " (destination "
+            // Bond Bunny: both phases fire immediately — no waiting-room delay for user.
+            moblinkManager.connectToSrtla(destHost, destPort);
+            Log.i(TAG, "Moblink manager started on port " + port + " (destination "
                     + destHost + ":" + destPort + ")");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to start Moblink streamer", e);
+            Log.e(TAG, "Failed to start Moblink manager", e);
         }
     }
 
@@ -402,7 +408,7 @@ public class NativeSrtlaService extends Service {
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
         startService(context, srtlaHost, srtlaPort, listenPort,
-                false, null, null, MoblinkStreamer.DEFAULT_PORT);
+                false, null, null, MoblinkManager.DEFAULT_PORT);
     }
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
