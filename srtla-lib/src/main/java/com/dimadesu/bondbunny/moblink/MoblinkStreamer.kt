@@ -149,7 +149,10 @@ class MoblinkStreamer(
                 session.startTunnelIfNeeded()
             }
         } else {
-            Log.i(TAG, "Destination cleared — relays will wait for next stream")
+            Log.i(TAG, "Destination cleared — resetting relay tunnel state for next stream")
+            for (session in sessions.values) {
+                session.resetTunnel()
+            }
         }
     }
 
@@ -375,6 +378,24 @@ class MoblinkStreamer(
             tunnelPort = null
             pending.clear()
             if (host != null && port != null) {
+                listener?.onRelayTunnelClosed(relayId, host, port)
+            }
+        }
+
+        /**
+         * Reset tunnel state so this session is ready to re-tunnel on the next stream.
+         * Called when the SRTLA stream stops ([setDestination] with port=0).
+         * Does NOT close the WebSocket connection — the relay stays pre-connected.
+         */
+        fun resetTunnel() {
+            val host = tunnelHost
+            val port = tunnelPort
+            tunnelHost = null
+            tunnelPort = null
+            pending.values.forEach { /* discard pending tunnel responses */ }
+            pending.clear()
+            if (host != null && port != null) {
+                Log.i(TAG, "Relay '$relayName' tunnel reset — will re-tunnel on next stream")
                 listener?.onRelayTunnelClosed(relayId, host, port)
             }
         }
