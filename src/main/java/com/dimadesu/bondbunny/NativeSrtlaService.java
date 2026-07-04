@@ -18,7 +18,7 @@ import com.dimadesu.bondbunny.moblink.MoblinkManager;
 import com.dimadesu.bondbunny.moblink.ThermalState;
 
 import java.net.InetAddress;
-import java.util.LinkedHashMap;
+import java.util.List;
 
 /**
  * Android foreground service for native SRTLA implementation.
@@ -32,20 +32,7 @@ public class NativeSrtlaService extends Service {
     // Service state
     private static boolean isServiceRunning = false;
 
-    private SrtlaSender sender;
-
-    // Optional Moblink manager: lets spare devices act as extra SRTLA bonding links.
-    private MoblinkManager moblinkManager;
-
-    // Live state of connected Moblink relays, keyed by relay id (for UI display).
-    private final LinkedHashMap<String, RelayUi> moblinkRelays = new LinkedHashMap<>();
-
-    private static class RelayUi {
-        String name;
-        String endpoint;
-        Integer battery;
-        String thermal;
-    }
+    private SrtlaEngine engine;
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -57,7 +44,7 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "NativeSrtlaService created");
         // Create notification channel
         createNotificationChannel(this);
-        sender = new SrtlaSender(this);
+        engine = new SrtlaEngine(this);
     }
 
     @Override
@@ -98,20 +85,25 @@ public class NativeSrtlaService extends Service {
                         return;
                     }
 
-                    sender.start(host, port, lPort, new SrtlaSender.Listener() {
-                        @Override public void onStatus(String message) { updateNotification(message); }
-                        @Override public void onError(String message)  {
+                    engine.startSrtla(host, port, lPort, new SrtlaEngine.Listener() {
+                        @Override public void onSrtlaStatus(String message) { updateNotification(message); }
+                        @Override public void onSrtlaError(String message)  {
                             Log.e(TAG, "Error starting native SRTLA: " + message);
                             updateNotification(message);
                             stopSelf();
+                        }
+                        @Override public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
+                            broadcastMoblinkStatus();
                         }
                     });
 
                     if (NativeSrtlaJni.isRunningSrtlaNative()) {
                         isServiceRunning = true;
                         if (moblinkEnabled && moblinkPassword != null && !moblinkPassword.isEmpty()) {
-                            startMoblinkStreamer(host, Integer.parseInt(port),
-                                    moblinkName, moblinkPassword, moblinkPort);
+                            String streamerName = (moblinkName != null && !moblinkName.isEmpty())
+                                    ? moblinkName : "Bond Bunny";
+                            engine.startMoblink(streamerName, moblinkPassword, moblinkPort);
+                            Log.i(TAG, "Moblink started on port " + moblinkPort);
                         }
                     } else {
                         stopSelf();
@@ -131,17 +123,8 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
-        if (moblinkManager != null) {
-            moblinkManager.stop();
-            moblinkManager = null;
-        }
-        synchronized (moblinkRelays) {
-            moblinkRelays.clear();
-        }
+        engine.stopAll();
         broadcastMoblinkStatus();
-        if (sender != null) {
-            sender.stop();
-        }
 
         // Wait a moment for the native process to actually stop
         new Thread(() -> {
@@ -171,85 +154,8 @@ public class NativeSrtlaService extends Service {
     }
 
     // -------------------------------------------------------------------------
-    // Moblink streamer
+    // Moblink status broadcast
     // -------------------------------------------------------------------------
-
-    /**
-     * Start the Moblink streamer so spare devices can join as extra SRTLA bonding links.
-     * Each relay tunnels to the SRTLA receiver ({@code destHost}:{@code destPort}); ready relays
-     * are registered with {@link SrtlaSender} as additional connections.
-     */
-    private void startMoblinkStreamer(String destHost, int destPort, String name,
-                                      String password, int port) {
-        try {
-            String streamerName = (name != null && !name.isEmpty()) ? name : "Bond Bunny";
-            moblinkManager = new MoblinkManager(this, streamerName, password, port);
-            moblinkManager.start(new MoblinkManager.Listener() {
-                @Override
-                public void onRelayTunnelReady(String relayId, String relayName,
-                                               String relayHost, int relayPort) {
-                    if (sender != null) {
-                        sender.addMoblinkRelay(relayId, relayHost, relayPort);
-                    }
-                    synchronized (moblinkRelays) {
-                        RelayUi r = moblinkRelays.get(relayId);
-                        if (r == null) {
-                            r = new RelayUi();
-                            moblinkRelays.put(relayId, r);
-                        }
-                        r.name = relayName;
-                        r.endpoint = relayHost + ":" + relayPort;
-                    }
-                    broadcastMoblinkStatus();
-                }
-
-                @Override
-                public void onRelayTunnelClosed(String relayId, String relayHost, int relayPort) {
-                    if (sender != null) {
-                        sender.removeMoblinkRelay(relayId);
-                    }
-                    synchronized (moblinkRelays) {
-                        moblinkRelays.remove(relayId);
-                    }
-                    broadcastMoblinkStatus();
-                }
-
-                @Override
-                public void onRelayStatus(String relayId, String relayName,
-                                          Integer batteryPercentage, ThermalState thermalState) {
-                    Log.i(TAG, "Moblink relay '" + relayName + "' battery=" + batteryPercentage
-                            + " thermal=" + thermalState);
-                    synchronized (moblinkRelays) {
-                        RelayUi r = moblinkRelays.get(relayId);
-                        if (r == null) {
-                            r = new RelayUi();
-                            r.name = relayName;
-                            moblinkRelays.put(relayId, r);
-                        }
-                        r.battery = batteryPercentage;
-                        r.thermal = thermalLabel(thermalState);
-                    }
-                    broadcastMoblinkStatus();
-                }
-
-                @Override
-                public void onRelayDisconnected(String relayId) {
-                    // Relay tracking is handled by onRelayTunnelClosed.
-                }
-
-                @Override
-                public void onLog(String message) {
-                    Log.i(TAG, "Moblink: " + message);
-                }
-            });
-            // Bond Bunny: both phases fire immediately — no waiting-room delay for user.
-            moblinkManager.connectToSrtla(destHost, destPort);
-            Log.i(TAG, "Moblink manager started on port " + port + " (destination "
-                    + destHost + ":" + destPort + ")");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to start Moblink manager", e);
-        }
-    }
 
     private static String thermalLabel(ThermalState t) {
         if (t == null) {
@@ -265,24 +171,22 @@ public class NativeSrtlaService extends Service {
 
     /** Broadcast the current Moblink relay summary for the UI. */
     private void broadcastMoblinkStatus() {
+        List<SrtlaEngine.RelayInfo> relayList = engine.getRelays();
         StringBuilder sb = new StringBuilder();
-        int count;
-        synchronized (moblinkRelays) {
-            count = moblinkRelays.size();
-            for (RelayUi r : moblinkRelays.values()) {
-                if (sb.length() > 0) {
-                    sb.append("\n");
-                }
-                sb.append("\u2022 ").append(r.name == null || r.name.isEmpty() ? "Relay" : r.name);
-                if (r.endpoint != null) {
-                    sb.append(" (").append(r.endpoint).append(")");
-                }
-                if (r.battery != null) {
-                    sb.append(" \u2014 ").append(r.battery).append("%");
-                }
-                if (r.thermal != null) {
-                    sb.append(" ").append(r.thermal);
-                }
+        int count = relayList.size();
+        for (SrtlaEngine.RelayInfo r : relayList) {
+            if (sb.length() > 0) {
+                sb.append("\n");
+            }
+            sb.append("\u2022 ").append(r.name == null || r.name.isEmpty() ? "Relay" : r.name);
+            if (r.tunnelActive) {
+                sb.append(" (tunneled)");
+            }
+            if (r.battery != null) {
+                sb.append(" \u2014 ").append(r.battery).append("%");
+            }
+            if (r.thermal != null) {
+                sb.append(" ").append(thermalLabel(r.thermal));
             }
         }
         Intent intent = new Intent("moblink-status");
