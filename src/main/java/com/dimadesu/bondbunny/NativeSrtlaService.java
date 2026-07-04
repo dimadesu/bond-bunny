@@ -14,7 +14,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.dimadesu.bondbunny.moblink.MoblinkManager;
+
 import com.dimadesu.bondbunny.moblink.ThermalState;
 
 import java.net.InetAddress;
@@ -65,7 +65,7 @@ public class NativeSrtlaService extends Service {
             final boolean moblinkEnabled = intent.getBooleanExtra("moblink_enabled", false);
             final String moblinkName = intent.getStringExtra("moblink_name");
             final String moblinkPassword = intent.getStringExtra("moblink_password");
-            final int moblinkPort = intent.getIntExtra("moblink_port", MoblinkManager.DEFAULT_PORT);
+            final int moblinkPort = intent.getIntExtra("moblink_port", SrtlaEngine.DEFAULT_MOBLINK_PORT);
 
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
@@ -310,10 +310,7 @@ public class NativeSrtlaService extends Service {
         }
     }
 
-    public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
-        startService(context, srtlaHost, srtlaPort, listenPort,
-                false, null, null, MoblinkManager.DEFAULT_PORT);
-    }
+
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
                                     boolean moblinkEnabled, String moblinkName, String moblinkPassword,

@@ -47,6 +47,10 @@ class SrtlaEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "SrtlaEngine"
+
+        /** Default WebSocket port for the Moblink server. */
+        @JvmField
+        val DEFAULT_MOBLINK_PORT = MoblinkManager.DEFAULT_PORT
     }
 
     // -------------------------------------------------------------------------
