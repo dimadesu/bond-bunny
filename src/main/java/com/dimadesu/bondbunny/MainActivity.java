@@ -158,8 +158,10 @@ public class MainActivity extends Activity {
         if (serviceRunning) {
             textStatus.setText("✅ Service is running");
         } else {
-            textStatus.setText("❌ Service is stopped");            // Moblink relays are gone when the service stops
-            updateMoblinkStatus(0, null);            // Only clear connection stats if native SRTLA is also not running
+            textStatus.setText("❌ Service is stopped");
+            // Moblink relays are gone when the service stops
+            updateMoblinkStatus(0, null);
+            // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
                 srtlaStatsView.stopStatsUpdates();

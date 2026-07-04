@@ -14,7 +14,6 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-
 import com.dimadesu.bondbunny.moblink.ThermalState;
 
 import java.net.InetAddress;
@@ -309,8 +308,6 @@ public class NativeSrtlaService extends Service {
             return isServiceRunning;
         }
     }
-
-
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
                                     boolean moblinkEnabled, String moblinkName, String moblinkPassword,
