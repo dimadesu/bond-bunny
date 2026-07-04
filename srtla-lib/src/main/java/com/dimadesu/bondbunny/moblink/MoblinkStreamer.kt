@@ -7,6 +7,9 @@ import android.util.Log
 import java.net.InetSocketAddress
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
@@ -25,7 +28,10 @@ interface MoblinkStreamerListener {
      * is sent. If [setDestination] has not been called yet, no tunnel will be started yet —
      * the session waits in the "identified" pool until [setDestination] is called.
      */
-    fun onRelayIdentified(relayId: String, name: String) {}
+    fun onRelayConnected(relayId: String, name: String) {}
+
+    /** A relay WebSocket connection closed (regardless of tunnel state). */
+    fun onRelayDisconnected(relayId: String) {}
 
     fun onRelayTunnelReady(relayId: String, name: String, relayHost: String, relayPort: Int)
     fun onRelayTunnelClosed(relayId: String, relayHost: String, relayPort: Int)
@@ -60,7 +66,10 @@ class MoblinkStreamer(
 ) {
     companion object {
         private const val TAG = "MoblinkStreamer"
-        const val DEFAULT_PORT = 7777
+        private const val STATUS_POLL_INTERVAL_SECONDS = 10L
+
+        @JvmField
+        val DEFAULT_PORT = 7777
     }
 
     private val sessions = ConcurrentHashMap<WebSocket, RelaySession>()
@@ -83,6 +92,8 @@ class MoblinkStreamer(
      * The SRTLA destination is **not** required at this point. Call [setDestination] once the
      * SRTLA stack is running to activate tunnels for all waiting relays.
      */
+    private var statusScheduler: ScheduledExecutorService? = null
+
     fun start(listener: MoblinkStreamerListener) {
         stop()
         this.listener = listener
@@ -117,6 +128,18 @@ class MoblinkStreamer(
         server.connectionLostTimeout = 15
         server.start()
         this.server = server
+
+        // 10-second periodic status poll (mirrors Moblin iOS cadence).
+        val sched = Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "MoblinkStatusPoller").also { it.isDaemon = true }
+        }
+        sched.scheduleAtFixedRate(
+            { updateStatus() },
+            STATUS_POLL_INTERVAL_SECONDS,
+            STATUS_POLL_INTERVAL_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        statusScheduler = sched
     }
 
     /**
@@ -156,8 +179,15 @@ class MoblinkStreamer(
         }
     }
 
+    /**
+     * Alias for [setDestination]. Pass `host=""` / `port=0` to park relays between streams.
+     */
+    fun connectToSrtla(host: String, port: Int) = setDestination(host, port)
+
     /** Stop the streamer, disconnect all relays, and withdraw the mDNS advertisement. */
     fun stop() {
+        statusScheduler?.shutdownNow()
+        statusScheduler = null
         unregisterMdns()
         val server = this.server
         this.server = null
@@ -206,6 +236,7 @@ class MoblinkStreamer(
         val session = sessions.remove(conn) ?: return
         Log.i(TAG, "Relay disconnected: ${conn.remoteSocketAddress}")
         session.reportTunnelRemoved()
+        listener?.onRelayDisconnected(session.relayId)
     }
 
     private fun randomString(): String {
@@ -279,7 +310,7 @@ class MoblinkStreamer(
         private var salt = ""
         private var identified = false
 
-        private var relayId = ""
+        var relayId = ""
         private var relayName = ""
         private var batteryPercentage: Int? = null
         private var thermalState: ThermalState? = null
@@ -321,7 +352,7 @@ class MoblinkStreamer(
             relayId = identify.id
             relayName = identify.name.substringBefore('\n').trim().take(30)
             send(MessageToRelay(identified = Identified(result = Result(ok = Present()))))
-            listener?.onRelayIdentified(relayId, relayName)
+            listener?.onRelayConnected(relayId, relayName)
             startTunnelIfNeeded()
             requestStatus()
         }
