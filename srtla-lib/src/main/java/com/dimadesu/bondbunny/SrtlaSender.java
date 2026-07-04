@@ -531,7 +531,8 @@ public class SrtlaSender {
      * with the native sender using a custom destination so its packets go to the relay (which
      * forwards them to the SRTLA receiver). Safe to call from any thread.
      */
-    public synchronized void addMoblinkRelay(String relayId, String relayHost, int relayPort) {
+    public synchronized void addMoblinkRelay(String relayId, String relayName,
+                                              String relayHost, int relayPort) {
         if (!NativeSrtlaJni.isRunningSrtlaNative()) {
             Log.w(TAG, "Ignoring relay " + relayId + ": native SRTLA not running");
             return;
@@ -555,8 +556,8 @@ public class SrtlaSender {
 
         virtualConnections.put(virtualIp, socket);
         relayIdToVirtualIp.put(relayId, virtualIp);
-        NativeSrtlaJni.setRelaySocket(virtualIp, relayHost, relayPort, socket);
-        Log.i(TAG, "Added Moblink relay " + relayId + ": " + virtualIp + " -> "
+        NativeSrtlaJni.setRelaySocket(virtualIp, relayHost, relayPort, socket, relayName);
+        Log.i(TAG, "Added Moblink relay " + relayId + " '" + relayName + "': " + virtualIp + " -> "
                 + relayHost + ":" + relayPort + " (fd " + socket + ")");
 
         refreshIpsFile("adding relay " + relayId);

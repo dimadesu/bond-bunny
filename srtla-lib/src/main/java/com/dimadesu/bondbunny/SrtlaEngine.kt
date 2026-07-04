@@ -258,7 +258,7 @@ class SrtlaEngine(private val context: Context) {
 
         override fun onRelayTunnelReady(relayId: String, name: String, host: String, port: Int) {
             Log.i(TAG, "Moblink relay tunnel ready: '$name' @ $host:$port")
-            sender?.addMoblinkRelay(relayId, host, port)
+            sender?.addMoblinkRelay(relayId, name, host, port)
             val existing = relayMap[relayId]
             relayMap[relayId] = (existing ?: RelayInfo(relayId, name, null, null, false))
                 .copy(tunnelActive = true)
