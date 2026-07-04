@@ -62,7 +62,6 @@ public class NativeSrtlaService extends Service {
             }
 
             final boolean moblinkEnabled = intent.getBooleanExtra("moblink_enabled", false);
-            final String moblinkName = intent.getStringExtra("moblink_name");
             final String moblinkPassword = intent.getStringExtra("moblink_password");
             final int moblinkPort = intent.getIntExtra("moblink_port", SrtlaEngine.DEFAULT_MOBLINK_PORT);
 
@@ -99,9 +98,7 @@ public class NativeSrtlaService extends Service {
                     if (NativeSrtlaJni.isRunningSrtlaNative()) {
                         isServiceRunning = true;
                         if (moblinkEnabled && moblinkPassword != null && !moblinkPassword.isEmpty()) {
-                            String streamerName = (moblinkName != null && !moblinkName.isEmpty())
-                                    ? moblinkName : "Bond Bunny";
-                            engine.startMoblink(streamerName, moblinkPassword, moblinkPort);
+                            engine.startMoblink(moblinkPassword, moblinkPort);
                             Log.i(TAG, "Moblink started on port " + moblinkPort);
                         }
                     } else {
@@ -310,14 +307,13 @@ public class NativeSrtlaService extends Service {
     }
 
     public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
-                                    boolean moblinkEnabled, String moblinkName, String moblinkPassword,
+                                    boolean moblinkEnabled, String moblinkPassword,
                                     int moblinkPort) {
         Intent intent = new Intent(context, NativeSrtlaService.class);
         intent.putExtra("srtla_host", srtlaHost);
         intent.putExtra("srtla_port", srtlaPort);
         intent.putExtra("listen_port", listenPort);
         intent.putExtra("moblink_enabled", moblinkEnabled);
-        intent.putExtra("moblink_name", moblinkName);
         intent.putExtra("moblink_password", moblinkPassword);
         intent.putExtra("moblink_port", moblinkPort);
 

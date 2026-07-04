@@ -5,6 +5,9 @@ import android.util.Log
 import com.dimadesu.bondbunny.moblink.MoblinkStreamer
 import com.dimadesu.bondbunny.moblink.MoblinkStreamerListener
 import com.dimadesu.bondbunny.moblink.ThermalState
+import android.os.Build
+import android.provider.Settings
+import java.util.Locale
 
 /**
  * Unified engine that owns both [SrtlaSender] (native SRTLA bonding) and
@@ -120,7 +123,8 @@ class SrtlaEngine(private val context: Context) {
      *
      * If SRTLA is already running, tunnels are activated immediately.
      */
-    fun startMoblink(name: String, password: String, port: Int) {
+    fun startMoblink(password: String, port: Int) {
+        val name = getDeviceName(context)
         val current = moblinkStreamer
         if (current != null) {
             Log.i(TAG, "Restarting Moblink server with new config")
@@ -290,5 +294,21 @@ class SrtlaEngine(private val context: Context) {
         override fun onLog(message: String) {
             Log.i(TAG, "Moblink: $message")
         }
+    }
+    // -------------------------------------------------------------------------
+    // Utils
+    // -------------------------------------------------------------------------
+
+    private fun getDeviceName(context: Context): String {
+        val deviceName = Settings.Global.getString(context.contentResolver, "device_name")
+        if (!deviceName.isNullOrBlank()) {
+            return deviceName
+        }
+        val manufacturer = Build.MANUFACTURER
+        val model = Build.MODEL
+        if (model.startsWith(manufacturer)) {
+            return model.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+        }
+        return manufacturer.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } + " " + model
     }
 }
