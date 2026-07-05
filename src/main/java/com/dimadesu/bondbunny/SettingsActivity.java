@@ -86,7 +86,7 @@ public class SettingsActivity extends Activity {
         editMoblinkPort = findViewById(R.id.edit_moblink_port);
 
         switchMoblinkEnabled.setChecked(prefs.getBoolean(PREF_MOBLINK_ENABLED, false));
-        editMoblinkPassword.setText(prefs.getString(PREF_MOBLINK_PASSWORD, ""));
+        editMoblinkPassword.setText(prefs.getString(PREF_MOBLINK_PASSWORD, "1234"));
         editMoblinkPort.setText(prefs.getString(PREF_MOBLINK_PORT, "7777"));
 
         switchMoblinkEnabled.setOnCheckedChangeListener((buttonView, isChecked) ->

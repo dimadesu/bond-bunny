@@ -258,7 +258,7 @@ public class MainActivity extends Activity {
     private void refreshMoblink() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         boolean enabled = prefs.getBoolean("moblink_enabled", false);
-        String password = prefs.getString("moblink_password", "");
+        String password = prefs.getString("moblink_password", "1234");
         int port = 7777;
         try {
             port = Integer.parseInt(prefs.getString("moblink_port", "7777").trim());
@@ -272,6 +272,10 @@ public class MainActivity extends Activity {
         } else {
             NativeSrtlaService.getSharedEngine(this).stopMoblink();
             srtlaStatsView.setRelays(null);
+            
+            if (enabled && (password == null || password.isEmpty())) {
+                Toast.makeText(this, "Moblink disabled: password cannot be empty", Toast.LENGTH_LONG).show();
+            }
         }
     }
     
