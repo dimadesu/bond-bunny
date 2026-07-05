@@ -79,7 +79,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Moblink"
+        android:text="Moblink Streamer Server"
         android:textStyle="bold"
         android:textSize="16sp" />
 
@@ -93,28 +93,27 @@
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Use spare devices (running the Moblink relay app) as extra SRTLA bonding connections on the same Wi-Fi."
-      android:textSize="12sp"
+      android:text="Connect phones running Moblink app to the same Wi-Fi to use their cellular data as additional SRTLA bonding connections."
       android:layout_marginBottom="8dp" />
 
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Password:"
+      android:text="Moblink Server Password:"
       android:layout_marginBottom="4dp" />
 
     <EditText
       android:id="@+id/edit_moblink_password"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:hint="Shared with relays"
+      android:hint="Relays connect using this password"
       android:inputType="textVisiblePassword"
       android:layout_marginBottom="12dp" />
 
     <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Moblink Port:"
+      android:text="Moblink Server Port:"
       android:layout_marginBottom="4dp" />
 
     <EditText
