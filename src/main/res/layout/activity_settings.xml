@@ -120,7 +120,7 @@
       android:id="@+id/edit_moblink_port"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:hint="7777"
+      android:hint="7788"
       android:inputType="number"
       android:layout_marginBottom="12dp" />
 

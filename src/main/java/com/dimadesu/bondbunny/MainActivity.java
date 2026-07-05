@@ -259,9 +259,9 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         boolean enabled = prefs.getBoolean("moblink_enabled", false);
         String password = prefs.getString("moblink_password", "1234");
-        int port = 7777;
+        int port = 7788;
         try {
-            port = Integer.parseInt(prefs.getString("moblink_port", "7777").trim());
+            port = Integer.parseInt(prefs.getString("moblink_port", "7788").trim());
         } catch (NumberFormatException ignored) {}
 
         if (enabled && password != null && !password.isEmpty()) {

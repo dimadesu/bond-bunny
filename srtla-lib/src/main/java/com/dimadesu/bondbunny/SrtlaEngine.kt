@@ -26,7 +26,7 @@ import java.util.Locale
  *
  * **Phase 1 — Moblink server (call early, before stream start):**
  * ```
- * engine.startMoblink("MyDevice", "password", 7777)
+ * engine.startMoblink("password", 7777)
  * ```
  * Relays connect and authenticate. No video flows yet.
  *
