@@ -10,6 +10,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
+    android:background="#F0F0F0"
+    android:layout_marginBottom="4dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
     android:visibility="gone">
 
     <TextView
@@ -20,11 +24,9 @@
       android:textSize="14sp"
       android:textStyle="bold"
       android:textColor="#212529"
-      android:paddingTop="8dp"
       android:paddingLeft="12dp"
       android:paddingRight="12dp"
-      android:paddingBottom="4dp"
-      android:background="#F0F0F0" />
+      android:paddingBottom="4dp" />
 
     <LinearLayout
       android:id="@+id/relays_container"
