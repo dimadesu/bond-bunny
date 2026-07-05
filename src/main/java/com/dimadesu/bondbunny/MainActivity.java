@@ -47,8 +47,6 @@ public class MainActivity extends Activity {
     
     private TextView textStatus;
     private TextView textError;
-    private TextView textMoblinkTitle;
-    private TextView textMoblinkStatus;
     private SrtlaStatsView srtlaStatsView;
     private Button buttonAbout;
     private Button buttonSettings;
@@ -64,8 +62,9 @@ public class MainActivity extends Activity {
     
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
-    // Receiver for live Moblink relay status
-    private BroadcastReceiver moblinkReceiver;
+
+    // Moblink engine — lives in the Activity so relays can pre-connect before service start
+    private SrtlaEngine moblinkEngine;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,8 +107,6 @@ public class MainActivity extends Activity {
     private void initViews() {
         textStatus = findViewById(R.id.text_status);
         textError = findViewById(R.id.text_error);
-        textMoblinkTitle = findViewById(R.id.text_moblink_title);
-        textMoblinkStatus = findViewById(R.id.text_moblink_status);
         srtlaStatsView = findViewById(R.id.srtla_stats_view);
         srtlaStatsView.setOnServiceStoppedListener(() -> {
             // Periodically refresh native SRTLA UI state (handles crashes)
@@ -130,6 +127,17 @@ public class MainActivity extends Activity {
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
         buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
+
+        // Moblink engine for early relay connections
+        moblinkEngine = new SrtlaEngine(this);
+        moblinkEngine.setListener(new SrtlaEngine.Listener() {
+            @Override public void onSrtlaStatus(String message) {}
+            @Override public void onSrtlaError(String message) {}
+            @Override
+            public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
+                runOnUiThread(() -> srtlaStatsView.setRelays(relays));
+            }
+        });
         
         // Initialize native SRTLA UI state
         updateNativeSrtlaUI();
@@ -159,8 +167,6 @@ public class MainActivity extends Activity {
             textStatus.setText("✅ Service is running");
         } else {
             textStatus.setText("❌ Service is stopped");
-            // Moblink relays are gone when the service stops
-            updateMoblinkStatus(0, null);
             // Only clear connection stats if native SRTLA is also not running
             if (!NativeSrtlaService.isServiceRunning()) {
                 Log.i("MainActivity", "updateUI: Clearing connection stats - no services running");
@@ -179,8 +185,9 @@ public class MainActivity extends Activity {
         // Register error receiver
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(moblinkReceiver,
-            new IntentFilter("moblink-status"));
+        
+        // Start / restart Moblink if enabled (reads latest settings)
+        refreshMoblink();
         
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
@@ -201,6 +208,10 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
         
+        // Stop Moblink when leaving the Activity (no background service)
+        moblinkEngine.stopMoblink();
+        srtlaStatsView.setRelays(null);
+        
         // Unregister error receiver
         try {
             if (errorReceiver != null) {
@@ -209,13 +220,6 @@ public class MainActivity extends Activity {
             }
         } catch (IllegalArgumentException e) {
             Log.w("MainActivity", "Error receiver was not registered");
-        }
-        try {
-            if (moblinkReceiver != null) {
-                LocalBroadcastManager.getInstance(this).unregisterReceiver(moblinkReceiver);
-            }
-        } catch (IllegalArgumentException e) {
-            Log.w("MainActivity", "Moblink receiver was not registered");
         }
     }
     
@@ -241,30 +245,33 @@ public class MainActivity extends Activity {
             }
         };
         Log.i("MainActivity", "Initialized error receiver");
-
-        // Live Moblink relay status
-        moblinkReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                int count = intent.getIntExtra("count", 0);
-                String summary = intent.getStringExtra("summary");
-                updateMoblinkStatus(count, summary);
-            }
-        };
     }
 
-    private void updateMoblinkStatus(int count, String summary) {
-        runOnUiThread(() -> {
-            if (count > 0 && summary != null && !summary.isEmpty()) {
-                textMoblinkTitle.setText("Moblink Relays (" + count + "):");
-                textMoblinkTitle.setVisibility(TextView.VISIBLE);
-                textMoblinkStatus.setText(summary);
-                textMoblinkStatus.setVisibility(TextView.VISIBLE);
-            } else {
-                textMoblinkTitle.setVisibility(TextView.GONE);
-                textMoblinkStatus.setVisibility(TextView.GONE);
-            }
-        });
+    // -------------------------------------------------------------------------
+    // Moblink lifecycle (runs in Activity, not the foreground service)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Read Moblink settings and start/stop the WebSocket server accordingly.
+     * Called from onResume so the latest settings are always applied.
+     */
+    private void refreshMoblink() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean enabled = prefs.getBoolean("moblink_enabled", false);
+        String password = prefs.getString("moblink_password", "");
+        int port = 7777;
+        try {
+            port = Integer.parseInt(prefs.getString("moblink_port", "7777").trim());
+        } catch (NumberFormatException ignored) {}
+
+        if (enabled && password != null && !password.isEmpty()) {
+            moblinkEngine.startMoblink(password, port);
+            // Push current relay snapshot (may already have relays from before onPause)
+            srtlaStatsView.setRelays(moblinkEngine.getRelays());
+        } else {
+            moblinkEngine.stopMoblink();
+            srtlaStatsView.setRelays(null);
+        }
     }
     
     private void showError(String errorMessage) {
@@ -416,24 +423,9 @@ public class MainActivity extends Activity {
                 return;
             }
             
-            // Read optional Moblink settings
-            boolean moblinkEnabled = prefs.getBoolean("moblink_enabled", false);
-            String moblinkPassword = prefs.getString("moblink_password", "");
-            int moblinkPort = 7777;
-            try {
-                moblinkPort = Integer.parseInt(prefs.getString("moblink_port", "7777").trim());
-            } catch (NumberFormatException ignored) {
-                // keep default 7777
-            }
-            if (moblinkEnabled && moblinkPassword.isEmpty()) {
-                showError("Set a Moblink password in settings or disable Moblink");
-                textStatus.setText("❌ Moblink enabled but no password set");
-                return;
-            }
 
             // Start the native SRTLA service
-            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort,
-                    moblinkEnabled, moblinkPassword, moblinkPort);
+            NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             
             textStatus.setText("⏳ Service is starting...");
             Toast.makeText(this, "Native SRTLA service starting on port " + listenPort, Toast.LENGTH_LONG).show();

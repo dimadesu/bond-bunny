@@ -10,7 +10,10 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.dimadesu.bondbunny.moblink.ThermalState;
 import com.dimadesu.bondbunny.srtlalib.R;
+
+import java.util.List;
 
 /**
  * Self-contained view that polls native SRTLA stats every second and renders them.
@@ -33,6 +36,11 @@ public class SrtlaStatsView extends LinearLayout {
     private TextView textTotalBitrate;
     private LinearLayout connectionsContainer;
     private TextView textNoConnections;
+
+    // Relay rendering
+    private LinearLayout relaysSection;
+    private TextView textRelaysTitle;
+    private LinearLayout relaysContainer;
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Runnable statsUpdateRunnable;
@@ -71,10 +79,78 @@ public class SrtlaStatsView extends LinearLayout {
 
     private void init(Context context) {
         LayoutInflater.from(context).inflate(R.layout.srtla_stats_view, this, true);
-        textTotalBitrate    = findViewById(R.id.text_total_bitrate);
+        textTotalBitrate     = findViewById(R.id.text_total_bitrate);
         connectionsContainer = findViewById(R.id.connections_container);
-        textNoConnections   = findViewById(R.id.text_no_connections);
+        textNoConnections    = findViewById(R.id.text_no_connections);
+        relaysSection        = findViewById(R.id.relays_section);
+        textRelaysTitle      = findViewById(R.id.text_relays_title);
+        relaysContainer      = findViewById(R.id.relays_container);
         clearConnectionsDisplay();
+    }
+
+    // -------------------------------------------------------------------------
+    // Relay rendering
+    // -------------------------------------------------------------------------
+
+    /**
+     * Update the relay list shown at the top of this view.
+     *
+     * <p>Call this whenever the relay list changes.  When {@code relays} is empty
+     * (or null), the relay section is hidden entirely so the view looks the same
+     * as before Moblink was introduced.</p>
+     */
+    public void setRelays(List<SrtlaEngine.RelayInfo> relays) {
+        if (relays == null || relays.isEmpty()) {
+            relaysSection.setVisibility(View.GONE);
+            return;
+        }
+
+        relaysSection.setVisibility(View.VISIBLE);
+        textRelaysTitle.setText("Moblink Relays (" + relays.size() + ")");
+        relaysContainer.removeAllViews();
+
+        LayoutInflater inflater = LayoutInflater.from(getContext());
+        for (SrtlaEngine.RelayInfo relay : relays) {
+            View row = inflater.inflate(R.layout.relay_item, relaysContainer, false);
+
+            TextView nameView = row.findViewById(R.id.relay_name);
+            StringBuilder label = new StringBuilder();
+            label.append("\u2022 ");
+            label.append(relay.name == null || relay.name.isEmpty() ? "Relay" : relay.name);
+            if (relay.tunnelActive) {
+                label.append(" (tunneled)");
+            }
+            nameView.setText(label.toString());
+
+            TextView batteryView = row.findViewById(R.id.relay_battery);
+            if (relay.battery != null) {
+                batteryView.setText(relay.battery + "%");
+                batteryView.setVisibility(View.VISIBLE);
+            } else {
+                batteryView.setVisibility(View.GONE);
+            }
+
+            TextView thermalView = row.findViewById(R.id.relay_thermal);
+            String thermalIcon = thermalLabel(relay.thermal);
+            if (thermalIcon != null) {
+                thermalView.setText(thermalIcon);
+                thermalView.setVisibility(View.VISIBLE);
+            } else {
+                thermalView.setVisibility(View.GONE);
+            }
+
+            relaysContainer.addView(row);
+        }
+    }
+
+    private static String thermalLabel(ThermalState t) {
+        if (t == null) return null;
+        switch (t) {
+            case WHITE:  return "\uD83D\uDFE2"; // green circle
+            case YELLOW: return "\uD83D\uDFE1"; // yellow circle
+            case RED:    return "\uD83D\uDD34"; // red circle
+            default:     return null;
+        }
     }
 
     // -------------------------------------------------------------------------

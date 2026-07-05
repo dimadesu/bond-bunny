@@ -14,10 +14,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.dimadesu.bondbunny.moblink.ThermalState;
-
 import java.net.InetAddress;
-import java.util.List;
 
 /**
  * Android foreground service for native SRTLA implementation.
@@ -61,10 +58,6 @@ public class NativeSrtlaService extends Service {
                 return START_NOT_STICKY;
             }
 
-            final boolean moblinkEnabled = intent.getBooleanExtra("moblink_enabled", false);
-            final String moblinkPassword = intent.getStringExtra("moblink_password");
-            final int moblinkPort = intent.getIntExtra("moblink_port", SrtlaEngine.DEFAULT_MOBLINK_PORT);
-
             // Start foreground service
             startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
 
@@ -90,17 +83,11 @@ public class NativeSrtlaService extends Service {
                             updateNotification(message);
                             stopSelf();
                         }
-                        @Override public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
-                            broadcastMoblinkStatus();
-                        }
+                        @Override public void onRelaysChanged(java.util.List<SrtlaEngine.RelayInfo> relays) {}
                     });
 
                     if (NativeSrtlaJni.isRunningSrtlaNative()) {
                         isServiceRunning = true;
-                        if (moblinkEnabled && moblinkPassword != null && !moblinkPassword.isEmpty()) {
-                            engine.startMoblink(moblinkPassword, moblinkPort);
-                            Log.i(TAG, "Moblink started on port " + moblinkPort);
-                        }
                     } else {
                         stopSelf();
                     }
@@ -119,8 +106,7 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
-        engine.stopAll();
-        broadcastMoblinkStatus();
+        engine.stopSrtla();
 
         // Wait a moment for the native process to actually stop
         new Thread(() -> {
@@ -149,47 +135,6 @@ public class NativeSrtlaService extends Service {
         return null; // Not a bound service
     }
 
-    // -------------------------------------------------------------------------
-    // Moblink status broadcast
-    // -------------------------------------------------------------------------
-
-    private static String thermalLabel(ThermalState t) {
-        if (t == null) {
-            return null;
-        }
-        switch (t) {
-            case WHITE: return "\uD83D\uDFE2"; // green circle
-            case YELLOW: return "\uD83D\uDFE1"; // yellow circle
-            case RED: return "\uD83D\uDD34"; // red circle
-            default: return null;
-        }
-    }
-
-    /** Broadcast the current Moblink relay summary for the UI. */
-    private void broadcastMoblinkStatus() {
-        List<SrtlaEngine.RelayInfo> relayList = engine.getRelays();
-        StringBuilder sb = new StringBuilder();
-        int count = relayList.size();
-        for (SrtlaEngine.RelayInfo r : relayList) {
-            if (sb.length() > 0) {
-                sb.append("\n");
-            }
-            sb.append("\u2022 ").append(r.name == null || r.name.isEmpty() ? "Relay" : r.name);
-            if (r.tunnelActive) {
-                sb.append(" (tunneled)");
-            }
-            if (r.battery != null) {
-                sb.append(" \u2014 ").append(r.battery).append("%");
-            }
-            if (r.thermal != null) {
-                sb.append(" ").append(thermalLabel(r.thermal));
-            }
-        }
-        Intent intent = new Intent("moblink-status");
-        intent.putExtra("count", count);
-        intent.putExtra("summary", sb.toString());
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
 
     // -------------------------------------------------------------------------
     // Notifications
@@ -306,16 +251,11 @@ public class NativeSrtlaService extends Service {
         }
     }
 
-    public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort,
-                                    boolean moblinkEnabled, String moblinkPassword,
-                                    int moblinkPort) {
+    public static void startService(Context context, String srtlaHost, String srtlaPort, String listenPort) {
         Intent intent = new Intent(context, NativeSrtlaService.class);
         intent.putExtra("srtla_host", srtlaHost);
         intent.putExtra("srtla_port", srtlaPort);
         intent.putExtra("listen_port", listenPort);
-        intent.putExtra("moblink_enabled", moblinkEnabled);
-        intent.putExtra("moblink_password", moblinkPassword);
-        intent.putExtra("moblink_port", moblinkPort);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent);

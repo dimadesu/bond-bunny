@@ -111,6 +111,16 @@ class SrtlaEngine(private val context: Context) {
         externalListener?.onRelaysChanged(snapshot)
     }
 
+    /**
+     * Register (or replace) the external listener for relay and SRTLA events.
+     *
+     * Useful when the host wants relay callbacks **before** calling [startSrtla],
+     * e.g. Bond Bunny starting Moblink early in the Activity.
+     */
+    fun setListener(listener: Listener?) {
+        externalListener = listener
+    }
+
     // -------------------------------------------------------------------------
     // Phase 1: Moblink server lifecycle
     // -------------------------------------------------------------------------

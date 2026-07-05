@@ -105,26 +105,6 @@
       android:layout_height="wrap_content"
       android:layout_marginBottom="16dp" />
 
-    <!-- Moblink relays -->
-    <TextView
-      android:id="@+id/text_moblink_title"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Moblink Relays:"
-      android:textSize="16sp"
-      android:textStyle="bold"
-      android:layout_marginBottom="8dp"
-      android:visibility="gone" />
-
-    <TextView
-      android:id="@+id/text_moblink_status"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:text=""
-      android:textSize="14sp"
-      android:textColor="#495057"
-      android:layout_marginBottom="16dp"
-      android:visibility="gone" />
 
   </LinearLayout>
 
