@@ -28,7 +28,20 @@ public class NativeSrtlaService extends Service {
     // Service state
     private static boolean isServiceRunning = false;
 
-    private SrtlaEngine engine;
+    /** Shared SrtlaEngine singleton — used by both MainActivity and this service. */
+    private static SrtlaEngine sharedEngine;
+
+    /**
+     * Get or create the shared SrtlaEngine.
+     * Must be called with an application-level Context so the engine
+     * outlives any single Activity or Service instance.
+     */
+    public static SrtlaEngine getSharedEngine(Context context) {
+        if (sharedEngine == null) {
+            sharedEngine = new SrtlaEngine(context.getApplicationContext());
+        }
+        return sharedEngine;
+    }
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -38,9 +51,7 @@ public class NativeSrtlaService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "NativeSrtlaService created");
-        // Create notification channel
         createNotificationChannel(this);
-        engine = new SrtlaEngine(this);
     }
 
     @Override
@@ -76,6 +87,7 @@ public class NativeSrtlaService extends Service {
                         return;
                     }
 
+                    SrtlaEngine engine = getSharedEngine(NativeSrtlaService.this);
                     engine.startSrtla(host, port, lPort, new SrtlaEngine.Listener() {
                         @Override public void onSrtlaStatus(String message) { updateNotification(message); }
                         @Override public void onSrtlaError(String message)  {
@@ -106,7 +118,8 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
-        engine.stopSrtla();
+        // Stop only SRTLA — Moblink is managed by MainActivity
+        getSharedEngine(this).stopSrtla();
 
         // Wait a moment for the native process to actually stop
         new Thread(() -> {

@@ -63,9 +63,6 @@ public class MainActivity extends Activity {
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
 
-    // Moblink engine — lives in the Activity so relays can pre-connect before service start
-    private SrtlaEngine moblinkEngine;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -128,9 +125,9 @@ public class MainActivity extends Activity {
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
         buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
 
-        // Moblink engine for early relay connections
-        moblinkEngine = new SrtlaEngine(this);
-        moblinkEngine.setListener(new SrtlaEngine.Listener() {
+        // Register relay change listener on the shared engine
+        SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
+        engine.setListener(new SrtlaEngine.Listener() {
             @Override public void onSrtlaStatus(String message) {}
             @Override public void onSrtlaError(String message) {}
             @Override
@@ -209,7 +206,7 @@ public class MainActivity extends Activity {
         savePreferences();
         
         // Stop Moblink when leaving the Activity (no background service)
-        moblinkEngine.stopMoblink();
+        NativeSrtlaService.getSharedEngine(this).stopMoblink();
         srtlaStatsView.setRelays(null);
         
         // Unregister error receiver
@@ -265,11 +262,12 @@ public class MainActivity extends Activity {
         } catch (NumberFormatException ignored) {}
 
         if (enabled && password != null && !password.isEmpty()) {
-            moblinkEngine.startMoblink(password, port);
+            SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
+            engine.startMoblink(password, port);
             // Push current relay snapshot (may already have relays from before onPause)
-            srtlaStatsView.setRelays(moblinkEngine.getRelays());
+            srtlaStatsView.setRelays(engine.getRelays());
         } else {
-            moblinkEngine.stopMoblink();
+            NativeSrtlaService.getSharedEngine(this).stopMoblink();
             srtlaStatsView.setRelays(null);
         }
     }
