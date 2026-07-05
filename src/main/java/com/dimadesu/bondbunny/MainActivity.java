@@ -63,6 +63,16 @@ public class MainActivity extends Activity {
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
 
+    // Listener for UI updates from Moblink/SRTLA
+    private final SrtlaEngine.Listener engineListener = new SrtlaEngine.Listener() {
+        @Override public void onSrtlaStatus(String message) {}
+        @Override public void onSrtlaError(String message) {}
+        @Override
+        public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
+            runOnUiThread(() -> srtlaStatsView.setRelays(relays));
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -125,17 +135,6 @@ public class MainActivity extends Activity {
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
         buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
 
-        // Register relay change listener on the shared engine
-        SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
-        engine.setListener(new SrtlaEngine.Listener() {
-            @Override public void onSrtlaStatus(String message) {}
-            @Override public void onSrtlaError(String message) {}
-            @Override
-            public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
-                runOnUiThread(() -> srtlaStatsView.setRelays(relays));
-            }
-        });
-        
         // Initialize native SRTLA UI state
         updateNativeSrtlaUI();
         
@@ -183,6 +182,9 @@ public class MainActivity extends Activity {
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
         
+        // Register engine listener for UI updates
+        NativeSrtlaService.getSharedEngine(this).addListener(engineListener);
+
         // Start / restart Moblink if enabled (reads latest settings)
         refreshMoblink();
         
@@ -208,6 +210,7 @@ public class MainActivity extends Activity {
         // Stop Moblink when leaving the Activity (no background service)
         NativeSrtlaService.getSharedEngine(this).stopMoblink();
         srtlaStatsView.setRelays(null);
+        NativeSrtlaService.getSharedEngine(this).removeListener(engineListener);
         
         // Unregister error receiver
         try {

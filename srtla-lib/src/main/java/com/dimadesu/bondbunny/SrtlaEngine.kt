@@ -88,7 +88,7 @@ class SrtlaEngine(private val context: Context) {
 
     private var sender: SrtlaSender? = null
     private var moblinkStreamer: MoblinkStreamer? = null
-    private var externalListener: Listener? = null
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<Listener>()
 
     /** SRTLA receiver address — saved for Moblink tunnel activation. */
     private var srtlaHost: String = ""
@@ -108,17 +108,17 @@ class SrtlaEngine(private val context: Context) {
     private fun publishRelays() {
         val snapshot = relayMap.values.toList()
         relays = snapshot
-        externalListener?.onRelaysChanged(snapshot)
+        listeners.forEach { it.onRelaysChanged(snapshot) }
     }
 
-    /**
-     * Register (or replace) the external listener for relay and SRTLA events.
-     *
-     * Useful when the host wants relay callbacks **before** calling [startSrtla],
-     * e.g. Bond Bunny starting Moblink early in the Activity.
-     */
-    fun setListener(listener: Listener?) {
-        externalListener = listener
+    /** Register a listener for SRTLA events and relay changes. */
+    fun addListener(listener: Listener) {
+        listeners.addIfAbsent(listener)
+    }
+
+    /** Unregister a listener. */
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
     }
 
     // -------------------------------------------------------------------------
@@ -185,14 +185,11 @@ class SrtlaEngine(private val context: Context) {
         host: String,
         port: String,
         listenPort: String,
-        listener: Listener? = null,
     ) {
         if (isRunning) {
             Log.i(TAG, "SRTLA already running — skipping start")
             return
         }
-
-        externalListener = listener
 
         Log.i(TAG, "Starting SRTLA: $host:$port, listen on $listenPort")
 
@@ -202,11 +199,11 @@ class SrtlaEngine(private val context: Context) {
         s.start(host, port, listenPort, object : SrtlaSender.Listener {
             override fun onStatus(message: String) {
                 Log.i(TAG, "SrtlaSender: $message")
-                externalListener?.onSrtlaStatus(message)
+                listeners.forEach { it.onSrtlaStatus(message) }
             }
             override fun onError(message: String) {
                 Log.e(TAG, "SrtlaSender error: $message")
-                externalListener?.onSrtlaError(message)
+                listeners.forEach { it.onSrtlaError(message) }
             }
         })
 
@@ -238,7 +235,6 @@ class SrtlaEngine(private val context: Context) {
 
         sender?.stop()
         sender = null
-        externalListener = null
         srtlaHost = ""
         srtlaPort = 0
     }

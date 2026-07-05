@@ -31,17 +31,22 @@ public class NativeSrtlaService extends Service {
     /** Shared SrtlaEngine singleton — used by both MainActivity and this service. */
     private static SrtlaEngine sharedEngine;
 
-    /**
-     * Get or create the shared SrtlaEngine.
-     * Must be called with an application-level Context so the engine
-     * outlives any single Activity or Service instance.
-     */
     public static SrtlaEngine getSharedEngine(Context context) {
         if (sharedEngine == null) {
             sharedEngine = new SrtlaEngine(context.getApplicationContext());
         }
         return sharedEngine;
     }
+
+    private final SrtlaEngine.Listener serviceListener = new SrtlaEngine.Listener() {
+        @Override public void onSrtlaStatus(String message) { updateNotification(message); }
+        @Override public void onSrtlaError(String message)  {
+            Log.e(TAG, "Error starting native SRTLA: " + message);
+            updateNotification(message);
+            stopSelf();
+        }
+        @Override public void onRelaysChanged(java.util.List<SrtlaEngine.RelayInfo> relays) {}
+    };
 
     // -------------------------------------------------------------------------
     // Service lifecycle
@@ -88,15 +93,8 @@ public class NativeSrtlaService extends Service {
                     }
 
                     SrtlaEngine engine = getSharedEngine(NativeSrtlaService.this);
-                    engine.startSrtla(host, port, lPort, new SrtlaEngine.Listener() {
-                        @Override public void onSrtlaStatus(String message) { updateNotification(message); }
-                        @Override public void onSrtlaError(String message)  {
-                            Log.e(TAG, "Error starting native SRTLA: " + message);
-                            updateNotification(message);
-                            stopSelf();
-                        }
-                        @Override public void onRelaysChanged(java.util.List<SrtlaEngine.RelayInfo> relays) {}
-                    });
+                    engine.addListener(serviceListener);
+                    engine.startSrtla(host, port, lPort);
 
                     if (NativeSrtlaJni.isRunningSrtlaNative()) {
                         isServiceRunning = true;
@@ -119,7 +117,9 @@ public class NativeSrtlaService extends Service {
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
         // Stop only SRTLA — Moblink is managed by MainActivity
-        getSharedEngine(this).stopSrtla();
+        SrtlaEngine engine = getSharedEngine(this);
+        engine.stopSrtla();
+        engine.removeListener(serviceListener);
 
         // Wait a moment for the native process to actually stop
         new Thread(() -> {
