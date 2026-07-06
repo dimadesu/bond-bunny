@@ -89,8 +89,10 @@ public class SettingsActivity extends Activity {
         editMoblinkPassword.setText(prefs.getString(PREF_MOBLINK_PASSWORD, "1234"));
         editMoblinkPort.setText(prefs.getString(PREF_MOBLINK_PORT, "7788"));
 
-        switchMoblinkEnabled.setOnCheckedChangeListener((buttonView, isChecked) ->
-                prefs.edit().putBoolean(PREF_MOBLINK_ENABLED, isChecked).apply());
+        switchMoblinkEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(PREF_MOBLINK_ENABLED, isChecked).apply();
+            applyMoblink();
+        });
 
         editMoblinkPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -107,6 +109,33 @@ public class SettingsActivity extends Activity {
                 prefs.edit().putString(PREF_MOBLINK_PORT, s.toString().trim()).apply();
             }
         });
+
+        // Re-apply Moblink when leaving the password/port fields so config edits take
+        // effect without restarting the server on every keystroke.
+        editMoblinkPassword.setOnFocusChangeListener((v, hasFocus) -> { if (!hasFocus) applyMoblink(); });
+        editMoblinkPort.setOnFocusChangeListener((v, hasFocus) -> { if (!hasFocus) applyMoblink(); });
+    }
+
+    /**
+     * Start, restart, or stop the shared Moblink server to match the current Moblink
+     * settings. {@link SrtlaEngine#startMoblink} is idempotent, so a no-op config change
+     * won't disturb connected relays.
+     */
+    private void applyMoblink() {
+        boolean enabled = switchMoblinkEnabled.isChecked();
+        String password = editMoblinkPassword.getText().toString();
+        SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
+        if (enabled && !password.isEmpty()) {
+            int port;
+            try {
+                port = Integer.parseInt(editMoblinkPort.getText().toString().trim());
+            } catch (NumberFormatException e) {
+                return; // wait for a valid port before starting
+            }
+            engine.startMoblink(password, port);
+        } else {
+            engine.stopMoblink();
+        }
     }
 
 }
