@@ -63,6 +63,16 @@ public class MainActivity extends Activity {
     // Error receiver for service errors
     private BroadcastReceiver errorReceiver;
 
+    // Listener for UI updates from Moblink/SRTLA
+    private final SrtlaEngine.Listener engineListener = new SrtlaEngine.Listener() {
+        @Override public void onSrtlaStatus(String message) {}
+        @Override public void onSrtlaError(String message) {}
+        @Override
+        public void onRelaysChanged(List<SrtlaEngine.RelayInfo> relays) {
+            runOnUiThread(() -> srtlaStatsView.setRelays(relays));
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -124,7 +134,7 @@ public class MainActivity extends Activity {
         buttonSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
         buttonUrlBuilder.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, UrlBuilderActivity.class)));
         buttonNativeSrtla.setOnClickListener(v -> toggleNativeSrtla());
-        
+
         // Initialize native SRTLA UI state
         updateNativeSrtlaUI();
         
@@ -172,6 +182,12 @@ public class MainActivity extends Activity {
         LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
             new IntentFilter("srtla-error"));
         
+        // Register engine listener for UI updates
+        NativeSrtlaService.getSharedEngine(this).addListener(engineListener);
+
+        // Start / restart Moblink if enabled (reads latest settings)
+        refreshMoblink();
+        
         // Always check service state when resuming (handles rotation, app switching, etc.)
         checkServiceState();
         // Also check native SRTLA state
@@ -190,6 +206,13 @@ public class MainActivity extends Activity {
         }
         // Save current form values when app is paused
         savePreferences();
+        
+        // Leave the Moblink server running in the background so relays stay
+        // connected (and keep bonding while a stream is active). Android freezes
+        // the process when appropriate and resumes it on return to foreground.
+        // Moblink is only stopped when disabled or reconfigured (see refreshMoblink).
+        srtlaStatsView.setRelays(null);
+        NativeSrtlaService.getSharedEngine(this).removeListener(engineListener);
         
         // Unregister error receiver
         try {
@@ -224,6 +247,38 @@ public class MainActivity extends Activity {
             }
         };
         Log.i("MainActivity", "Initialized error receiver");
+    }
+
+    // -------------------------------------------------------------------------
+    // Moblink lifecycle (runs in Activity, not the foreground service)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Read Moblink settings and start/stop the WebSocket server accordingly.
+     * Called from onResume so the latest settings are always applied.
+     */
+    private void refreshMoblink() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean enabled = prefs.getBoolean("moblink_enabled", false);
+        String password = prefs.getString("moblink_password", "1234");
+        int port = 7788;
+        try {
+            port = Integer.parseInt(prefs.getString("moblink_port", "7788").trim());
+        } catch (NumberFormatException ignored) {}
+
+        if (enabled && password != null && !password.isEmpty()) {
+            SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
+            engine.startMoblink(password, port);
+            // Push current relay snapshot (may already have relays from before onPause)
+            srtlaStatsView.setRelays(engine.getRelays());
+        } else {
+            NativeSrtlaService.getSharedEngine(this).stopMoblink();
+            srtlaStatsView.setRelays(null);
+            
+            if (enabled && (password == null || password.isEmpty())) {
+                Toast.makeText(this, "Moblink disabled: password cannot be empty", Toast.LENGTH_LONG).show();
+            }
+        }
     }
     
     private void showError(String errorMessage) {
@@ -375,6 +430,7 @@ public class MainActivity extends Activity {
                 return;
             }
             
+
             // Start the native SRTLA service
             NativeSrtlaService.startService(this, srtlaHost, srtlaPort, listenPort);
             

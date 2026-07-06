@@ -68,6 +68,18 @@ public class SrtlaSender {
     // Wi-Fi lock to maintain high-performance Wi-Fi
     private WifiManager.WifiLock wifiLock;
 
+    // Current Wi-Fi network, used to bind Moblink relay sockets (relays live on the LAN)
+    private volatile Network wifiNetwork;
+
+    // Moblink relay tracking: relayId -> allocated relay virtual IP
+    private final Map<String, String> relayIdToVirtualIp = new ConcurrentHashMap<>();
+
+    // Allocated relay virtual-IP slots (10.0.100.N)
+    private final java.util.Set<Integer> usedRelaySlots =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static final String RELAY_IP_PREFIX = "10.0.100.";
+
     public SrtlaSender(Context context) {
         this.context = context.getApplicationContext();
         this.connectivityManager =
@@ -95,6 +107,8 @@ public class SrtlaSender {
         firstConnectionLatch = new CountDownLatch(1);
         virtualConnections.clear();
         networkState.clear();
+        relayIdToVirtualIp.clear();
+        usedRelaySlots.clear();
 
         setupDedicatedNetworkCallbacks();
 
@@ -353,6 +367,9 @@ public class SrtlaSender {
     private synchronized void handleDedicatedNetworkAvailable(Network network, String networkType, String operatorName) {
         try {
             Log.i(TAG, "DEDICATED: Handling " + networkType + " network: " + network);
+            if ("WIFI".equals(networkType)) {
+                wifiNetwork = network;
+            }
             String realIP = getNetworkIP(network);
             Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
 
@@ -417,6 +434,10 @@ public class SrtlaSender {
     private void handleDedicatedNetworkLost(Network network, String networkType) {
         try {
             String virtualIP = getVirtualIPForNetworkType(networkType);
+
+            if ("WIFI".equals(networkType)) {
+                wifiNetwork = null;
+            }
 
             if (virtualIP != null && virtualConnections.containsKey(virtualIP)) {
                 Log.i(TAG, "DEDICATED: Removing " + networkType + " connection: " + virtualIP);
@@ -501,6 +522,111 @@ public class SrtlaSender {
     }
 
     // -------------------------------------------------------------------------
+    // Moblink relays
+    // -------------------------------------------------------------------------
+
+    /**
+     * Add (or replace) a Moblink relay as an extra SRTLA bonding link. The relay is reachable on
+     * the local network at {@code relayHost:relayPort}; its socket is bound to Wi-Fi and registered
+     * with the native sender using a custom destination so its packets go to the relay (which
+     * forwards them to the SRTLA receiver). Safe to call from any thread.
+     */
+    public synchronized void addMoblinkRelay(String relayId, String relayName,
+                                              String relayHost, int relayPort) {
+        if (!NativeSrtlaJni.isRunningSrtlaNative()) {
+            Log.w(TAG, "Ignoring relay " + relayId + ": native SRTLA not running");
+            return;
+        }
+
+        // Replace any existing tunnel for this relay (e.g. relay re-tunnelled with a new port).
+        removeMoblinkRelay(relayId);
+
+        String virtualIp = allocateRelayVirtualIp();
+        if (virtualIp == null) {
+            Log.e(TAG, "No free relay virtual IP slots for relay " + relayId);
+            return;
+        }
+
+        int socket = createRelaySocket();
+        if (socket < 0) {
+            Log.e(TAG, "Failed to create relay socket for " + relayId);
+            freeRelayVirtualIp(virtualIp);
+            return;
+        }
+
+        virtualConnections.put(virtualIp, socket);
+        relayIdToVirtualIp.put(relayId, virtualIp);
+        NativeSrtlaJni.setRelaySocket(virtualIp, relayHost, relayPort, socket, relayName);
+        Log.i(TAG, "Added Moblink relay " + relayId + " '" + relayName + "': " + virtualIp + " -> "
+                + relayHost + ":" + relayPort + " (fd " + socket + ")");
+
+        refreshIpsFile("adding relay " + relayId);
+    }
+
+    /**
+     * Remove a previously added Moblink relay. The native sender closes the (fdsan-detached) socket
+     * when the connection is dropped, so Java must not close it. Safe to call from any thread.
+     */
+    public synchronized void removeMoblinkRelay(String relayId) {
+        String virtualIp = relayIdToVirtualIp.remove(relayId);
+        if (virtualIp == null) {
+            return;
+        }
+        virtualConnections.remove(virtualIp);
+        freeRelayVirtualIp(virtualIp);
+        Log.i(TAG, "Removed Moblink relay " + relayId + " (" + virtualIp + ")");
+
+        refreshIpsFile("removing relay " + relayId);
+    }
+
+    private void refreshIpsFile(String reason) {
+        if (!NativeSrtlaJni.isRunningSrtlaNative()) {
+            return;
+        }
+        try {
+            createVirtualIpsFile();
+            NativeSrtlaJni.notifyNetworkChange();
+            Log.i(TAG, "Updated virtual IPs file and notified native code after " + reason);
+        } catch (Exception e) {
+            Log.w(TAG, "Error updating virtual IPs file after " + reason, e);
+        }
+    }
+
+    /** Create a UDP socket for a relay link, bound to Wi-Fi when available. */
+    private int createRelaySocket() {
+        Network net = wifiNetwork;
+        if (net != null) {
+            int fd = createNetworkSocket(net);
+            if (fd >= 0) {
+                return fd;
+            }
+            Log.w(TAG, "Failed to bind relay socket to Wi-Fi; falling back to an unbound socket");
+        } else {
+            Log.w(TAG, "No Wi-Fi network available; relay socket will be unbound");
+        }
+        return NativeSrtlaJni.createUdpSocketNative();
+    }
+
+    private String allocateRelayVirtualIp() {
+        for (int i = 1; i <= 254; i++) {
+            if (usedRelaySlots.add(i)) {
+                return RELAY_IP_PREFIX + i;
+            }
+        }
+        return null;
+    }
+
+    private void freeRelayVirtualIp(String virtualIp) {
+        if (virtualIp != null && virtualIp.startsWith(RELAY_IP_PREFIX)) {
+            try {
+                usedRelaySlots.remove(Integer.parseInt(virtualIp.substring(RELAY_IP_PREFIX.length())));
+            } catch (NumberFormatException ignored) {
+                // not a relay slot
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Network wait / IPs file
     // -------------------------------------------------------------------------
 
@@ -563,6 +689,9 @@ public class SrtlaSender {
 
         virtualConnections.clear();
         networkState.clear();
+        relayIdToVirtualIp.clear();
+        usedRelaySlots.clear();
+        wifiNetwork = null;
         Log.i(TAG, "Virtual connections cleanup complete - native code handles socket cleanup");
     }
 

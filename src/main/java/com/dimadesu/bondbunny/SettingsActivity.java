@@ -6,16 +6,23 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.widget.EditText;
+import android.widget.Switch;
 
 public class SettingsActivity extends Activity {
     private static final String PREFS_NAME = "SrtlaAppPrefs";
     private static final String PREF_LISTEN_PORT = "listen_port";
     private static final String PREF_SRTLA_HOST = "srtla_host";
     private static final String PREF_SRTLA_PORT = "srtla_port";
+    private static final String PREF_MOBLINK_ENABLED = "moblink_enabled";
+    private static final String PREF_MOBLINK_PASSWORD = "moblink_password";
+    private static final String PREF_MOBLINK_PORT = "moblink_port";
 
     private EditText editListenPort;
     private EditText editServerHost;
     private EditText editServerPort;
+    private Switch switchMoblinkEnabled;
+    private EditText editMoblinkPassword;
+    private EditText editMoblinkPort;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,6 +79,63 @@ public class SettingsActivity extends Activity {
                 editor.apply();
             }
         });
+
+        // Moblink settings
+        switchMoblinkEnabled = findViewById(R.id.switch_moblink_enabled);
+        editMoblinkPassword = findViewById(R.id.edit_moblink_password);
+        editMoblinkPort = findViewById(R.id.edit_moblink_port);
+
+        switchMoblinkEnabled.setChecked(prefs.getBoolean(PREF_MOBLINK_ENABLED, false));
+        editMoblinkPassword.setText(prefs.getString(PREF_MOBLINK_PASSWORD, "1234"));
+        editMoblinkPort.setText(prefs.getString(PREF_MOBLINK_PORT, "7788"));
+
+        switchMoblinkEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(PREF_MOBLINK_ENABLED, isChecked).apply();
+            applyMoblink();
+        });
+
+        editMoblinkPassword.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                prefs.edit().putString(PREF_MOBLINK_PASSWORD, s.toString()).apply();
+            }
+        });
+
+        editMoblinkPort.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                prefs.edit().putString(PREF_MOBLINK_PORT, s.toString().trim()).apply();
+            }
+        });
+
+        // Re-apply Moblink when leaving the password/port fields so config edits take
+        // effect without restarting the server on every keystroke.
+        editMoblinkPassword.setOnFocusChangeListener((v, hasFocus) -> { if (!hasFocus) applyMoblink(); });
+        editMoblinkPort.setOnFocusChangeListener((v, hasFocus) -> { if (!hasFocus) applyMoblink(); });
+    }
+
+    /**
+     * Start, restart, or stop the shared Moblink server to match the current Moblink
+     * settings. {@link SrtlaEngine#startMoblink} is idempotent, so a no-op config change
+     * won't disturb connected relays.
+     */
+    private void applyMoblink() {
+        boolean enabled = switchMoblinkEnabled.isChecked();
+        String password = editMoblinkPassword.getText().toString();
+        SrtlaEngine engine = NativeSrtlaService.getSharedEngine(this);
+        if (enabled && !password.isEmpty()) {
+            int port;
+            try {
+                port = Integer.parseInt(editMoblinkPort.getText().toString().trim());
+            } catch (NumberFormatException e) {
+                return; // wait for a valid port before starting
+            }
+            engine.startMoblink(password, port);
+        } else {
+            engine.stopMoblink();
+        }
     }
 
 }

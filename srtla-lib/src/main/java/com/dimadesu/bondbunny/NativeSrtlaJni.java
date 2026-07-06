@@ -90,6 +90,11 @@ public class NativeSrtlaJni {
     // Virtual IP support for Application-Level Virtual IPs
     public static native void setNetworkSocket(String virtualIP, String realIP, 
                                              int networkType, int socketFD);
+
+    // Moblink relay support: pre-bound socket whose destination is the relay's tunnel endpoint
+    public static native void setRelaySocket(String virtualIP, String relayIP,
+                                             int relayPort, int socketFD,
+                                             String name);
     
     // Socket helpers (used by SrtlaSender)
     public static native int createUdpSocketNative();

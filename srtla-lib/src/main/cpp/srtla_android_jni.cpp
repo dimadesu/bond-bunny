@@ -37,6 +37,10 @@ extern "C" {
     // Virtual IP functions
     void srtla_set_network_socket(const char* virtual_ip, const char* real_ip, 
                                   int network_type, int socket_fd);
+
+    // Moblink relay function: pre-bound socket with a custom (relay) destination
+    void srtla_set_relay_socket(const char* virtual_ip, const char* relay_ip,
+                                int relay_port, int socket_fd, const char* name);
     
     // Per-connection bitrate functions
     int srtla_get_connection_bitrates(double* bitrates_mbps, char connection_types[][16], 
@@ -499,6 +503,35 @@ Java_com_dimadesu_bondbunny_NativeSrtlaJni_setNetworkSocket(JNIEnv *env, jclass 
     
     env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
     env->ReleaseStringUTFChars(real_ip, real_ip_str);
+}
+
+// Moblink relay JNI function: register a pre-bound socket whose destination is the
+// relay's tunnel endpoint instead of the global SRTLA receiver.
+extern "C" JNIEXPORT void JNICALL
+Java_com_dimadesu_bondbunny_NativeSrtlaJni_setRelaySocket(JNIEnv *env, jclass clazz,
+                                                    jstring virtual_ip, jstring relay_ip,
+                                                    jint relay_port, jint socket_fd,
+                                                    jstring name) {
+    const char *virtual_ip_str = env->GetStringUTFChars(virtual_ip, nullptr);
+    const char *relay_ip_str = env->GetStringUTFChars(relay_ip, nullptr);
+    const char *name_str = name ? env->GetStringUTFChars(name, nullptr) : nullptr;
+
+    // Track this as a Java-owned FD so native code never closes it.
+    {
+        std::lock_guard<std::mutex> lock(java_fds_mutex);
+        java_owned_fds.insert(socket_fd);
+        __android_log_print(ANDROID_LOG_DEBUG, "SRTLA-JNI",
+                          "Tracking Java-owned relay FD %d for %s->%s:%d '%s'",
+                          socket_fd, virtual_ip_str, relay_ip_str, relay_port,
+                          name_str ? name_str : "RELAY");
+    }
+
+    srtla_set_relay_socket(virtual_ip_str, relay_ip_str, relay_port, socket_fd,
+                           name_str ? name_str : "");
+
+    env->ReleaseStringUTFChars(virtual_ip, virtual_ip_str);
+    env->ReleaseStringUTFChars(relay_ip, relay_ip_str);
+    if (name_str) env->ReleaseStringUTFChars(name, name_str);
 }
 
 // Add a new JNI method to check if connected
