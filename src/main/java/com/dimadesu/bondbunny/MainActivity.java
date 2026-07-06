@@ -207,8 +207,10 @@ public class MainActivity extends Activity {
         // Save current form values when app is paused
         savePreferences();
         
-        // Stop Moblink when leaving the Activity (no background service)
-        NativeSrtlaService.getSharedEngine(this).stopMoblink();
+        // Leave the Moblink server running in the background so relays stay
+        // connected (and keep bonding while a stream is active). Android freezes
+        // the process when appropriate and resumes it on return to foreground.
+        // Moblink is only stopped when disabled or reconfigured (see refreshMoblink).
         srtlaStatsView.setRelays(null);
         NativeSrtlaService.getSharedEngine(this).removeListener(engineListener);
         

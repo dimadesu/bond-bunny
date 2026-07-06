@@ -94,6 +94,10 @@ class SrtlaEngine(private val context: Context) {
     private var srtlaHost: String = ""
     private var srtlaPort: Int = 0
 
+    /** Config the Moblink server is currently running with (for idempotent restarts). */
+    @Volatile private var moblinkPassword: String = ""
+    @Volatile private var moblinkPort: Int = 0
+
     /** True when the native SRTLA thread is running. */
     val isRunning: Boolean get() = NativeSrtlaJni.isRunningSrtlaNative()
 
@@ -128,15 +132,20 @@ class SrtlaEngine(private val context: Context) {
     /**
      * Start (or restart) the Moblink WebSocket server.
      *
-     * If called while already running, stops the old server first (matching Moblin's
+     * Idempotent: if the server is already running with the same password/port this is a no-op,
+     * so callers can safely invoke it on every `onResume` without churning relay connections.
+     * If the config differs, the old server is stopped first (matching Moblin's
      * `reloadMoblinkStreamer()` pattern for config changes).
      *
      * If SRTLA is already running, tunnels are activated immediately.
      */
     fun startMoblink(password: String, port: Int) {
-        val name = getDeviceName(context)
         val current = moblinkStreamer
         if (current != null) {
+            if (password == moblinkPassword && port == moblinkPort) {
+                Log.i(TAG, "Moblink server already running with same config — no-op")
+                return
+            }
             Log.i(TAG, "Restarting Moblink server with new config")
             current.stop()
             moblinkStreamer = null
@@ -144,6 +153,9 @@ class SrtlaEngine(private val context: Context) {
             publishRelays()
         }
 
+        val name = getDeviceName(context)
+        moblinkPassword = password
+        moblinkPort = port
         Log.i(TAG, "Starting Moblink server (port=$port, name='$name')")
         val streamer = MoblinkStreamer(context, name, password, port)
         streamer.start(makeMoblinkListener())
@@ -165,6 +177,8 @@ class SrtlaEngine(private val context: Context) {
         Log.i(TAG, "Stopping Moblink server")
         streamer.stop()
         moblinkStreamer = null
+        moblinkPassword = ""
+        moblinkPort = 0
         relayMap.clear()
         publishRelays()
     }

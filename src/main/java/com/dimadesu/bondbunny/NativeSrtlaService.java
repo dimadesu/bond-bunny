@@ -31,7 +31,7 @@ public class NativeSrtlaService extends Service {
     /** Shared SrtlaEngine singleton — used by both MainActivity and this service. */
     private static SrtlaEngine sharedEngine;
 
-    public static SrtlaEngine getSharedEngine(Context context) {
+    public static synchronized SrtlaEngine getSharedEngine(Context context) {
         if (sharedEngine == null) {
             sharedEngine = new SrtlaEngine(context.getApplicationContext());
         }
@@ -116,7 +116,8 @@ public class NativeSrtlaService extends Service {
     @Override
     public void onDestroy() {
         Log.i(TAG, "NativeSrtlaService onDestroy");
-        // Stop only SRTLA — Moblink is managed by MainActivity
+        // Stop only SRTLA — the Moblink server is owned by MainActivity and is
+        // left running so relays stay connected for the next stream.
         SrtlaEngine engine = getSharedEngine(this);
         engine.stopSrtla();
         engine.removeListener(serviceListener);
