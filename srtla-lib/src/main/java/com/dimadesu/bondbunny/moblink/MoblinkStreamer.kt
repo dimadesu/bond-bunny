@@ -198,6 +198,12 @@ class MoblinkStreamer(
                 Log.w(TAG, "Error stopping Moblink server", e)
             }
         }
+        // Report tunnel removal for every relay before dropping the listener, so the
+        // SRTLA layer unbonds the links (mirrors Moblin's MoblinkStreamer.stop() →
+        // relay.stop() → reportTunnelRemoved()). Idempotent if a close already fired.
+        for (session in sessions.values) {
+            session.reportTunnelRemoved()
+        }
         sessions.clear()
         listener = null
         destinationAddress = ""

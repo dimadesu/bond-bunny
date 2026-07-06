@@ -86,13 +86,13 @@ class SrtlaEngine(private val context: Context) {
     // State
     // -------------------------------------------------------------------------
 
-    private var sender: SrtlaSender? = null
-    private var moblinkStreamer: MoblinkStreamer? = null
+    @Volatile private var sender: SrtlaSender? = null
+    @Volatile private var moblinkStreamer: MoblinkStreamer? = null
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<Listener>()
 
     /** SRTLA receiver address — saved for Moblink tunnel activation. */
-    private var srtlaHost: String = ""
-    private var srtlaPort: Int = 0
+    @Volatile private var srtlaHost: String = ""
+    @Volatile private var srtlaPort: Int = 0
 
     /** Config the Moblink server is currently running with (for idempotent restarts). */
     @Volatile private var moblinkPassword: String = ""
@@ -101,7 +101,8 @@ class SrtlaEngine(private val context: Context) {
     /** True when the native SRTLA thread is running. */
     val isRunning: Boolean get() = NativeSrtlaJni.isRunningSrtlaNative()
 
-    /** Internal relay map keyed by relay ID. */
+    /** Internal relay map keyed by relay ID. Guarded by [relayLock]. */
+    private val relayLock = Any()
     private val relayMap = LinkedHashMap<String, RelayInfo>()
 
     /** Current snapshot of connected relays. Thread-safe read via copy-on-write. */
@@ -110,8 +111,11 @@ class SrtlaEngine(private val context: Context) {
         private set
 
     private fun publishRelays() {
-        val snapshot = relayMap.values.toList()
-        relays = snapshot
+        val snapshot = synchronized(relayLock) {
+            val s = relayMap.values.toList()
+            relays = s
+            s
+        }
         listeners.forEach { it.onRelaysChanged(snapshot) }
     }
 
@@ -149,7 +153,7 @@ class SrtlaEngine(private val context: Context) {
             Log.i(TAG, "Restarting Moblink server with new config")
             current.stop()
             moblinkStreamer = null
-            relayMap.clear()
+            synchronized(relayLock) { relayMap.clear() }
             publishRelays()
         }
 
@@ -175,11 +179,13 @@ class SrtlaEngine(private val context: Context) {
     fun stopMoblink() {
         val streamer = moblinkStreamer ?: return
         Log.i(TAG, "Stopping Moblink server")
+        // streamer.stop() reports tunnel removal for every relay, which unbonds the
+        // links from the SRTLA sender via onRelayTunnelClosed (matches Moblin).
         streamer.stop()
         moblinkStreamer = null
         moblinkPassword = ""
         moblinkPort = 0
-        relayMap.clear()
+        synchronized(relayLock) { relayMap.clear() }
         publishRelays()
     }
 
@@ -270,33 +276,42 @@ class SrtlaEngine(private val context: Context) {
 
         override fun onRelayConnected(relayId: String, name: String) {
             Log.i(TAG, "Moblink relay connected: '$name'")
-            relayMap[relayId] = RelayInfo(relayId, name, null, null, tunnelActive = false)
+            synchronized(relayLock) {
+                relayMap[relayId] = RelayInfo(relayId, name, null, null, tunnelActive = false)
+            }
             publishRelays()
         }
 
         override fun onRelayDisconnected(relayId: String) {
             Log.i(TAG, "Moblink relay disconnected: $relayId")
-            relayMap.remove(relayId)
+            synchronized(relayLock) { relayMap.remove(relayId) }
             publishRelays()
         }
 
         override fun onRelayTunnelReady(relayId: String, name: String, host: String, port: Int) {
             Log.i(TAG, "Moblink relay tunnel ready: '$name' @ $host:$port")
             sender?.addMoblinkRelay(relayId, name, host, port)
-            val existing = relayMap[relayId]
-            relayMap[relayId] = (existing ?: RelayInfo(relayId, name, null, null, false))
-                .copy(tunnelActive = true)
+            synchronized(relayLock) {
+                val existing = relayMap[relayId]
+                relayMap[relayId] = (existing ?: RelayInfo(relayId, name, null, null, false))
+                    .copy(tunnelActive = true)
+            }
             publishRelays()
         }
 
         override fun onRelayTunnelClosed(relayId: String, host: String, port: Int) {
             Log.i(TAG, "Moblink relay tunnel closed: $relayId @ $host:$port")
             sender?.removeMoblinkRelay(relayId)
-            val existing = relayMap[relayId]
-            if (existing != null) {
-                relayMap[relayId] = existing.copy(tunnelActive = false)
-                publishRelays()
+            val changed = synchronized(relayLock) {
+                val existing = relayMap[relayId]
+                if (existing != null) {
+                    relayMap[relayId] = existing.copy(tunnelActive = false)
+                    true
+                } else {
+                    false
+                }
             }
+            if (changed) publishRelays()
         }
 
         override fun onRelayStatus(
@@ -305,9 +320,11 @@ class SrtlaEngine(private val context: Context) {
             batteryPercentage: Int?,
             thermalState: ThermalState?,
         ) {
-            val existing = relayMap[relayId]
-            relayMap[relayId] = (existing ?: RelayInfo(relayId, name, null, null, false))
-                .copy(battery = batteryPercentage, thermal = thermalState)
+            synchronized(relayLock) {
+                val existing = relayMap[relayId]
+                relayMap[relayId] = (existing ?: RelayInfo(relayId, name, null, null, false))
+                    .copy(battery = batteryPercentage, thermal = thermalState)
+            }
             publishRelays()
         }
 
