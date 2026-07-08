@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -24,6 +25,9 @@ public class NativeSrtlaService extends Service {
     private static final String TAG = "NativeSrtlaService";
     private static final int NOTIFICATION_ID = 1; // Same as startup notification - will update it
     public static final String CHANNEL_ID = "SRTLA_SERVICE_CHANNEL";
+
+    /** Notification action that lets the user stop the service directly. */
+    public static final String ACTION_STOP = "com.dimadesu.bondbunny.action.STOP";
 
     // Service state
     private static boolean isServiceRunning = false;
@@ -64,6 +68,13 @@ public class NativeSrtlaService extends Service {
         Log.i(TAG, "NativeSrtlaService onStartCommand");
 
         if (intent != null) {
+            // Handle the user tapping "Stop" on the foreground-service notification.
+            if (ACTION_STOP.equals(intent.getAction())) {
+                Log.i(TAG, "Stop requested by user from notification");
+                stopSelf();
+                return START_NOT_STICKY;
+            }
+
             String srtlaHost = intent.getStringExtra("srtla_host");
             String srtlaPort = intent.getStringExtra("srtla_port");
             String listenPort = intent.getStringExtra("listen_port");
@@ -74,8 +85,15 @@ public class NativeSrtlaService extends Service {
                 return START_NOT_STICKY;
             }
 
-            // Start foreground service
-            startForeground(NOTIFICATION_ID, createNotification("Starting native SRTLA..."));
+            // Start foreground service with the data-sync type (API 29+ requires the
+            // explicit type; the manifest declares it for all supported versions).
+            Notification startupNotification = createNotification("Starting native SRTLA...");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, startupNotification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(NOTIFICATION_ID, startupNotification);
+            }
 
             // Start native SRTLA in background thread
             final String host = srtlaHost;
@@ -111,6 +129,18 @@ public class NativeSrtlaService extends Service {
         }
 
         return START_STICKY; // Restart if killed by system
+    }
+
+    /**
+     * Called by the system (Android 15+) when a data-sync foreground service exceeds its
+     * allowed runtime budget. We must stop promptly; inform the user why the stream ended.
+     */
+    @Override
+    public void onTimeout(int startId, int fgsType) {
+        Log.w(TAG, "Foreground service timed out (data-sync time budget exhausted) — stopping");
+        updateNotification("Stopped: Android reached its background time limit. Tap Start to resume.");
+        broadcastError("Streaming stopped: Android's background time limit was reached. Tap Start to resume.");
+        stopSelf();
     }
 
     @Override
@@ -177,15 +207,26 @@ public class NativeSrtlaService extends Service {
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Bond Bunny")
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(ongoing)
             .setAutoCancel(autoCancel)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build();
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+
+        // While the service is running, let the user stop it directly from the notification.
+        if (ongoing) {
+            Intent stopIntent = new Intent(this, NativeSrtlaService.class).setAction(ACTION_STOP);
+            PendingIntent stopPendingIntent = PendingIntent.getService(
+                this, 1, stopIntent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+            );
+            builder.addAction(R.drawable.ic_notification, "Stop service", stopPendingIntent);
+        }
+
+        return builder.build();
     }
 
     private void updateNotification(String contentText) {

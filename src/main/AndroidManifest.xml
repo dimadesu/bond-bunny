@@ -6,7 +6,7 @@
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
   <uses-permission android:name="android.permission.WAKE_LOCK" />
   <!-- Required on Android 13+ to post notifications (foreground service notification) -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -45,6 +45,6 @@
       android:name=".NativeSrtlaService"
       android:enabled="true"
       android:exported="false"
-      android:foregroundServiceType="connectedDevice" />
+      android:foregroundServiceType="dataSync" />
   </application>
 </manifest>
