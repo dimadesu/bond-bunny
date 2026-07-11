@@ -80,6 +80,15 @@ public class SrtlaSender {
 
     private static final String RELAY_IP_PREFIX = "10.0.100.";
 
+    // Sticky owner: the Network currently backing each virtual IP. Prevents thrashing the
+    // socket between duplicate/stale networks of the same transport type (e.g. a lingering
+    // old cellular PDP appearing alongside the live one).
+    private final Map<String, Network> ownerNetworkByVirtualIp = new ConcurrentHashMap<>();
+
+    // Placeholder IP returned when Samsung blocks bindSocket on a DatagramSocket (EPERM).
+    // A network reporting this hasn't given us a real IP and is treated as lower priority.
+    private static final String PLACEHOLDER_CELLULAR_IP = "10.64.64.64";
+
     public SrtlaSender(Context context) {
         this.context = context.getApplicationContext();
         this.connectivityManager =
@@ -107,6 +116,7 @@ public class SrtlaSender {
         firstConnectionLatch = new CountDownLatch(1);
         virtualConnections.clear();
         networkState.clear();
+        ownerNetworkByVirtualIp.clear();
         relayIdToVirtualIp.clear();
         usedRelaySlots.clear();
 
@@ -375,9 +385,6 @@ public class SrtlaSender {
     private synchronized void handleDedicatedNetworkAvailable(Network network, String networkType, String operatorName) {
         try {
             Log.i(TAG, "DEDICATED: Handling " + networkType + " network: " + network);
-            if ("WIFI".equals(networkType)) {
-                wifiNetwork = network;
-            }
             String realIP = getNetworkIP(network);
             Log.i(TAG, "DEDICATED: Real IP for " + networkType + ": " + (realIP != null ? realIP : "NULL"));
 
@@ -388,13 +395,39 @@ public class SrtlaSender {
                 Log.i(TAG, "DEDICATED: Virtual IP: " + virtualIP + ", already registered: " + virtualConnections.containsKey(virtualIP));
 
                 if (virtualIP != null) {
+                    // Sticky owner: one Network owns each virtual IP. Android can briefly expose
+                    // two networks of the same transport (e.g. a lingering old cellular PDP next
+                    // to the live one), and both map to the same virtual IP. Without this guard we
+                    // thrash the socket between them, so the native SRTLA link never stays up.
+                    Network owner = ownerNetworkByVirtualIp.get(virtualIP);
+                    if (virtualConnections.containsKey(virtualIP) && owner != null && !owner.equals(network)) {
+                        // Owner is only "still valid" if it still exists AND still carries internet.
+                        // A network that dropped INTERNET but lingers must not block a better newcomer.
+                        NetworkCapabilities ownerCaps = connectivityManager.getNetworkCapabilities(owner);
+                        boolean ownerStillValid = ownerCaps != null
+                                && ownerCaps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+                        boolean ownerIsPlaceholder =
+                                PLACEHOLDER_CELLULAR_IP.equals(networkState.get(networkType + ":" + owner.toString()));
+                        boolean incomingIsPlaceholder = PLACEHOLDER_CELLULAR_IP.equals(realIP);
+                        // Keep the current owner unless it's gone, or it's a placeholder (never
+                        // got a real IP) while the newcomer has a real one.
+                        if (ownerStillValid && !(ownerIsPlaceholder && !incomingIsPlaceholder)) {
+                            Log.i(TAG, "DEDICATED: Ignoring duplicate/stale " + networkType + " network " + network
+                                    + "; owner " + owner + " still active for " + virtualIP);
+                            return;
+                        }
+                        Log.i(TAG, "DEDICATED: Replacing " + networkType + " owner " + owner + " with " + network
+                                + " for " + virtualIP + " (owner gone or placeholder)");
+                    }
+
                     // Track network state to prevent duplicate creations
                     String stateKey = networkType + ":" + network.toString();
                     String previousState = networkState.get(stateKey);
                     String currentState = realIP;
 
-                    // Skip if this exact network+IP combination already exists
-                    if (currentState.equals(previousState) && virtualConnections.containsKey(virtualIP)) {
+                    // Skip if this exact owning network + IP is already set up
+                    if (currentState.equals(previousState) && network.equals(owner)
+                            && virtualConnections.containsKey(virtualIP)) {
                         Log.d(TAG, "DEDICATED: Socket already exists for " + networkType + " with same IP, skipping");
                         return;
                     }
@@ -412,7 +445,13 @@ public class SrtlaSender {
                     if (socket >= 0) {
                         // Success — now it's safe to replace the previous socket (if any).
                         virtualConnections.put(virtualIP, socket);
+                        // Record all state only after a successful bind, so a failed rebind
+                        // leaves the previous owner/state untouched (see the else branch below).
                         networkState.put(stateKey, currentState);
+                        ownerNetworkByVirtualIp.put(virtualIP, network);
+                        if ("WIFI".equals(networkType)) {
+                            wifiNetwork = network;
+                        }
                         NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
                         Log.i(TAG, "DEDICATED: Successfully setup " + networkType + " connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
 
@@ -448,7 +487,15 @@ public class SrtlaSender {
         try {
             String virtualIP = getVirtualIPForNetworkType(networkType);
 
-            if ("WIFI".equals(networkType)) {
+            // Only act if the lost network actually owns this virtual IP. A stale/duplicate
+            // network of the same transport being lost must NOT tear down the active socket.
+            Network owner = (virtualIP != null) ? ownerNetworkByVirtualIp.get(virtualIP) : null;
+            if (owner != null && !owner.equals(network)) {
+                Log.i(TAG, "DEDICATED: Ignoring loss of non-owner " + networkType + " network " + network);
+                return;
+            }
+
+            if ("WIFI".equals(networkType) && network.equals(wifiNetwork)) {
                 wifiNetwork = null;
             }
 
@@ -456,6 +503,7 @@ public class SrtlaSender {
                 Log.i(TAG, "DEDICATED: Removing " + networkType + " connection: " + virtualIP);
                 // Note: Don't close socket here - native code owns it
                 virtualConnections.remove(virtualIP);
+                ownerNetworkByVirtualIp.remove(virtualIP);
 
                 // Clean up network state tracking
                 String stateKey = networkType + ":" + network.toString();
@@ -702,6 +750,7 @@ public class SrtlaSender {
 
         virtualConnections.clear();
         networkState.clear();
+        ownerNetworkByVirtualIp.clear();
         relayIdToVirtualIp.clear();
         usedRelaySlots.clear();
         wifiNetwork = null;
