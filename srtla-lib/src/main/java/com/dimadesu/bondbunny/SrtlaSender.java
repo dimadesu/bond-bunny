@@ -399,17 +399,20 @@ public class SrtlaSender {
                         return;
                     }
 
-                    // If already registered, remove old socket first (network may have changed)
-                    if (virtualConnections.containsKey(virtualIP)) {
+                    boolean isReplacement = virtualConnections.containsKey(virtualIP);
+                    if (isReplacement) {
                         Log.i(TAG, "DEDICATED: Re-creating socket for " + networkType + " (network reconnected/changed)");
-                        virtualConnections.remove(virtualIP);
                     }
 
+                    // Create the new socket BEFORE dropping any existing one. On Samsung a bind can
+                    // fail with EPERM (e.g. a transient non-internet cellular network); if we had
+                    // already removed the working socket we'd be left with no connection at all.
                     Log.i(TAG, "DEDICATED: Creating socket for " + networkType + " network: " + virtualIP + " -> " + realIP);
-                    networkState.put(stateKey, currentState);
                     int socket = createNetworkSocket(network);
                     if (socket >= 0) {
+                        // Success — now it's safe to replace the previous socket (if any).
                         virtualConnections.put(virtualIP, socket);
+                        networkState.put(stateKey, currentState);
                         NativeSrtlaJni.setNetworkSocket(virtualIP, realIP, networkTypeId, socket);
                         Log.i(TAG, "DEDICATED: Successfully setup " + networkType + " connection: " + virtualIP + " -> " + realIP + " (socket: " + socket + ")");
 
@@ -427,7 +430,9 @@ public class SrtlaSender {
                             }
                         }
                     } else {
-                        Log.e(TAG, "DEDICATED: Failed to create socket for " + networkType + " (returned " + socket + ")");
+                        // Keep any existing working socket in place rather than dropping it.
+                        Log.e(TAG, "DEDICATED: Failed to create socket for " + networkType + " (returned " + socket + ")"
+                                + (isReplacement ? " — keeping existing socket" : ""));
                     }
                 }
             }
