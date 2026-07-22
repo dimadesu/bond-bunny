@@ -196,7 +196,7 @@ public class SrtlaSender {
         // Acquire Wi-Fi lock to maintain high-performance Wi-Fi
         WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         if (wifiManager != null) {
-            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "SRTLA::WifiLock");
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "SRTLA::WifiLock");
             wifiLock.acquire();
             Log.i(TAG, "Wi-Fi lock acquired");
         }
