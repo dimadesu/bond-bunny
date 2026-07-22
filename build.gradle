@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'com.dimadesu.bondbunny'
+    namespace = 'com.dimadesu.bondbunny'
     compileSdk 35
 
     defaultConfig {
@@ -38,7 +38,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
     }
     
@@ -63,7 +63,7 @@ android {
     }
 
     // Enable NDK (needed for ndk.abiFilters in defaultConfig)
-    ndkVersion "25.1.8937393"
+    ndkVersion = "25.1.8937393"
 }
 
 dependencies {

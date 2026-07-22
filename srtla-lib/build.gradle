@@ -7,7 +7,7 @@ plugins {
 group = 'com.dimadesu.bondbunny'
 
 android {
-    namespace 'com.dimadesu.bondbunny.srtlalib'
+    namespace = 'com.dimadesu.bondbunny.srtlalib'
     compileSdk 35
 
     defaultConfig {
@@ -38,12 +38,12 @@ android {
         }
     }
 
-    ndkVersion "25.1.8937393"
+    ndkVersion = "25.1.8937393"
 
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
-            version "3.22.1"
+            version = "3.22.1"
         }
     }
 }
