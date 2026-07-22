@@ -54,7 +54,7 @@ public class MainActivity extends Activity {
     private Button buttonNativeSrtla;
     private Switch switchAutoStart;
     private boolean serviceRunning = false;
-    private android.os.Handler uiHandler = new android.os.Handler();
+    private android.os.Handler uiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     
     // Debounce mechanism for start/stop button
     private long lastToggleTime = 0;
