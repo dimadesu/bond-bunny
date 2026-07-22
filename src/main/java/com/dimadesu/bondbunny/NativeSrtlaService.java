@@ -13,7 +13,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.net.InetAddress;
 
@@ -250,7 +249,8 @@ public class NativeSrtlaService extends Service {
     private void broadcastError(String errorMessage) {
         Intent intent = new Intent("srtla-error");
         intent.putExtra("error_message", errorMessage);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+        intent.setPackage(getPackageName());
+        sendBroadcast(intent);
     }
 
     private void handleStartupError(String errorMessage) {

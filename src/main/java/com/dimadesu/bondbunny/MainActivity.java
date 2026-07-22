@@ -32,7 +32,7 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.content.Context;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.core.content.ContextCompat;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_CODE_POST_NOTIFICATIONS = 1001;
@@ -179,8 +179,8 @@ public class MainActivity extends Activity {
         super.onResume();
         
         // Register error receiver
-        LocalBroadcastManager.getInstance(this).registerReceiver(errorReceiver, 
-            new IntentFilter("srtla-error"));
+        ContextCompat.registerReceiver(this, errorReceiver,
+            new IntentFilter("srtla-error"), ContextCompat.RECEIVER_NOT_EXPORTED);
         
         // Register engine listener for UI updates
         NativeSrtlaService.getSharedEngine(this).addListener(engineListener);
@@ -217,7 +217,7 @@ public class MainActivity extends Activity {
         // Unregister error receiver
         try {
             if (errorReceiver != null) {
-                LocalBroadcastManager.getInstance(this).unregisterReceiver(errorReceiver);
+                unregisterReceiver(errorReceiver);
                 Log.i("MainActivity", "Unregistered error receiver");
             }
         } catch (IllegalArgumentException e) {
