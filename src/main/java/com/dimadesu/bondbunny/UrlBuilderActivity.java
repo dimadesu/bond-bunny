@@ -33,7 +33,7 @@ public class UrlBuilderActivity extends Activity {
     private EditText editStreamId;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
-    private android.os.Handler updateHandler = new android.os.Handler();
+    private android.os.Handler updateHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable updateRunnable;
 
     @Override

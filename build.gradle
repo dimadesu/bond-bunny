@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace 'com.dimadesu.bondbunny'
+    namespace = 'com.dimadesu.bondbunny'
     compileSdk 35
 
     defaultConfig {
@@ -38,7 +38,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
     }
     
@@ -52,8 +52,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     packaging {
@@ -63,13 +63,12 @@ android {
     }
 
     // Enable NDK (needed for ndk.abiFilters in defaultConfig)
-    ndkVersion "25.1.8937393"
+    ndkVersion = "25.1.8937393"
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.10.0'
-    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
     implementation project(':srtla-lib')
 }
 

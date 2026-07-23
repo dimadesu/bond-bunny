@@ -112,15 +112,6 @@ public class SrtlaSender {
 
         setupDedicatedNetworkCallbacks();
 
-        // Ensure sockets exist (callbacks may not fire again if networks already connected)
-        // Only recreate if we have no sockets yet
-        if (virtualConnections.isEmpty()) {
-            Log.i(TAG, "No sockets detected, manually recreating for existing networks");
-            recreateNetworkSockets();
-        } else {
-            Log.i(TAG, "Sockets already exist (" + virtualConnections.size() + "), skipping recreation");
-        }
-
         // Wait for at least one network to be detected by dedicated callbacks
         if (listener != null) listener.onStatus("Waiting for network connections...");
         waitForNetworkConnections();
@@ -196,7 +187,7 @@ public class SrtlaSender {
         // Acquire Wi-Fi lock to maintain high-performance Wi-Fi
         WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
         if (wifiManager != null) {
-            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "SRTLA::WifiLock");
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "SRTLA::WifiLock");
             wifiLock.acquire();
             Log.i(TAG, "Wi-Fi lock acquired");
         }
@@ -325,48 +316,6 @@ public class SrtlaSender {
         }
 
         return callback;
-    }
-
-    /**
-     * Manually recreate sockets for all currently available networks
-     * This is needed when service restarts but callbacks don't fire (networks already connected)
-     */
-    private void recreateNetworkSockets() {
-        Log.i(TAG, "Recreating network sockets for currently available networks");
-        if (connectivityManager == null) {
-            Log.e(TAG, "ConnectivityManager not available");
-            return;
-        }
-
-        // Get all currently active networks
-        Network[] networks = connectivityManager.getAllNetworks();
-        for (Network network : networks) {
-            NetworkCapabilities caps = connectivityManager.getNetworkCapabilities(network);
-            if (caps == null) continue;
-
-            // Skip VPN networks
-            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) continue;
-
-            // Skip networks without general internet access. Samsung devices expose several
-            // concurrent CELLULAR networks (e.g. IMS/VoLTE, DUN/tethering) that share the same
-            // transport but cannot carry our traffic and fail to bind with EPERM. Because they
-            // all map to the single cellular virtual IP, processing them would tear down the
-            // working internet socket. The dedicated callbacks already require this capability
-            // (see registerNetworkCallback); mirror that filter here.
-            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue;
-
-            // Check each transport type and recreate socket
-            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                Log.i(TAG, "Found existing CELLULAR network, recreating socket");
-                handleDedicatedNetworkAvailable(network, "CELLULAR", "");
-            } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                Log.i(TAG, "Found existing WIFI network, recreating socket");
-                handleDedicatedNetworkAvailable(network, "WIFI", "");
-            } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                Log.i(TAG, "Found existing ETHERNET network, recreating socket");
-                handleDedicatedNetworkAvailable(network, "ETHERNET", "");
-            }
-        }
     }
 
     /**
