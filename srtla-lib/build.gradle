@@ -8,7 +8,7 @@ group = 'com.dimadesu.bondbunny'
 
 android {
     namespace = 'com.dimadesu.bondbunny.srtlalib'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         minSdk 24
@@ -38,7 +38,7 @@ android {
         }
     }
 
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "29.0.14206865"
 
     externalNativeBuild {
         cmake {
@@ -49,8 +49,8 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'com.google.android.material:material:1.12.0'
 
     // Moblink streamer: WebSocket server + JSON protocol
     implementation 'org.java-websocket:Java-WebSocket:1.5.7'

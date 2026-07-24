@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace = 'com.dimadesu.bondbunny'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.dimadesu.bondbunny"
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode 13
         versionName "1.14.2"
         
@@ -63,12 +63,12 @@ android {
     }
 
     // Enable NDK (needed for ndk.abiFilters in defaultConfig)
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "29.0.14206865"
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'com.google.android.material:material:1.12.0'
     implementation project(':srtla-lib')
 }
 
