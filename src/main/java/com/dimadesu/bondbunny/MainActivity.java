@@ -526,6 +526,13 @@ public class MainActivity extends Activity {
         boolean isRunning = NativeSrtlaService.isServiceRunning();
         // Log.i("MainActivity", "updateNativeSrtlaUI: isRunning=" + isRunning);
         
+        // Sync local serviceRunning field and update status text when state
+        // changes externally (e.g. service stopped from the notification action).
+        if (serviceRunning != isRunning) {
+            serviceRunning = isRunning;
+            updateUI();
+        }
+        
         if (isRunning) {
             buttonNativeSrtla.setText("Stop Service");
             buttonNativeSrtla.setBackgroundColor(0xFFD32F2F); // Proper red color
