@@ -151,24 +151,6 @@ public class NativeSrtlaService extends Service {
         engine.stopSrtla();
         engine.removeListener(serviceListener);
 
-        // Wait a moment for the native process to actually stop
-        new Thread(() -> {
-            try {
-                Thread.sleep(1000); // Wait 1 second
-
-                // Check if native process actually stopped
-                if (!NativeSrtlaJni.isRunningSrtlaNative()) {
-                    Log.i(TAG, "Native SRTLA process confirmed stopped");
-                    // Post a dismissible notification when service stops
-                    postStoppedNotification("Service stopped");
-                } else {
-                    Log.w(TAG, "Native SRTLA process still running after stop signal");
-                }
-            } catch (InterruptedException e) {
-                Log.w(TAG, "Stop monitoring interrupted", e);
-            }
-        }).start();
-
         isServiceRunning = false;
         super.onDestroy();
     }
@@ -232,14 +214,6 @@ public class NativeSrtlaService extends Service {
         NotificationManager notificationManager =
             (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, createNotification(contentText));
-    }
-
-    private void postStoppedNotification(String contentText) {
-        // Create a dismissible notification when service stops
-        // Using same notification ID updates the existing notification in place
-        NotificationManager notificationManager =
-            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.notify(NOTIFICATION_ID, createNotification(contentText, false, true));
     }
 
     // -------------------------------------------------------------------------
