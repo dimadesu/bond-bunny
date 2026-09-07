@@ -52,6 +52,7 @@ public class SrtlaSender {
     private ConnectivityManager.NetworkCallback cellularCallback;
     private ConnectivityManager.NetworkCallback wifiCallback;
     private ConnectivityManager.NetworkCallback ethernetCallback;
+    private ConnectivityManager.NetworkCallback usbCallback;
 
     // Virtual connection tracking
     private Map<String, Integer> virtualConnections = new ConcurrentHashMap<>();
@@ -228,6 +229,10 @@ public class SrtlaSender {
         wifiCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_WIFI, "WIFI");
         ethernetCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_ETHERNET, "ETHERNET");
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            usbCallback = registerNetworkCallback(NetworkCapabilities.TRANSPORT_USB, "USB");
+        }
+
         Log.i(TAG, "Dedicated network callbacks setup complete");
     }
 
@@ -249,6 +254,10 @@ public class SrtlaSender {
                     connectivityManager.unregisterNetworkCallback(ethernetCallback);
                     Log.i(TAG, "Unregistered dedicated ethernet callback");
                 }
+                if (usbCallback != null) {
+                    connectivityManager.unregisterNetworkCallback(usbCallback);
+                    Log.i(TAG, "Unregistered dedicated USB callback");
+                }
             } catch (Exception e) {
                 Log.w(TAG, "Error unregistering dedicated network callbacks", e);
             }
@@ -256,6 +265,7 @@ public class SrtlaSender {
             cellularCallback = null;
             wifiCallback = null;
             ethernetCallback = null;
+            usbCallback = null;
         }
     }
 
@@ -740,6 +750,8 @@ public class SrtlaSender {
                 return "10.0.2.1";
             case "ETHERNET":
                 return "10.0.3.1";
+            case "USB":
+                return "10.0.4.1";
             default:
                 return null;
         }
@@ -756,6 +768,8 @@ public class SrtlaSender {
                 return 2;
             case "ETHERNET":
                 return 3;
+            case "USB":
+                return 4;
             default:
                 return 0;
         }
