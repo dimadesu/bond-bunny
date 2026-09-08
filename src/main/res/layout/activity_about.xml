@@ -22,7 +22,7 @@
     <TextView
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:text="The purpose of this app is to use multiple connections of this device, such as cellular, Wi-Fi, and Ethernet, at the same time to send SRT data packets in parallel to the SRTLA server, a process also known as bonding."
+      android:text="The purpose of this app is to use multiple connections of this device, such as cellular, Wi-Fi, Ethernet, and USB tethering, at the same time to send SRT data packets in parallel to the SRTLA server, a process also known as bonding."
       android:textSize="16sp"
       android:layout_marginBottom="8dp" />
 

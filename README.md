@@ -2,7 +2,7 @@
 
 [<img src="docs/google-play-store.svg">](https://play.google.com/store/apps/details?id=com.dimadesu.bondbunny)
 
-Android app that allows listening on a local port for an incoming SRT stream and forwarding SRT packets via multiple connections, such as cellular, Wi-Fi and Ethernet, to a remote SRTLA server like [Belabox Cloud](https://belabox.net/). This process is also known as SRTLA connection bonding.
+Android app that allows listening on a local port for an incoming SRT stream and forwarding SRT packets via multiple connections, such as cellular, Wi-Fi, Ethernet, and USB tethering, to a remote SRTLA server like [Belabox Cloud](https://belabox.net/). This process is also known as SRTLA connection bonding.
 
 It is compatible with any apps that can stream SRT and essentially extends them with SRTLA bonding on the same device.
 
