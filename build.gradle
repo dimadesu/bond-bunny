@@ -1,5 +1,5 @@
 plugins {
-    id 'com.android.application' version '8.12.2'
+    id 'com.android.application' version '9.2.1'
 }
 
 android {
@@ -41,15 +41,6 @@ android {
             signingConfig = signingConfigs.release
         }
     }
-    
-    // Custom APK output names
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            def versionName = variant.versionName
-            def buildType = variant.buildType.name
-            outputFileName = "Bond-Bunny-v${versionName}-${buildType}.apk"
-        }
-    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -78,8 +69,22 @@ dependencies {
     implementation project(':srtla-lib')
 }
 
-// Custom AAB output names - create copy so Android Studio can still locate original
+// Custom APK and AAB output names - create copy so Android Studio can still locate original
 afterEvaluate {
+    tasks.named("assembleRelease").configure {
+        doLast {
+            def originalApk = file("${layout.buildDirectory.get()}/outputs/apk/release/Bond Bunny-release.apk")
+            if (!originalApk.exists()) {
+                originalApk = file("${layout.buildDirectory.get()}/outputs/apk/release/bond-bunny-release.apk")
+            }
+            if (originalApk.exists()) {
+                def newName = "Bond-Bunny-v${android.defaultConfig.versionName}-release.apk"
+                def newFile = new File(originalApk.parent, newName)
+                java.nio.file.Files.copy(originalApk.toPath(), newFile.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
     tasks.named("bundleRelease").configure {
         doLast {
             def originalBundle = file("${projectDir}/release/Bond Bunny-release.aab")
